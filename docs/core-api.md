@@ -190,17 +190,21 @@ stl2stp-cli convert in.stl out.step --timestamp '2024-02-29T18:52:00.123+08:00'
 `STL2STP_ERROR_ARGUMENT`；本接口不提供空日期 opt-out。
 
 覆盖值接受如下明确的 ISO 8601 extended calendar-date 子集：
-`YYYY-MM-DDTHH:MM:SS[.fraction](Z|+HH:MM|-HH:MM)`；四位年份 0001–9999，
+`YYYY-MM-DDTHH:MM:SS[.fraction][Z|+HH:MM|-HH:MM]`；四位年份 0001–9999，
 Gregorian 日历（含世纪闰年规则），小时 00–23、分/秒 00–59，offset 小时 00–23、
-分钟 00–59，小数若存在必须为一个或多个 ASCII 数字。必须大写 `T`/`Z`、必须含秒和
-时区，不接受 basic/week/ordinal date、24:00、闰秒 60、逗号小数或前后空白。
+分钟 00–59，小数若存在必须为一个或多个 ASCII 数字。必须大写 `T`/`Z`、必须含秒，
+可省略时区（视为 UTC），不接受 basic/week/ordinal date、24:00、闰秒 60、逗号小数或前后空白，
+也不接受 `+0800` 这种无冒号 offset。
 非 NULL 覆盖值在 STEP 中逐字保留，包括小数位和原 offset；非法语法/日期不发布目标文件。
 CLI `--timestamp ISO8601` 使用同一校验，缺值/重复 flag 无效。
 
-IGES 5.3 的日期数据没有 timezone / fractional-second 槽位。本库取 ISO 值的
-**墙钟年月日时分秒**，不改变 offset 所代表的墙钟时间，不做 UTC 归一化，舍去小数秒和
-时区，写成 `15HYYYYMMDD.HHNNSS`，例如上述覆盖值产生 `15H20240229.185200`。
-默认值取 UTC 墙钟时间，两个日期字段使用同一次采样。
+IGES 5.3 的日期数据没有 timezone / fractional-second 槽位。本库将覆盖值按 offset
+**转换为 UTC**，`Z` 或无 offset 的值已视为 UTC。使用纯 Gregorian 日历算术处理
+跨日、跨月、跨年及闰年，不依赖本地时区、环境变量或 `timegm`。小数秒直接截断，不四舍五入，
+写成 `15HYYYYMMDD.HHNNSS`；例如 `2026-10-20T18:52:00+08:00` 产生
+`15H20261020.105200`，`2024-02-29T18:52:00.123+08:00` 产生 `15H20240229.105200`。
+若 UTC 转换超出四位年份 0001–9999，则返回 `STL2STP_ERROR_ARGUMENT`（STEP/IGES 均适用）。
+STEP 仍逐字保留原字符串，不改写 offset 或小数秒。默认值取 UTC，两个 IGES 日期字段使用同一次采样。
 参数 18 是生成本 IGES 文件的日期；参数 25 是所传模型创建/最后修改的日期，
 **不是文件系统 mtime**。STL 输入没有独立模型修改时间来源，所以新建导出模型的
 两个字段使用相同值；覆盖值也同时控制两者，不推测输入文件 mtime。

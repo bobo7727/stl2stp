@@ -86,38 +86,66 @@ Timestamp timestamp_value(const char* supplied) {
         }
         return true;
     };
-    if (iso.size() < 20 || iso[4] != '-' || iso[7] != '-' || iso[10] != 'T' || iso[13] != ':' ||
+    if (iso.size() < 19 || iso[4] != '-' || iso[7] != '-' || iso[10] != 'T' || iso[13] != ':' ||
         iso[16] != ':' || !digits(0, 4) || !digits(5, 2) || !digits(8, 2) ||
         !digits(11, 2) || !digits(14, 2) || !digits(17, 2)) {
-        throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp must be an ISO 8601 extended date-time with timezone");
+        throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp must be an ISO 8601 extended date-time");
     }
     std::size_t zone_begin = 19;
-    if (iso[zone_begin] == '.') {
+    if (zone_begin < iso.size() && iso[zone_begin] == '.') {
         const auto fraction_begin = ++zone_begin;
         while (zone_begin < iso.size() && digits(zone_begin, 1)) { ++zone_begin; }
         if (zone_begin == fraction_begin) { throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp fraction is empty"); }
     }
     const std::string zone = iso.substr(zone_begin);
-    if (zone != "Z" && (zone.size() != 6 || (zone[0] != '+' && zone[0] != '-') || zone[3] != ':' ||
+    if (!zone.empty() && zone != "Z" && (zone.size() != 6 || (zone[0] != '+' && zone[0] != '-') || zone[3] != ':' ||
                        !digits(zone_begin + 1, 2) || !digits(zone_begin + 4, 2))) {
         throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp timezone must be Z or +/-HH:MM");
     }
-    const int year = std::stoi(iso.substr(0, 4));
-    const int month = std::stoi(iso.substr(5, 2));
-    const int day = std::stoi(iso.substr(8, 2));
+    int year = std::stoi(iso.substr(0, 4));
+    int month = std::stoi(iso.substr(5, 2));
+    int day = std::stoi(iso.substr(8, 2));
     const int hour = std::stoi(iso.substr(11, 2));
     const int minute = std::stoi(iso.substr(14, 2));
     const int second = std::stoi(iso.substr(17, 2));
     const std::array<int, 12> days{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    const bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    auto month_days = [&](int calendar_year, int calendar_month) {
+        const bool leap = calendar_year % 4 == 0 && (calendar_year % 100 != 0 || calendar_year % 400 == 0);
+        return days[calendar_month - 1] + (calendar_month == 2 && leap ? 1 : 0);
+    };
+    const bool has_offset = !zone.empty() && zone != "Z";
+    const int offset_hour = has_offset ? std::stoi(zone.substr(1, 2)) : 0;
+    const int offset_minute = has_offset ? std::stoi(zone.substr(4, 2)) : 0;
     if (year == 0 || month < 1 || month > 12 || day < 1 ||
-        day > days[month - 1] + (month == 2 && leap ? 1 : 0) ||
+        day > month_days(year, month) ||
         hour > 23 || minute > 59 || second > 59 ||
-        (zone != "Z" && (std::stoi(zone.substr(1, 2)) > 23 || std::stoi(zone.substr(4, 2)) > 59))) {
+        offset_hour > 23 || offset_minute > 59) {
         throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp has an invalid calendar date, time or offset");
     }
-    return {iso, iso.substr(0, 4) + iso.substr(5, 2) + iso.substr(8, 2) + "." +
-                 iso.substr(11, 2) + iso.substr(14, 2) + iso.substr(17, 2)};
+    const int offset = (has_offset && zone[0] == '-' ? -1 : 1) * (offset_hour * 60 + offset_minute);
+    int utc_minutes = hour * 60 + minute - offset;
+    if (utc_minutes < 0) {
+        utc_minutes += 24 * 60;
+        if (--day == 0) {
+            if (--month == 0) { month = 12; --year; }
+            day = month_days(year, month);
+        }
+    } else if (utc_minutes >= 24 * 60) {
+        utc_minutes -= 24 * 60;
+        if (++day > month_days(year, month)) {
+            day = 1;
+            if (++month == 13) { month = 1; ++year; }
+        }
+    }
+    if (year < 1 || year > 9999) {
+        throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp UTC year must be between 0001 and 9999");
+    }
+    std::ostringstream formatted;
+    formatted.imbue(std::locale::classic());
+    formatted << std::setfill('0') << std::setw(4) << year << std::setw(2) << month << std::setw(2) << day
+              << '.' << std::setw(2) << utc_minutes / 60 << std::setw(2) << utc_minutes % 60
+              << std::setw(2) << second;
+    return {iso, formatted.str()};
 }
 
 std::string step_text(const std::string& utf8) {

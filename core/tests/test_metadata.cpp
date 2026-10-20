@@ -104,9 +104,7 @@ std::vector<std::string> iges_parameters(const std::string& file) {
 
 void verify_timestamp(const std::string& timestamp, bool step, const std::string& expected = "") {
     if (!expected.empty()) {
-        const auto converted = expected.substr(0, 4) + expected.substr(5, 2) + expected.substr(8, 2) + "." +
-            expected.substr(11, 2) + expected.substr(14, 2) + expected.substr(17, 2);
-        require(timestamp == (step ? expected : converted), "Timestamp override differs: " + timestamp);
+        require(timestamp == expected, "Timestamp override differs: " + timestamp + " != " + expected);
         return;
     }
     const std::regex format(step ? R"(^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$)" :
@@ -147,7 +145,8 @@ std::string escaped(const std::string& text) {
     return result;
 }
 
-void verify(const std::filesystem::path& path, bool step, const Metadata& expected, const std::string& timestamp = "") {
+void verify(const std::filesystem::path& path, bool step, const Metadata& expected, const std::string& timestamp = "",
+            const std::string& iges_timestamp = "") {
     const auto file = contents(path);
     for (const auto* forbidden : {"VINCENT", "STL2STP", "STL TO STEP FILE", "Open CASCADE STEP processor",
                                   "Open CASCADE IGES processor"}) {
@@ -211,7 +210,8 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
         for (const auto index : {5, 11, 25}) {
             require(parameters[index].empty(), "IGES optional field is not empty: " + std::to_string(index + 1));
         }
-        verify_timestamp(parameters[17], false, timestamp);
+        require(timestamp.empty() == iges_timestamp.empty(), "Missing explicit IGES timestamp expectation");
+        verify_timestamp(parameters[17], false, iges_timestamp);
         require(parameters[24] == parameters[17], "IGES generation and modification dates differ");
         std::string global;
         std::istringstream records(file);
@@ -335,7 +335,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (scenario == "cli_timestamp") {
-            verify(output, step, custom, "2024-02-29T18:52:00.123+08:00");
+            verify(output, step, custom, "2024-02-29T18:52:00.123+08:00", "20240229.105200");
             return 0;
         }
         std::filesystem::create_directories(output);
@@ -348,23 +348,44 @@ int main(int argc, char** argv) {
             export_file(handle.get(), path("default"), step, &options);
             verify(path("default"), step, {});
         } else if (scenario == "timestamp") {
-            for (const char* stamp : {"2024-02-29T18:52:00.123+08:00", static_cast<const char*>(nullptr),
-                                      "2000-01-01T00:00:00Z", static_cast<const char*>(nullptr)}) {
+            const struct { const char* iso; const char* iges; } cases[] = {
+                {"2024-02-29T18:52:00.123+08:00", "20240229.105200"},
+                {nullptr, ""},
+                {"2026-10-20T18:52:00+08:00", "20261020.105200"},
+                {"2026-10-20T01:00:00+08:00", "20261019.170000"},
+                {"2024-03-01T02:00:00+05:00", "20240229.210000"},
+                {"2026-12-31T22:00:00-05:00", "20270101.030000"},
+                {"2026-10-20T18:52:00-05:30", "20261021.002200"},
+                {"2026-10-20T18:52:00", "20261020.185200"},
+                {"2026-10-20T18:52:00Z", "20261020.185200"},
+                {"2026-10-20T18:52:00.999", "20261020.185200"},
+                {"2026-10-20T18:52:00.999Z", "20261020.185200"},
+                {"2026-12-31T23:59:59.999-00:01", "20270101.000059"},
+                {"1900-03-01T00:00:00+00:01", "19000228.235900"},
+                {"2000-03-01T00:00:00+00:01", "20000229.235900"},
+                {"2000-01-01T00:00:00Z", "20000101.000000"},
+                {"0001-01-01T23:59:00+23:59", "00010101.000000"},
+                {"9999-12-31T00:00:00-23:59", "99991231.235900"},
+                {nullptr, ""}
+            };
+            for (const auto& entry : cases) {
                 auto options = stl2stp_default_export_options();
                 options.mode = mode;
-                options.timestamp = stamp;
+                options.timestamp = entry.iso;
                 export_file(handle.get(), path("timestamp"), step, &options);
-                verify(path("timestamp"), step, {}, stamp ? stamp : "");
+                verify(path("timestamp"), step, {}, entry.iso ? entry.iso : "", entry.iges);
                 settings.verify_restored();
             }
             auto options = stl2stp_default_export_options();
             options.mode = mode;
-            for (const char* stamp : {"", "2026-10-20", "2026-10-20T18:52:00", "2026-13-01T00:00:00Z",
+            for (const char* stamp : {"", "2026-10-20", "2026-13-01T00:00:00Z",
                     "2026-00-01T00:00:00Z", "2026-02-29T00:00:00Z", "1900-02-29T00:00:00Z",
                     "2026-04-31T00:00:00Z", "2026-01-00T00:00:00Z", "0000-01-01T00:00:00Z",
                     "2026-01-01T24:00:00Z", "2026-01-01T00:60:00Z", "2026-01-01T00:00:60Z",
                     "2026-01-01T00:00:00+24:00", "2026-01-01T00:00:00-08:60", "2026-01-01T00:00:00.Z",
-                    "2026-01-01T00:00:00Zjunk", "2026-01-01T00:00:00'Z", "2026-1-1T00:00:00Z"}) {
+                    "2026-01-01T00:00:00Zjunk", "2026-01-01T00:00:00'Z", "2026-1-1T00:00:00Z",
+                    "2026-10-20T18:52:00+0800", "2026-10-20T18:52:00.",
+                    "0001-01-01T00:00:00+00:01", "9999-12-31T23:59:00-00:01"}) {
                 options.timestamp = stamp;
                 const auto rejected = path("invalid-timestamp");
                 { std::ofstream stream(rejected); stream << "unchanged"; }
@@ -408,7 +429,8 @@ int main(int argc, char** argv) {
             CopyState state{&source, &timestamp};
             const stl2stp_callbacks callbacks{&change_source, nullptr, &state};
             export_file(handle.get(), path("custom"), step, &options, scenario == "copy" ? &callbacks : nullptr);
-            verify(path("custom"), step, custom, scenario == "copy" ? "2024-02-29T18:52:00.123+08:00" : "");
+            verify(path("custom"), step, custom, scenario == "copy" ? "2024-02-29T18:52:00.123+08:00" : "",
+                   scenario == "copy" ? "20240229.105200" : "");
             if (scenario == "copy") { require(state.changed, "Copy callback did not run"); }
         } else if (scenario == "isolation") {
             for (const auto& metadata : {custom, Metadata{"6Hliteral", "Other;Company,Inc", "Second'Product", "Other description"},
