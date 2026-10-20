@@ -6,6 +6,7 @@
 #include <IGESData_GlobalSection.hxx>
 #include <IGESData_IGESModel.hxx>
 #include <Interface_Static.hxx>
+#include <Interface_Check.hxx>
 #include <STEPControl_Controller.hxx>
 #include <STEPControl_Reader.hxx>
 #include <StepBasic_Product.hxx>
@@ -13,6 +14,12 @@
 #include <TCollection_HAsciiString.hxx>
 
 #include <array>
+#include <algorithm>
+#include <cmath>
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <regex>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -95,7 +102,52 @@ std::vector<std::string> iges_parameters(const std::string& file) {
     return result;
 }
 
-void verify(const std::filesystem::path& path, bool step, const Metadata& expected) {
+void verify_timestamp(const std::string& timestamp, bool step, const std::string& expected = "") {
+    if (!expected.empty()) {
+        const auto converted = expected.substr(0, 4) + expected.substr(5, 2) + expected.substr(8, 2) + "." +
+            expected.substr(11, 2) + expected.substr(14, 2) + expected.substr(17, 2);
+        require(timestamp == (step ? expected : converted), "Timestamp override differs: " + timestamp);
+        return;
+    }
+    const std::regex format(step ? R"(^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$)" :
+                                  R"(^[0-9]{8}\.[0-9]{6}$)");
+    require(std::regex_match(timestamp, format), "Malformed default timestamp: " + timestamp);
+    std::tm parsed{};
+    std::istringstream stream(timestamp);
+    stream >> std::get_time(&parsed, step ? "%Y-%m-%dT%H:%M:%SZ" : "%Y%m%d.%H%M%S");
+    require(!stream.fail(), "Cannot parse default timestamp");
+    const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    const auto utc = *std::gmtime(&now);
+    auto current = utc;
+    const auto difference = std::difftime(std::mktime(&parsed), std::mktime(&current));
+    require(std::abs(difference) < 180, "Default timestamp is not within three minutes of current UTC");
+}
+
+std::string escaped(const std::string& text) {
+    const std::vector<std::pair<std::string, std::string>> encodings{
+        {"致知屋", "\\X2\\81F477E55C4B\\X0\\"}, {"测试公司", "\\X2\\6D4B8BD5516C53F8\\X0\\"},
+        {"测试产品", "\\X2\\6D4B8BD54EA754C1\\X0\\"}, {"测试描述", "\\X2\\6D4B8BD563CF8FF0\\X0\\"},
+        {"中文", "\\X2\\4E2D6587\\X0\\"}, {"😀𠮷", "\\X4\\0001F60000020BB7\\X0\\"}};
+    std::string result;
+    for (std::size_t cursor = 0; cursor < text.size();) {
+        bool replaced = false;
+        for (const auto& encoding : encodings) {
+            if (text.compare(cursor, encoding.first.size(), encoding.first) == 0) {
+                result += encoding.second;
+                cursor += encoding.first.size();
+                replaced = true;
+                break;
+            }
+        }
+        if (replaced) { continue; }
+        const char character = text[cursor++];
+        if (character == '\'' || character == '\\') { result += character; }
+        result += character;
+    }
+    return result;
+}
+
+void verify(const std::filesystem::path& path, bool step, const Metadata& expected, const std::string& timestamp = "") {
     const auto file = contents(path);
     for (const auto* forbidden : {"VINCENT", "STL2STP", "STL TO STEP FILE", "Open CASCADE STEP processor",
                                   "Open CASCADE IGES processor"}) {
@@ -113,8 +165,9 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
         require(value(header.OriginatingSystem()) == expected.product, "STEP originating system differs");
         require(header.NbDescription() == 1 && value(header.DescriptionValue(1)) == expected.description,
                 "STEP description differs");
-        require(value(header.PreprocessorVersion()).empty() && value(header.Authorisation()).empty() &&
-                value(header.TimeStamp()).empty(), "STEP optional fields must be empty");
+        require(value(header.PreprocessorVersion()).empty() && value(header.Authorisation()).empty(),
+                "STEP optional fields must be empty");
+        verify_timestamp(value(header.TimeStamp()), true, timestamp);
         int products = 0;
         for (int index = 1; index <= model->NbEntities(); ++index) {
             const auto product = Handle(StepBasic_Product)::DownCast(model->Value(index));
@@ -128,9 +181,25 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
         if (expected.author.empty()) {
             require(file.find("(''),('')") != std::string::npos, "STEP author/org are not serialized empty");
         }
-        if (expected.author == "致知屋") {
-            require(file.find("'致知屋'") != std::string::npos && file.find("'测试公司'") != std::string::npos &&
-                    file.find("\\X2\\") == std::string::npos, "Expected raw UTF-8 STEP encoding");
+        std::string compact = file;
+        compact.erase(std::remove(compact.begin(), compact.end(), '\n'), compact.end());
+        compact.erase(std::remove(compact.begin(), compact.end(), '\r'), compact.end());
+        for (const auto* field : {&expected.author, &expected.organization, &expected.product, &expected.description}) {
+            require(compact.find("'" + escaped(*field) + "'") != std::string::npos, "STEP exact string bytes differ: " + *field);
+        }
+        if (!expected.product.empty()) {
+            const std::string prefix = " = PRODUCT(";
+            const auto begin = compact.find(prefix);
+            require(begin != std::string::npos, "STEP has no serialized PRODUCT");
+            const std::string name = "'" + escaped(expected.product) + "'";
+            const auto first = compact.find_first_not_of(" \t", begin + prefix.size());
+            require(compact.compare(first, name.size(), name) == 0, "STEP exact PRODUCT id bytes differ");
+            require(compact[first + name.size()] == ',', "STEP PRODUCT parameter delimiter differs");
+            const auto next = compact.find_first_not_of(" \t", first + name.size() + 1);
+            require(compact.compare(next, name.size(), name) == 0, "STEP exact PRODUCT name bytes differ");
+        }
+        if (expected.author == "致知屋" || expected.author.find("中文") != std::string::npos) {
+            require(file.find(expected.author) == std::string::npos, "STEP leaked raw UTF-8 metadata");
         }
     } else {
         const auto parameters = iges_parameters(file);
@@ -139,9 +208,18 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
         require(parameters[20] == expected.author && parameters[21] == expected.organization,
                 "IGES author/company differs: " + std::to_string(parameters[20].size()) + "/" +
                 std::to_string(expected.author.size()) + " bytes; company=" + parameters[21]);
-        for (const auto index : {5, 11, 17, 24, 25}) {
+        for (const auto index : {5, 11, 25}) {
             require(parameters[index].empty(), "IGES optional field is not empty: " + std::to_string(index + 1));
         }
+        verify_timestamp(parameters[17], false, timestamp);
+        require(parameters[24] == parameters[17], "IGES generation and modification dates differ");
+        std::string global;
+        std::istringstream records(file);
+        std::string record;
+        while (std::getline(records, record)) { if (record[72] == 'G') { global += record.substr(0, 72); } }
+        require(global.find("15H" + parameters[17]) != std::string::npos &&
+                global.rfind("15H" + parameters[17]) != global.find("15H" + parameters[17]),
+                "IGES dates must both be four-digit-year Hollerith strings");
         if (expected.author == "致知屋") {
             require(file.find("9H致知屋") != std::string::npos && file.find("12H测试公司") != std::string::npos,
                     "IGES must count UTF-8 bytes, not Unicode characters");
@@ -149,7 +227,12 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
         IGESControl_Reader reader;
         require(reader.ReadFile(path.u8string().c_str()) == IFSelect_RetDone, "IGES read failed");
         const auto model = reader.IGESModel();
+        Handle(Interface_Check) check = new Interface_Check;
+        model->VerifyCheck(check);
+        require(check->NbFails() == 0, "OCCT IGES global-section validation failed");
         const auto& section = model->GlobalSection();
+        require(value(section.Date()) == parameters[17] && value(section.LastChangeDate()) == parameters[24],
+                "OCCT IGES date readback differs");
         require(value(section.AuthorName()) == expected.author && value(section.CompanyName()) == expected.organization,
                 "OCCT IGES author/company readback differs");
         require(value(section.SendName()) == expected.product && value(section.SystemId()) == expected.product,
@@ -221,6 +304,7 @@ private:
 
 struct CopyState {
     Metadata* source;
+    std::string* timestamp;
     bool changed = false;
 };
 
@@ -228,6 +312,7 @@ void change_source(double, void* context) {
     auto& state = *static_cast<CopyState*>(context);
     if (!state.changed) {
         *state.source = {"changed author", "changed organization", "changed product", "changed description"};
+        *state.timestamp = "invalid timestamp after callback";
         state.changed = true;
     }
 }
@@ -249,6 +334,10 @@ int main(int argc, char** argv) {
             verify(output, step, custom);
             return 0;
         }
+        if (scenario == "cli_timestamp") {
+            verify(output, step, custom, "2024-02-29T18:52:00.123+08:00");
+            return 0;
+        }
         std::filesystem::create_directories(output);
         auto handle = load(std::filesystem::u8path(argv[4]));
         AmbientSettings settings;
@@ -258,13 +347,68 @@ int main(int argc, char** argv) {
             options.mode = mode;
             export_file(handle.get(), path("default"), step, &options);
             verify(path("default"), step, {});
+        } else if (scenario == "timestamp") {
+            for (const char* stamp : {"2024-02-29T18:52:00.123+08:00", static_cast<const char*>(nullptr),
+                                      "2000-01-01T00:00:00Z", static_cast<const char*>(nullptr)}) {
+                auto options = stl2stp_default_export_options();
+                options.mode = mode;
+                options.timestamp = stamp;
+                export_file(handle.get(), path("timestamp"), step, &options);
+                verify(path("timestamp"), step, {}, stamp ? stamp : "");
+                settings.verify_restored();
+            }
+            auto options = stl2stp_default_export_options();
+            options.mode = mode;
+            for (const char* stamp : {"", "2026-10-20", "2026-10-20T18:52:00", "2026-13-01T00:00:00Z",
+                    "2026-00-01T00:00:00Z", "2026-02-29T00:00:00Z", "1900-02-29T00:00:00Z",
+                    "2026-04-31T00:00:00Z", "2026-01-00T00:00:00Z", "0000-01-01T00:00:00Z",
+                    "2026-01-01T24:00:00Z", "2026-01-01T00:60:00Z", "2026-01-01T00:00:60Z",
+                    "2026-01-01T00:00:00+24:00", "2026-01-01T00:00:00-08:60", "2026-01-01T00:00:00.Z",
+                    "2026-01-01T00:00:00Zjunk", "2026-01-01T00:00:00'Z", "2026-1-1T00:00:00Z"}) {
+                options.timestamp = stamp;
+                const auto rejected = path("invalid-timestamp");
+                { std::ofstream stream(rejected); stream << "unchanged"; }
+                export_file(handle.get(), rejected, step, &options, nullptr, STL2STP_ERROR_ARGUMENT);
+                require(contents(rejected) == "unchanged", "Invalid timestamp replaced destination");
+                settings.verify_restored();
+            }
+        } else if (scenario == "encoding") {
+            const std::string mixed = "中文😀𠮷'\\";
+            for (const auto& metadata : {Metadata{mixed, mixed, mixed, mixed},
+                    Metadata{"ASCII author'\\", "ASCII org'\\", "ASCII product'\\", "ASCII description'\\"},
+                    Metadata{"literal \\X2\\0041\\X0\\", "literal \\X4\\0001F600\\X0\\",
+                             "literal \\N\\ and \\T\\", "literal \\S\\ and \\PA\\"}}) {
+                const auto options = metadata.options(mode);
+                export_file(handle.get(), path("encoding"), step, &options);
+                verify(path("encoding"), step, metadata);
+            }
+            const Metadata final{mixed, mixed, mixed, mixed};
+            const auto final_options = final.options(mode);
+            export_file(handle.get(), path("mixed"), step, &final_options);
+            verify(path("mixed"), step, final);
+            if (step) {
+                std::string long_text;
+                for (int index = 0; index < 10; ++index) { long_text += "中文😀𠮷'\\X2\\0041\\X0\\"; }
+                const Metadata wrapped{long_text, long_text, long_text, long_text};
+                const auto wrapped_options = wrapped.options(mode);
+                export_file(handle.get(), path("wrapped"), step, &wrapped_options);
+                verify(path("wrapped"), step, wrapped);
+                for (const std::string& invalid : {std::string("\xc0\xaf"), std::string("\xed\xa0\x80"),
+                                                  std::string("\xf4\x90\x80\x80"), std::string("\xe4\xb8")}) {
+                    const Metadata bad{invalid, "", "", ""};
+                    const auto bad_options = bad.options(mode);
+                    export_file(handle.get(), path("invalid-utf8"), step, &bad_options, nullptr, STL2STP_ERROR_ARGUMENT);
+                }
+            }
         } else if (scenario == "custom" || scenario == "copy") {
             auto source = custom;
-            const auto options = source.options(mode);
-            CopyState state{&source};
+            std::string timestamp = "2024-02-29T18:52:00.123+08:00";
+            auto options = source.options(mode);
+            if (scenario == "copy") { options.timestamp = timestamp.c_str(); }
+            CopyState state{&source, &timestamp};
             const stl2stp_callbacks callbacks{&change_source, nullptr, &state};
             export_file(handle.get(), path("custom"), step, &options, scenario == "copy" ? &callbacks : nullptr);
-            verify(path("custom"), step, custom);
+            verify(path("custom"), step, custom, scenario == "copy" ? "2024-02-29T18:52:00.123+08:00" : "");
             if (scenario == "copy") { require(state.changed, "Copy callback did not run"); }
         } else if (scenario == "isolation") {
             for (const auto& metadata : {custom, Metadata{"6Hliteral", "Other;Company,Inc", "Second'Product", "Other description"},

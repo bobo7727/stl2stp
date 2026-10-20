@@ -1,6 +1,65 @@
 # 核心库验证交接（2026-10-20）
 
-## 可配置空 metadata（当前工作，基于 `7d961fe`）
+## 当前：时间戳与 STEP Unicode（基于 `c0a553a`）
+
+branch `core/extract`，未 commit。`stl2stp_export_options` 最后追加 `timestamp`，
+NULL 每次取当前 UTC（STEP `YYYY-MM-DDTHH:MM:SSZ`），非 NULL 严格校验后在 STEP
+逐字保留，空字符串无效；IGES 参数 18/25 均为 `15HYYYYMMDD.HHNNSS`。
+覆盖值保留墙钟时间，IGES 去掉时区/小数秒；四个文本 metadata 仍默认空。
+CLI 新增 `--timestamp`；调用方须用新版头文件重新编译。
+
+STEP 写出 BMP X2 / 非 BMP X4，大写 hex；单引号由 OCCT 加倍一次，字面反斜杠
+受保护后归一化为两个反斜杠。OCCT 72 列换行可能拆开长字符串的 directive，
+流式 string-token 归一化已消除这种断裂，发布仍通过原子事务。
+OCCT 8.0.1 MakeHeader / PRODUCT 回读中文、emoji、U+20BB7、单引号、反斜杠、
+字面 directive 及长字符串均无损；不需要自定义 reader 解码。
+IGES 继续 UTF-8 byte-count Hollerith，既有纯中文 Start 行尾裁剪限制未改。
+
+保留全部 85 个测试，新增 19 个 CTest，共 104 个（58 个 metadata label）。
+两模式 × 两格式覆盖默认日期正则及距当前 UTC 小于 180 秒、精确覆盖/IGES 转换、
+覆盖→默认及默认→覆盖隔离、Gregorian 闰年/非法日期/时间/offset/空值拒绝且目标不变，
+callback 修改 timestamp 后私有副本仍有效、四组合 CLI 覆盖回读及缺值/重复/非法 flag。
+编码测试独立比较实际 X2/X4/引号/反斜杠 bytes 和 OCCT 回读，含 ASCII 不变、
+字面 directive、跨行长文本和非法 UTF-8；IGES 另通过 `IGESModel::VerifyCheck`。
+字段语义/格式与 setter 行为已核对只读 OCCT 8.0.1 源码；原 IGES 5.3 PDF 下载被
+DNS 与 approval reviewer 阻断，未声称原规范逐条审核或第三方 CAD 认证完成。
+
+构建仍使用 gcc-10/g++-10；TMPDIR、构建/日志/数据均在本仓库 build/。
+Debug C/C++ 均开启 `-Wall -Wextra -Wpedantic -Werror -fsanitize=undefined -fno-sanitize-recover=undefined`；
+只读 OCCT 仍为既有 Release 共享库，未对 OCCT 自身追加 UBSan。
+最终记录：`build/core-linux/ctest-timestamp-validation.log` 与
+`build/core-linux-debug-ubsan/ctest-timestamp-validation.log`。
+
+Release：
+
+```text
+100% tests passed, 0 tests failed out of 104
+
+Label Time Summary:
+mesh        =   2.50 sec*proc (10 tests)
+metadata    =  25.16 sec*proc (58 tests)
+occt        =  31.01 sec*proc (54 tests)
+
+Total Test time (real) =  47.98 sec
+```
+
+Debug `-Werror` + UBSan：
+
+```text
+100% tests passed, 0 tests failed out of 104
+
+Label Time Summary:
+mesh        =   7.83 sec*proc (10 tests)
+metadata    =  31.36 sec*proc (58 tests)
+occt        =  33.47 sec*proc (54 tests)
+
+Total Test time (real) =  49.22 sec
+```
+
+## 历史基线：可配置空 metadata（基于 `7d961fe`）
+
+以下 85 项摘要与 raw UTF-8 / 空日期描述是历史证据；当前日期/编码行为以上节及
+`docs/core-api.md` 为准。
 
 四个 UTF-8 指针 `author`、`organization`、`product`、`description` 追加在 options 尾部，
 默认 NULL；两模式 × STEP/IGES 均去掉原版及 OCCT 可控的默认 metadata，几何算法未改。

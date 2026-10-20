@@ -12,7 +12,7 @@ Objective-C++ bridge 只需包含此头文件并持有 opaque `stl2stp_handle*`�
 | `stl2stp_create` | 创建空 handle；失败返回 `NULL` |
 | `stl2stp_destroy` | 销毁 handle；`NULL` 安全 |
 | `stl2stp_last_error` | 读取上次诊断，不清空；`NULL` 读取当前线程的创建/null-handle 诊断 |
-| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0`，四个 metadata 指针均为 `NULL` |
+| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0`，四个文本 metadata 和 `timestamp` 指针均为 `NULL` |
 | `stl2stp_load_stl` | 自动识别 binary/ASCII STL，精确坐标去重，成功后替换网格 |
 | `stl2stp_get_mesh_stats` | 返回 unique vertices、无向 unique edges、triangular faces 和 AABB |
 | `stl2stp_simplify` | QEM edge collapse，按目标三角面数简化当前网格 |
@@ -159,17 +159,18 @@ IGES topology 是导出前 B-Rep，不是 IGES geometry read-back。
 stl2stp-cli convert in.stl out.step --mode original
 stl2stp-cli convert in.stl out.step --mode sewing --merge-coplanar
 stl2stp-cli convert in.stl out.step --author '致知屋' --org '测试公司' --product '测试产品' --description '测试描述'
+stl2stp-cli convert in.stl out.step --timestamp '2024-02-29T18:52:00.123+08:00'
 ```
 
 省略 `--mode` 等价于 `original`。CLI 在导出前打印 `mode=original` 或 `mode=sewing`；
 未知、重复或缺值选项失败。完整原始行号、隐式公差、prompt 和 API 替代见
 `docs/original-conversion.md`；实测拓扑与测试边界见 `docs/core-validation.md`。
 
-## 文件 metadata：默认空（OCCT 8.0.1 实测）
+## 文件 metadata：文本默认空、日期默认当前 UTC（OCCT 8.0.1 实测）
 
 四个字段都是 UTF-8、NUL 结尾 C 字符串；`NULL` 和 `""` 均表示空，
 `options=NULL` 也不会恢复旧硬编码。库在首次 callback 和获取 exchange mutex **之前**
-将四个字符串复制为私有 `std::string`，不保存 caller 指针。调用者只需在同步调用期间
+将四个文本和非 NULL timestamp 复制为私有 `std::string`，不保存 caller 指针。调用者只需在同步调用期间
 提供有效内存，不必保留到调用之后；不能与最初的复制并发修改这些字符串。
 默认文件不含 `VINCENT`、`STL2STP` 或 `STL TO STEP FILE`。
 
@@ -179,6 +180,42 @@ stl2stp-cli convert in.stl out.step --author '致知屋' --org '测试公司' --
 | `organization` | `FILE_NAME.organization` 的唯一列表元素 | Global 参数 22 company |
 | `product` | `FILE_NAME.originating_system`，每个 `PRODUCT.id` / `PRODUCT.name` | Global 参数 3 send/product、5 system id |
 | `description` | `FILE_DESCRIPTION.description` 的唯一列表元素 | Start section（IGES Global 没有 description 槽位） |
+| `timestamp`（options 最后一个字段） | `FILE_NAME.time_stamp` | Global 参数 18 文件生成日期、25 模型创建/最后修改日期 |
+
+### 时间戳约定
+
+`timestamp=NULL`（含 `options=NULL`）每次导出重新取当前时间，默认采用 UTC：
+`YYYY-MM-DDTHH:MM:SSZ`，不是本地无时区时间，也不是可复用的初始化常量。
+四个文本 metadata 的默认空行为不变。`timestamp=""` **无效**，返回
+`STL2STP_ERROR_ARGUMENT`；本接口不提供空日期 opt-out。
+
+覆盖值接受如下明确的 ISO 8601 extended calendar-date 子集：
+`YYYY-MM-DDTHH:MM:SS[.fraction](Z|+HH:MM|-HH:MM)`；四位年份 0001–9999，
+Gregorian 日历（含世纪闰年规则），小时 00–23、分/秒 00–59，offset 小时 00–23、
+分钟 00–59，小数若存在必须为一个或多个 ASCII 数字。必须大写 `T`/`Z`、必须含秒和
+时区，不接受 basic/week/ordinal date、24:00、闰秒 60、逗号小数或前后空白。
+非 NULL 覆盖值在 STEP 中逐字保留，包括小数位和原 offset；非法语法/日期不发布目标文件。
+CLI `--timestamp ISO8601` 使用同一校验，缺值/重复 flag 无效。
+
+IGES 5.3 的日期数据没有 timezone / fractional-second 槽位。本库取 ISO 值的
+**墙钟年月日时分秒**，不改变 offset 所代表的墙钟时间，不做 UTC 归一化，舍去小数秒和
+时区，写成 `15HYYYYMMDD.HHNNSS`，例如上述覆盖值产生 `15H20240229.185200`。
+默认值取 UTC 墙钟时间，两个日期字段使用同一次采样。
+参数 18 是生成本 IGES 文件的日期；参数 25 是所传模型创建/最后修改的日期，
+**不是文件系统 mtime**。STL 输入没有独立模型修改时间来源，所以新建导出模型的
+两个字段使用相同值；覆盖值也同时控制两者，不推测输入文件 mtime。
+
+核对 OCCT `IGESData_GlobalSection::{SetDate,SetLastChangeDate,Params}`：setter 接受
+原始 `YYYYMMDD.HHNNSS`，内部去除已有 Hollerith 前缀，`Params` 再写出长度 15 的
+Hollerith。`IGESData_IGESModel::{Print,VerifyCheck}` 将其明确映射到参数 18/25，
+接受 13/15 字节日期；测试同时验证实际参数位置、字节和 OCCT global-section 检查。
+`GlobalSection.hxx` 的 `NewDateString` mode 注释与实现的 -1/0 年份长度相反；
+本库直接组装四位年，不依赖该有歧义的 mode 注释。
+IGES 5.3 原始规范 PDF 未能在线获取（DNS / approval reviewer 阻断）；上述实现契约
+已用只读 OCCT 8.0.1 源码核对，不宣称已经完成原规范逐条审核或第三方 CAD 认证。
+
+追加字段改变了 options 的结构大小；调用方必须与更新后的头文件重新编译，
+不支持把旧二进制布局传入新版库。建议总是从 `stl2stp_default_export_options()` 初始化。
 
 两格式的文件名均使用最终输出 basename（含扩展名），不使用事务临时路径。
 STEP `PRODUCT.description` 不另写 description，保持 writer 的空值。
@@ -192,8 +229,8 @@ IGES receiver、interface/preprocessor version、application protocol 都明确�
 - `DataExchange/TKDESTEP/APIHeaderSection/APIHeaderSection_MakeHeader.cxx` 默认注入
   `Author`、`Open CASCADE`、`Open CASCADE STEP processor 8.0`、
   `Open CASCADE 8.0`、authorisation `Unknown`、当前 timestamp 和 `Open CASCADE Model`。
-  本库在 Transfer 后用 MakeHeader setter 全部覆盖；preprocessor、authorisation、timestamp
-  都能清空，实测均为 `''`，**不是强制保留字段**。
+  本库在 Transfer 后用 MakeHeader setter 全部覆盖；preprocessor、authorisation
+  清空，timestamp 使用上述当前 UTC / 显式覆盖值。
 - `DataExchange/TKDESTEP/STEPConstruct/STEPConstruct_ContextTool.cxx::GetProductName`
   在 `write.step.product.name=""` 时回退成 `Product`，并可追加层级序号。
   本库每次设置该全局参数并恢复，同时在 Transfer 后遍历 `StepBasic_Product`
@@ -203,14 +240,13 @@ IGES receiver、interface/preprocessor version、application protocol 都明确�
   `write.iges.header.receiver`；没有猜测使用 `write.iges.header.system` 等不存在的键。
   author 原默认宿主用户名，product 原默认 `Open CASCADE IGES processor 8.0`。
   本库每次设置上述四个参数并恢复，ComputeModel 后再覆盖模型 GlobalSection。
-  system id、preprocessor/interface version、creation date、last-change date 全都可以清空；
-  实测默认 Global 参数 3、5、6、12、18、21、22、25、26 均是空参数。
+  实测默认 Global 参数 3、5、6、12、21、22、26 均是空参数；18、25 写入日期。
 
-默认 cube 的实际 STEP header（两模式一致）：
+默认 cube 的 STEP header 示例（日期每次导出变化；两模式相同约定）：
 
 ```text
 FILE_DESCRIPTION((''),'2;1');
-FILE_NAME('default.step','',(''),(''),'','','');
+FILE_NAME('default.step','2026-10-20T11:00:00Z',(''),(''),'','','');
 FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));
 ```
 
@@ -232,22 +268,40 @@ FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));
 
 这些结构/单位/精度字段不属于四个文本选项，刻意保留，不通过清空破坏几何语义。
 ORIGINAL 仍尊重外部配置的 schema/unit/precision；SEWING 仍为 AP214IS/MM。
-没有强制非空的作者、组织、产品、描述、处理器版本、授权或日期字段。
-空日期可以被 OCCT 写出且 ReadFile 成功，不等于通过 ISO/IGES 严格规范校验；
-本次未认证其它 CAD/严格 schema validator 对空 timestamp/date 的兼容性。
+作者、组织、产品、描述、处理器版本和授权保持可空；日期现在必须有效且非空。
+本次未认证其它 CAD/严格 schema validator，不将 OCCT 回读成功等同于正式互操作认证。
 
 ### 中文编码与 OCCT 限制
 
-STEP writer 的 `StepData_StepWriter.cxx::CleanTextForSend` 不自动把 UTF-8 转成
-ISO 10303-21 `\X2\...\X0\`。本库实测原始 UTF-8，例如 `('致知屋')`、`('测试公司')`；
-OCCT 默认 `read.step.codepage=UTF8` 时 MakeHeader 和 PRODUCT 回读得到原字符串。
-非 ASCII 文件 basename 也按相同方式写出/回读；ASCII 单引号由 writer 加倍。
-外部 reader 应明确支持 UTF-8；不是宣称所有 Part-21/CAD reader 都接受此编码。
-OCCT 还会解释字符串中的 STEP 控制 directive，因此不要将 `\X2\...\X0\` 等
-文本当作必然逐字回读的普通文字。本库未更改 OCCT 的 directive 解释规则。
+核对 `StepData_StepWriter::{Send,CleanTextForSend}`：OCCT 8.0.1 不自动把 UTF-8 转成
+Unicode directive；会自动加倍普通单引号和反斜杠，但识别到已有 directive 时逐字保留。
+STEPControl 注册参数中没有 `write.step.unicode` 等写出 UTF-8 转换开关；
+`read.step.codepage=UTF8` 是 reader 参数，不是 writer 编码设置。
+
+本库对 header 文本、最终 basename 和每个 `PRODUCT.id/name` 验证 UTF-8，拒绝 overlong、
+截断、surrogate 或超出 U+10FFFF 的序列（ARGUMENT）。BMP 用大写四位 UTF-16 code unit
+`\X2\hhhh...\X0\`，非 BMP 用大写八位 scalar `\X4\hhhhhhhh...\X0\`，同类相邻字符
+共用一个 directive。示例：`致知屋` → `\X2\81F477E55C4B\X0\`，
+`😀𠮷` → `\X4\0001F60000020BB7\X0\`。ASCII 不改变；单引号仅交给 writer 一次，
+最终字节为 `''`，不二次转义。
+
+字面反斜杠先作为单独的 `\X2\005C\X0\` 交给 writer，避免 OCCT 把用户文本
+`\X2\0041\X0\`、`\N\` 等误识别为 directive；写出后在临时文件的字符串 token 内
+流式归一化为标准字节 `\\`。同一流式处理去掉 writer 在长字符串内部插入的物理
+CR/LF，防止 directive 或加倍单引号被 OCCT 的 72 列换行拆开。
+这不是对 caller 文本作全文件替换；仅处理 writer 的 string token，空间占用有界，
+取消/IO 失败仍不发布目标文件，不修改只读 OCCT。用户的字面 STEP directive 可逐字回读。
+
+实测 OCCT 默认 UTF8 reader 对 X2 中文、X4 emoji/U+20BB7、单引号、反斜杠均能还原，
+包括 MakeHeader author/organization/description/originating_system 和 PRODUCT id/name，
+长字符串和非 ASCII basename 也通过。测试直接比较原 UTF-8 值，不需要 encoded-form
+fallback 或自定义解码器；文件字节另以独立的固定 hex 对照验证，避免只测试同一编解码器。
 
 IGES GlobalSection 使用 `TCollection_HAsciiString::Length()`，即 **UTF-8 字节数**，
 并保留原始字节：`9H致知屋`、`12H测试公司`，不是 `2H` / `4H`。
+IGES 没有 STEP 的 Unicode directive，保留现有 UTF-8 byte-count Hollerith，避免把
+STEP 转义当作 IGES 字面字符串，或改用未约定的本地代码页导致中文/非 BMP 损失；
+这是当前可无损 OCCT GlobalSection 回读的策略，不保证所有旧 CAD 接受 UTF-8。
 固定记录按 72 字节数据 + 8 字节 section/序号切分；Hollerith 可跨记录。
 实测 OCCT GlobalSection author/company/send/system id 回读均得到原字符串。
 setter 会把开头形如 `6H...` 的输入误当成 Hollerith，本库先包一层长度前缀，

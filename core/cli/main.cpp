@@ -64,7 +64,7 @@ void usage() {
               << "  stl2stp-cli info <in.stl>\n"
               << "  stl2stp-cli simplify <in.stl> <out.stl> --faces N\n"
               << "  stl2stp-cli convert <in.stl> <out.step|out.igs> [--mode original|sewing] [--merge-coplanar] [--simplify N]\n"
-              << "      [--author TEXT] [--org TEXT] [--product TEXT] [--description TEXT]\n"
+              << "      [--author TEXT] [--org TEXT] [--product TEXT] [--description TEXT] [--timestamp ISO8601]\n"
               << "  stl2stp-cli readback <in.step>\n";
 }
 
@@ -110,10 +110,11 @@ int main(int argc, char** argv) {
                     target = face_count(argv[++index]);
                 } else if (command == "convert" && index + 1 < argc &&
                            (argument == "--author" || argument == "--org" ||
-                            argument == "--product" || argument == "--description")) {
+                            argument == "--product" || argument == "--description" || argument == "--timestamp")) {
                     const char** field = argument == "--author" ? &options.author :
                         argument == "--org" ? &options.organization :
-                        argument == "--product" ? &options.product : &options.description;
+                        argument == "--product" ? &options.product :
+                        argument == "--description" ? &options.description : &options.timestamp;
                     if (*field) { throw std::runtime_error("Duplicate option: " + argument); }
                     *field = argv[++index];
                 } else {

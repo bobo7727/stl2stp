@@ -46,6 +46,10 @@
 #include <gp_Pnt.hxx>
 
 #include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+#include <locale>
 #include <exception>
 #include <fstream>
 #include <memory>
@@ -56,6 +60,155 @@ namespace stl2stp {
 namespace {
 
 std::timed_mutex exchange_mutex;
+
+struct Timestamp {
+    std::string iso;
+    std::string iges;
+};
+
+Timestamp timestamp_value(const char* supplied) {
+    std::string iso;
+    if (supplied) {
+        iso = supplied;
+    } else {
+        const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        const auto* utc = std::gmtime(&now);
+        if (!utc) { throw Error(STL2STP_ERROR_INTERNAL, "Cannot obtain current UTC time"); }
+        std::ostringstream formatted;
+        formatted.imbue(std::locale::classic());
+        formatted << std::put_time(utc, "%Y-%m-%dT%H:%M:%SZ");
+        iso = formatted.str();
+    }
+    auto digits = [&](std::size_t begin, std::size_t length) {
+        if (begin > iso.size() || length > iso.size() - begin) { return false; }
+        for (std::size_t index = begin; index < begin + length; ++index) {
+            if (iso[index] < '0' || iso[index] > '9') { return false; }
+        }
+        return true;
+    };
+    if (iso.size() < 20 || iso[4] != '-' || iso[7] != '-' || iso[10] != 'T' || iso[13] != ':' ||
+        iso[16] != ':' || !digits(0, 4) || !digits(5, 2) || !digits(8, 2) ||
+        !digits(11, 2) || !digits(14, 2) || !digits(17, 2)) {
+        throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp must be an ISO 8601 extended date-time with timezone");
+    }
+    std::size_t zone_begin = 19;
+    if (iso[zone_begin] == '.') {
+        const auto fraction_begin = ++zone_begin;
+        while (zone_begin < iso.size() && digits(zone_begin, 1)) { ++zone_begin; }
+        if (zone_begin == fraction_begin) { throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp fraction is empty"); }
+    }
+    const std::string zone = iso.substr(zone_begin);
+    if (zone != "Z" && (zone.size() != 6 || (zone[0] != '+' && zone[0] != '-') || zone[3] != ':' ||
+                       !digits(zone_begin + 1, 2) || !digits(zone_begin + 4, 2))) {
+        throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp timezone must be Z or +/-HH:MM");
+    }
+    const int year = std::stoi(iso.substr(0, 4));
+    const int month = std::stoi(iso.substr(5, 2));
+    const int day = std::stoi(iso.substr(8, 2));
+    const int hour = std::stoi(iso.substr(11, 2));
+    const int minute = std::stoi(iso.substr(14, 2));
+    const int second = std::stoi(iso.substr(17, 2));
+    const std::array<int, 12> days{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    if (year == 0 || month < 1 || month > 12 || day < 1 ||
+        day > days[month - 1] + (month == 2 && leap ? 1 : 0) ||
+        hour > 23 || minute > 59 || second > 59 ||
+        (zone != "Z" && (std::stoi(zone.substr(1, 2)) > 23 || std::stoi(zone.substr(4, 2)) > 59))) {
+        throw Error(STL2STP_ERROR_ARGUMENT, "Timestamp has an invalid calendar date, time or offset");
+    }
+    return {iso, iso.substr(0, 4) + iso.substr(5, 2) + iso.substr(8, 2) + "." +
+                 iso.substr(11, 2) + iso.substr(14, 2) + iso.substr(17, 2)};
+}
+
+std::string step_text(const std::string& utf8) {
+    std::string encoded;
+    std::string directive;
+    auto close = [&] {
+        if (!directive.empty()) { encoded += "\\X0\\"; directive.clear(); }
+    };
+    for (std::size_t cursor = 0; cursor < utf8.size();) {
+        const auto first = static_cast<unsigned char>(utf8[cursor++]);
+        uint32_t codepoint = first;
+        int remaining = 0;
+        uint32_t minimum = 0;
+        if (first >= 0xc2 && first <= 0xdf) { remaining = 1; codepoint &= 0x1f; minimum = 0x80; }
+        else if (first >= 0xe0 && first <= 0xef) { remaining = 2; codepoint &= 0x0f; minimum = 0x800; }
+        else if (first >= 0xf0 && first <= 0xf4) { remaining = 3; codepoint &= 0x07; minimum = 0x10000; }
+        else if (first >= 0x80) { throw Error(STL2STP_ERROR_ARGUMENT, "STEP metadata must be valid UTF-8"); }
+        for (int index = 0; index < remaining; ++index) {
+            if (cursor == utf8.size() || (static_cast<unsigned char>(utf8[cursor]) & 0xc0) != 0x80) {
+                throw Error(STL2STP_ERROR_ARGUMENT, "STEP metadata must be valid UTF-8");
+            }
+            codepoint = (codepoint << 6) | (static_cast<unsigned char>(utf8[cursor++]) & 0x3f);
+        }
+        if (codepoint < minimum || codepoint > 0x10ffff || (codepoint >= 0xd800 && codepoint <= 0xdfff)) {
+            throw Error(STL2STP_ERROR_ARGUMENT, "STEP metadata must contain Unicode scalar values");
+        }
+        if (codepoint == '\\') {
+            close();
+            encoded += "\\X2\\005C\\X0\\";
+        } else if (codepoint >= 0x20 && codepoint <= 0x7e) {
+            close();
+            encoded += static_cast<char>(codepoint);
+        } else {
+            const std::string next = codepoint <= 0xffff ? "\\X2\\" : "\\X4\\";
+            if (directive != next) { close(); encoded += next; directive = next; }
+            for (int shift = codepoint <= 0xffff ? 12 : 28; shift >= 0; shift -= 4) {
+                encoded += "0123456789ABCDEF"[(codepoint >> shift) & 0xf];
+            }
+        }
+    }
+    close();
+    return encoded;
+}
+
+void normalize_step_strings(const std::string& path, Progress& progress) {
+    std::ifstream input(std::filesystem::u8path(path), std::ios::binary);
+    OutputFile normalized(path.c_str());
+    std::ofstream output(normalized.temporary(), std::ios::binary);
+    if (!input || !output) { throw Error(STL2STP_ERROR_IO, "Cannot normalize STEP strings"); }
+    const std::string marker = "\\X2\\005C\\X0\\";
+    std::string pending;
+    bool in_string = false;
+    bool quote_pending = false;
+    auto emit = [&](char byte) {
+        pending += byte;
+        while (!pending.empty()) {
+            if (pending == marker) { output << "\\\\"; pending.clear(); break; }
+            if (marker.compare(0, pending.size(), pending) == 0) { break; }
+            output.put(pending.front());
+            pending.erase(0, 1);
+        }
+    };
+    char character;
+    std::size_t count = 0;
+    while (input.get(character)) {
+        if (++count % 65536 == 0) { progress.check(); }
+        if (in_string && (character == '\n' || character == '\r')) { continue; }
+        if (quote_pending) {
+            quote_pending = false;
+            if (character == '\'') { emit('\''); emit('\''); continue; }
+            output << pending << '\'';
+            pending.clear();
+            in_string = false;
+        }
+        if (!in_string) {
+            output.put(character);
+            in_string = character == '\'';
+        } else if (character == '\'') {
+            quote_pending = true;
+        } else {
+            emit(character);
+        }
+    }
+    output << pending;
+    if (quote_pending) { output.put('\''); }
+    if (in_string && !quote_pending) { throw Error(STL2STP_ERROR_IO, "Unterminated STEP string"); }
+    output.close();
+    if (!input.eof() || !output) { throw Error(STL2STP_ERROR_IO, "Cannot normalize STEP strings"); }
+    input.close();
+    normalized.commit();
+}
 
 class Indicator : public Message_ProgressIndicator {
 public:
@@ -360,10 +513,13 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
         const std::string organization = options.organization ? options.organization : "";
         const std::string product_name = options.product ? options.product : "";
         const std::string description = options.description ? options.description : "";
+        const std::string supplied_timestamp = options.timestamp ? options.timestamp : "";
+        Timestamp timestamp;
         const std::string filename = std::filesystem::u8path(path).filename().u8string();
         auto text = [](const std::string& value) {
             return Handle(TCollection_HAsciiString)(new TCollection_HAsciiString(value.c_str()));
         };
+        auto step_string = [&](const std::string& value) { return text(step_text(value)); };
         auto iges_text = [&](const std::string& value) {
             return text(value.empty() ? "" : std::to_string(value.size()) + "H" + value);
         };
@@ -391,6 +547,7 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
         Progress progress(callbacks);
         progress.report(0);
         auto lock = exchange_lock(progress);
+        timestamp = timestamp_value(options.timestamp ? supplied_timestamp.c_str() : nullptr);
         const bool original = options.mode == STL2STP_MODE_ORIGINAL;
         const auto shape = original ? make_original_shape(handle->mesh, options, progress)
                                     : make_sewing_shape(handle->mesh, options, progress);
@@ -415,24 +572,25 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
             progress.report(0.88);
             const auto model = writer.Model(false);
             APIHeaderSection_MakeHeader header(model);
-            header.SetName(text(filename));
-            header.SetAuthorValue(1, text(author));
-            header.SetOrganizationValue(1, text(organization));
-            header.SetOriginatingSystem(text(product_name));
-            header.SetDescriptionValue(1, text(description));
+            header.SetName(step_string(filename));
+            header.SetAuthorValue(1, step_string(author));
+            header.SetOrganizationValue(1, step_string(organization));
+            header.SetOriginatingSystem(step_string(product_name));
+            header.SetDescriptionValue(1, step_string(description));
             header.SetPreprocessorVersion(text(""));
             header.SetAuthorisation(text(""));
-            header.SetTimeStamp(text(""));
+            header.SetTimeStamp(text(timestamp.iso));
             for (int index = 1; index <= model->NbEntities(); ++index) {
                 const auto product_entity = Handle(StepBasic_Product)::DownCast(model->Value(index));
                 if (!product_entity.IsNull()) {
-                    product_entity->SetId(text(product_name));
-                    product_entity->SetName(text(product_name));
+                    product_entity->SetId(step_string(product_name));
+                    product_entity->SetName(step_string(product_name));
                 }
             }
             if (writer.Write(temporary.c_str()) != IFSelect_RetDone) {
                 throw Error(STL2STP_ERROR_IO, "STEP write failed");
             }
+            normalize_step_strings(temporary, progress);
         } else {
             IGESControl_Controller::Init();
             StaticSetting author_setting("write.iges.header.author", author.c_str());
@@ -455,8 +613,8 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
             section.SetSendName(iges_text(product_name));
             section.SetSystemId(iges_text(product_name));
             section.SetReceiveName(text(""));
-            section.SetDate(text(""));
-            section.SetLastChangeDate(text(""));
+            section.SetDate(text(timestamp.iges));
+            section.SetLastChangeDate(text(timestamp.iges));
             section.SetApplicationProtocol(text(""));
             writer.Model()->SetGlobalSection(section);
             writer.Model()->ClearStartSection();

@@ -65,6 +65,7 @@ typedef struct stl2stp_export_options {
     const char* organization;
     const char* product;
     const char* description;
+    const char* timestamp;
 } stl2stp_export_options;
 
 stl2stp_handle* stl2stp_create(void);

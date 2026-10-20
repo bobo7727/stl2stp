@@ -37,7 +37,7 @@ if(STL2STP_WITH_OCCT)
     target_link_libraries(stl2stp-metadata-tests PRIVATE stl2stp-core Threads::Threads)
     foreach(_mode original sewing)
         foreach(_format step iges)
-            foreach(_scenario default custom isolation copy cancel)
+            foreach(_scenario default custom isolation copy cancel timestamp encoding)
                 set(_test "metadata_${_scenario}_${_mode}_${_format}")
                 add_test(NAME stl2stp.${_test} COMMAND stl2stp-metadata-tests ${_scenario} ${_mode} ${_format}
                     "${_data}/cube-binary.stl" "${_data}/${_test}")
@@ -82,7 +82,23 @@ if(STL2STP_WITH_OCCT)
             set_tests_properties(stl2stp.${_test}_read PROPERTIES FIXTURES_REQUIRED ${_test} LABELS metadata TIMEOUT 180)
         endforeach()
     endforeach()
-    foreach(_flag author org product description)
+    foreach(_mode original sewing)
+        foreach(_format step iges)
+            set(_test "cli_timestamp_${_mode}_${_format}")
+            add_test(NAME stl2stp.${_test} COMMAND stl2stp-cli convert "${_data}/cube-binary.stl"
+                "${_data}/${_test}.${_format}" --mode ${_mode} --author "致知屋" --org "测试公司"
+                --product "测试产品" --description "测试描述" --timestamp "2024-02-29T18:52:00.123+08:00")
+            set_tests_properties(stl2stp.${_test} PROPERTIES FIXTURES_REQUIRED stl2stp_data FIXTURES_SETUP ${_test}
+                LABELS metadata TIMEOUT 180)
+            add_test(NAME stl2stp.${_test}_read COMMAND stl2stp-metadata-tests cli_timestamp ${_mode} ${_format}
+                "${_data}/cube-binary.stl" "${_data}/${_test}.${_format}")
+            set_tests_properties(stl2stp.${_test}_read PROPERTIES FIXTURES_REQUIRED ${_test} LABELS metadata TIMEOUT 180)
+        endforeach()
+    endforeach()
+    add_test(NAME stl2stp.cli_timestamp_invalid COMMAND stl2stp-cli convert "${_data}/cube-binary.stl"
+        "${_data}/invalid-timestamp.step" --timestamp "2026-02-29T00:00:00Z")
+    set_tests_properties(stl2stp.cli_timestamp_invalid PROPERTIES FIXTURES_REQUIRED stl2stp_data WILL_FAIL TRUE LABELS metadata)
+    foreach(_flag author org product description timestamp)
         foreach(_error missing duplicate)
             set(_args --${_flag})
             if(_error STREQUAL duplicate)
