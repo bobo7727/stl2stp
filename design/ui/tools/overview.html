@@ -1,0 +1,20 @@
+<!doctype html><html lang="zh-Hans"><head><meta charset="utf-8"><style>
+body{margin:0;background:#E9ECF2;font-family:"PingFang SC","Noto Sans CJK SC",sans-serif;color:#111;padding:40px 48px}
+h1{margin:0;font-size:34px} .sub{color:#555;font-size:17px;margin:6px 0 26px}
+.row{display:flex;align-items:flex-start;gap:0;margin-bottom:26px} .row.dark{background:#111;border-radius:28px;padding:22px 0 10px;color:#eee}
+.lab{writing-mode:vertical-rl;font-weight:700;font-size:18px;width:40px;align-self:center;text-align:center}
+.cell{width:300px;text-align:center;margin:0 6px} .cell img{width:300px;height:650px;border-radius:38px;box-shadow:0 0 0 7px #1b1b1d,0 14px 30px rgba(0,0,0,.25);display:block}
+.cap{margin-top:16px;font-size:17px;font-weight:600} .cap small{display:block;font-weight:400;font-size:13px;opacity:.7;margin-top:2px}
+.arrow{width:34px;align-self:center;font-size:30px;color:#007AFF;text-align:center;margin-top:-40px}
+.foot{font-size:14px;color:#666}
+</style></head><body>
+<h1>STL2STP 手机版 · 主流程</h1>
+<div class="sub">导入 → 预览 + 一键转换 → 分享 / 存到“文件”（3 次点击）。高级设置默认收起。图中数值均为示例。</div>
+<div id="rows"></div>
+<div class="foot">原型：prototype/index.html · 规范：ui-spec.md · 单屏截图：screenshots/</div>
+<script>
+const S=[['04_home','① 首页','点“导入 STL 文件”'],['06_preview','② 预览','旋转查看 · 一键转换'],['08_advanced_settings','（可选）高级设置','减面 · 模式 · 合并共面 · 文件信息'],['11_converting','③ 转换中','分阶段进度 · 可取消'],['13_done','④ 完成','校验结果 · 分享 / 存储'],['14_share_sheet','⑤ 系统分享','微信 · 隔空投送 · 文件']];
+let h='';for(const th of ['light','dark']){h+=`<div class="row ${th}"><div class="lab">${th==='light'?'浅色':'深色'}</div>`;
+S.forEach(([f,a,b],i)=>{ if(i) h+='<div class="arrow">→</div>'; h+=`<div class="cell"><img src="../screenshots/${f}_${th}.png"><div class="cap">${a}<small>${b}</small></div></div>`;});h+='</div>';}
+document.getElementById('rows').innerHTML=h;
+</script></body></html>
