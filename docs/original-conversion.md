@@ -190,6 +190,15 @@ OCCT transfer 的内部 shape processing 也不能描述成应用显式调用了
 
 ## 7. 本次 ORIGINAL 迁移边界与 OCCT 8.x 替代
 
+**所有者决定的刻意偏离（metadata）：** 上文列出的 `VINCENT`、`STL2STP 1.0.0`、
+`STL TO STEP FILE` 和 STEP/IGES processor 等，是 reference 的历史行为，
+不是当前 core 的默认值。当前 ORIGINAL 与 SEWING 的 author、organization、product、
+description 均默认空，并由 `stl2stp_export_options` 尾部四个 UTF-8 字段配置；
+也主动清空 OCCT 可控的 processor、authorisation、system/receiver、timestamp/date 默认值。
+STEP PRODUCT 的空值回退通过 Transfer 后 per-model setter 消除。
+ORIGINAL **仍复现原始几何重建算法**；这一 metadata 差异不改变共享边/节点或 shell/solid 管线。
+实际剩余结构字段、中文编码/IGES Start 回读限制及全局参数隔离见 `docs/core-api.md`。
+
 - `MakeVertex` → 共享无向 `MakeEdge` → `MakeWire`（只显式反转第一条边）→
   `MakeFace` → 单 shell / 单 solid 的顺序及 `BRepTools::Update` 保留；
   默认不合并共面，不 Sewing，不按闭合性改装配，不删除重复三角形。
@@ -209,7 +218,7 @@ OCCT transfer 的内部 shape processing 也不能描述成应用显式调用了
   7.x 条件分支保留 `GetMessageString()`。这些是统计/诊断兼容，不改变构造算法。
 - STEP `Model(false)`、header setter、IGES GlobalSection、Transfer/AddShape/Write
   的 API 在 8.0.1 仍有效，无需改名。仅增加 progress range/cancellation。
-  ORIGINAL 不覆盖 schema/unit/precision，STEP product 改动在操作后恢复，
+  ORIGINAL 不覆盖 schema/unit/precision，STEP product 和 IGES header 参数改动在操作后恢复，
   header 的 name 使用最终 basename，而不是库原子写出的临时文件名。
 - 原 handler 的未检查返回值改为 C status 错误；增加有限坐标/float32 key 范围/
   OCCT int 索引范围检查、事务写入及取消，不复刻崩溃、未定义读取或“失败仍显示成功”。

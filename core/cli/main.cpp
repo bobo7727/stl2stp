@@ -64,6 +64,7 @@ void usage() {
               << "  stl2stp-cli info <in.stl>\n"
               << "  stl2stp-cli simplify <in.stl> <out.stl> --faces N\n"
               << "  stl2stp-cli convert <in.stl> <out.step|out.igs> [--mode original|sewing] [--merge-coplanar] [--simplify N]\n"
+              << "      [--author TEXT] [--org TEXT] [--product TEXT] [--description TEXT]\n"
               << "  stl2stp-cli readback <in.step>\n";
 }
 
@@ -107,6 +108,14 @@ int main(int argc, char** argv) {
                 } else if (((command == "simplify" && argument == "--faces") ||
                             (command == "convert" && argument == "--simplify")) && !target && index + 1 < argc) {
                     target = face_count(argv[++index]);
+                } else if (command == "convert" && index + 1 < argc &&
+                           (argument == "--author" || argument == "--org" ||
+                            argument == "--product" || argument == "--description")) {
+                    const char** field = argument == "--author" ? &options.author :
+                        argument == "--org" ? &options.organization :
+                        argument == "--product" ? &options.product : &options.description;
+                    if (*field) { throw std::runtime_error("Duplicate option: " + argument); }
+                    *field = argv[++index];
                 } else {
                     throw std::runtime_error("Unknown, duplicate or incomplete option: " + argument);
                 }

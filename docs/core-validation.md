@@ -1,5 +1,56 @@
 # 核心库验证交接（2026-10-20）
 
+## 可配置空 metadata（当前工作，基于 `7d961fe`）
+
+四个 UTF-8 指针 `author`、`organization`、`product`、`description` 追加在 options 尾部，
+默认 NULL；两模式 × STEP/IGES 均去掉原版及 OCCT 可控的默认 metadata，几何算法未改。
+历史章节的硬编码 header 观察不是当前默认行为。branch 仍为 `core/extract`，未 commit。
+
+保留全部 46 个既有测试，新增 39 个 metadata CTest，共 85 个。
+覆盖四组合默认空/中文自定义、OCCT Header/PRODUCT/IGES GlobalSection 回读、连续两个
+不同值后跟空字符串及 NULL defaults（包括 options=NULL）、非 ASCII basename、
+调用中 callback 修改 caller 字符串后的私有副本、取消后恢复 ambient Interface_Static、
+两个独立 handle 的 ORIGINAL/SEWING 并发调用、IGES 195 字节边界及 CR/LF 拒绝、
+四组合 CLI 中文 flags 与缺值/重复 flags。生成数据都位于各 build/tests/data/。
+
+STEP 是原始 UTF-8（不是自动 X2），OCCT 默认 UTF8 codepage 可回读；
+IGES Global 是 UTF-8 字节数 Hollerith，中文 author/company/product 无损回读。
+纯中文 IGES Start description 写出字节正确，但 OCCT signed-char 行尾裁剪后回读为空；
+这是明确保留的外部 OCCT 8.0.1 限制，测试未用成功返回码掩盖该数据损失。
+空 timestamp/date 的严格格式合规性和其它 CAD 的兼容性未认证。
+准确字段清单、已清空和仍保留的结构值见 `docs/core-api.md`。
+
+构建使用 gcc-10/g++-10、只读 OCCT 8.0.1；所有生成文件、TMPDIR、日志都在仓库 build/，
+未写入 home、reference 或全局配置。Release 与 Debug `-Werror` + UBSan 最终摘要如下。
+Debug C/C++ flags 均为 `-Wall -Wextra -Wpedantic -Werror -fsanitize=undefined -fno-sanitize-recover=undefined`。
+OCCT 是现有 Release 共享库，未重建或对 OCCT 自身新增 UBSan instrumentation。
+
+Release，`build/core-linux/ctest-metadata-validation.log`：
+
+```text
+100% tests passed, 0 tests failed out of 85
+
+Label Time Summary:
+mesh        =   0.61 sec*proc (10 tests)
+metadata    =   2.54 sec*proc (39 tests)
+occt        =   3.68 sec*proc (46 tests)
+
+Total Test time (real) =   7.46 sec
+```
+
+Debug `-Werror` + UBSan，`build/core-linux-debug-ubsan/ctest-metadata-validation.log`：
+
+```text
+100% tests passed, 0 tests failed out of 85
+
+Label Time Summary:
+mesh        =   1.97 sec*proc (10 tests)
+metadata    =   3.81 sec*proc (39 tests)
+occt        =   5.01 sec*proc (46 tests)
+
+Total Test time (real) =  10.35 sec
+```
+
 ## 双模式验证（当前工作，基于 `9ec394a`）
 
 默认已经改为 `STL2STP_MODE_ORIGINAL`，因为 reference 的导出重建没有 Sewing。
@@ -288,4 +339,4 @@ ORIGINAL 导出约快 2 倍（省掉 Sewing），文件约小 5%（同一 shape 
 
 说明：
 - ORIGINAL 和桌面版一样，把所有面放进一个 shell 和一个 solid，所以 two-shells 导出时只有 1 个 solid。OCCT STEP reader 回读时会按连通域拆成 2 个；开放网格（截断文件）回读时 solid 会降级成 shell。
-- ORIGINAL 的 STEP 头部写入原版元数据：作者和组织为 `VINCENT`，产品名为 `STL2STP 1.0.0`，描述为 `STL TO STEP FILE`。
+- 本节历史版本的 ORIGINAL STEP 头部写入原版元数据：作者和组织为 `VINCENT`，产品名为 `STL2STP 1.0.0`，描述为 `STL TO STEP FILE`；已被当前默认空/可配置 metadata 决策取代。

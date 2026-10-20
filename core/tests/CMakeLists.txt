@@ -31,6 +31,28 @@ foreach(_test IN LISTS _mesh_tests)
     set_tests_properties(stl2stp.${_test} PROPERTIES FIXTURES_REQUIRED stl2stp_data LABELS mesh TIMEOUT 120)
 endforeach()
 if(STL2STP_WITH_OCCT)
+    find_package(Threads REQUIRED)
+    add_executable(stl2stp-metadata-tests test_metadata.cpp)
+    target_include_directories(stl2stp-metadata-tests SYSTEM PRIVATE "${OCCT_INCLUDE_DIR}")
+    target_link_libraries(stl2stp-metadata-tests PRIVATE stl2stp-core Threads::Threads)
+    foreach(_mode original sewing)
+        foreach(_format step iges)
+            foreach(_scenario default custom isolation copy cancel)
+                set(_test "metadata_${_scenario}_${_mode}_${_format}")
+                add_test(NAME stl2stp.${_test} COMMAND stl2stp-metadata-tests ${_scenario} ${_mode} ${_format}
+                    "${_data}/cube-binary.stl" "${_data}/${_test}")
+                set_tests_properties(stl2stp.${_test} PROPERTIES FIXTURES_REQUIRED stl2stp_data LABELS "occt;metadata" TIMEOUT 180)
+            endforeach()
+        endforeach()
+    endforeach()
+    foreach(_format step iges)
+        add_test(NAME stl2stp.metadata_parallel_${_format} COMMAND stl2stp-metadata-tests parallel original ${_format}
+            "${_data}/cube-binary.stl" "${_data}/metadata_parallel_${_format}")
+        set_tests_properties(stl2stp.metadata_parallel_${_format} PROPERTIES FIXTURES_REQUIRED stl2stp_data LABELS "occt;metadata" TIMEOUT 180)
+    endforeach()
+    add_test(NAME stl2stp.metadata_iges_limits COMMAND stl2stp-metadata-tests limits original iges
+        "${_data}/cube-binary.stl" "${_data}/metadata_iges_limits")
+    set_tests_properties(stl2stp.metadata_iges_limits PROPERTIES FIXTURES_REQUIRED stl2stp_data LABELS "occt;metadata" TIMEOUT 180)
     foreach(_test IN LISTS _exchange_tests)
         add_test(NAME stl2stp.${_test} COMMAND stl2stp-tests "${_test}" "${_data}" "${_data}/output-${_test}")
         set_tests_properties(stl2stp.${_test} PROPERTIES FIXTURES_REQUIRED stl2stp_data LABELS occt TIMEOUT 180)
@@ -47,6 +69,31 @@ set_tests_properties(stl2stp.cli_simplify PROPERTIES PASS_REGULAR_EXPRESSION "ou
 set_tests_properties(stl2stp.cli_info stl2stp.cli_simplify stl2stp.cli_invalid PROPERTIES FIXTURES_REQUIRED stl2stp_data)
 
 if(STL2STP_WITH_OCCT)
+    foreach(_mode original sewing)
+        foreach(_format step iges)
+            set(_test "cli_metadata_${_mode}_${_format}")
+            add_test(NAME stl2stp.${_test} COMMAND stl2stp-cli convert "${_data}/cube-binary.stl"
+                "${_data}/${_test}.${_format}" --mode ${_mode} --author "致知屋" --org "测试公司"
+                --product "测试产品" --description "测试描述")
+            set_tests_properties(stl2stp.${_test} PROPERTIES FIXTURES_REQUIRED stl2stp_data FIXTURES_SETUP ${_test}
+                LABELS metadata TIMEOUT 180)
+            add_test(NAME stl2stp.${_test}_read COMMAND stl2stp-metadata-tests cli ${_mode} ${_format}
+                "${_data}/cube-binary.stl" "${_data}/${_test}.${_format}")
+            set_tests_properties(stl2stp.${_test}_read PROPERTIES FIXTURES_REQUIRED ${_test} LABELS metadata TIMEOUT 180)
+        endforeach()
+    endforeach()
+    foreach(_flag author org product description)
+        foreach(_error missing duplicate)
+            set(_args --${_flag})
+            if(_error STREQUAL duplicate)
+                set(_args --${_flag} "" --${_flag} second)
+            endif()
+            add_test(NAME stl2stp.cli_metadata_${_flag}_${_error} COMMAND stl2stp-cli convert "${_data}/cube-binary.stl"
+                "${_data}/invalid-metadata.step" ${_args})
+            set_tests_properties(stl2stp.cli_metadata_${_flag}_${_error} PROPERTIES FIXTURES_REQUIRED stl2stp_data
+                WILL_FAIL TRUE LABELS metadata)
+        endforeach()
+    endforeach()
     add_test(NAME stl2stp.cli_convert COMMAND stl2stp-cli convert "${_data}/cube-binary.stl" "${_data}/cli-cube.step" --merge-coplanar)
     set_tests_properties(stl2stp.cli_convert PROPERTIES FIXTURES_REQUIRED stl2stp_data FIXTURES_SETUP cli_step
         PASS_REGULAR_EXPRESSION "mode=original" TIMEOUT 180)

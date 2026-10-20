@@ -12,7 +12,7 @@ Objective-C++ bridge 只需包含此头文件并持有 opaque `stl2stp_handle*`�
 | `stl2stp_create` | 创建空 handle；失败返回 `NULL` |
 | `stl2stp_destroy` | 销毁 handle；`NULL` 安全 |
 | `stl2stp_last_error` | 读取上次诊断，不清空；`NULL` 读取当前线程的创建/null-handle 诊断 |
-| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0` |
+| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0`，四个 metadata 指针均为 `NULL` |
 | `stl2stp_load_stl` | 自动识别 binary/ASCII STL，精确坐标去重，成功后替换网格 |
 | `stl2stp_get_mesh_stats` | 返回 unique vertices、无向 unique edges、triangular faces 和 AABB |
 | `stl2stp_simplify` | QEM edge collapse，按目标三角面数简化当前网格 |
@@ -99,13 +99,14 @@ typedef enum stl2stp_mode {
 } stl2stp_mode;
 ```
 
-`stl2stp_export_options` 保留原字段顺序，在末尾追加 `stl2stp_mode mode`。
+`stl2stp_export_options` 顺序为 `sewing_tolerance`、`merge_coplanar`、`mode`，
+再在末尾追加 `const char* author`、`organization`、`product`、`description`。
 C++17 声明固定 underlying type 为 `int32_t`，使任意 C 传入的 32-bit 枚举值
 都可以安全验证，不先触发 UBSan 的 invalid enum load；C99 端使用普通 enum，
 C header 测试检查其大小为 4 bytes。不要用 `-fshort-enums` 编译 bridge。
 未知 mode 返回 `STL2STP_ERROR_ARGUMENT`，不改变文件或 topology。
-这不是旧已编译客户端的 ABI 兼容承诺：新增字段可能占原来的尾部 padding；
-原客户端没有初始化它，**库和 bridge 必须一起重新编译**。
+这不是旧已编译客户端的 ABI 兼容承诺：结构体大小已经改变；旧客户端没有初始化
+新增字段，**库和 bridge 必须一起重新编译**。
 建议总是使用 `stl2stp_default_export_options()` 初始化，不手工猜结构体布局。
 
 **默认是 ORIGINAL，不是 SEWING**，因为所给桌面导出算法共享节点/边并直接
@@ -128,10 +129,8 @@ shells/solids。例如 two-shells 导出前 1 solid / 1 shell，OCCT 8.0.1 回�
 没有隐含 100000 面上限，没有交互确认或自动简化，相当于桌面大面数提示选择“是”。
 UI 应自行提示/限流；CLI 只有显式 `--simplify N` 才执行简化。
 
-STEP 保留 `STEPControl_AsIs`、`compgraph=true`、product `STL2STP 1.0.0`，
-author/organization `VINCENT`、originating system `STL2STP`、description
-`STL TO STEP FILE`、preprocessor `STL2STP STEP processor`。
-IGES 保留 GlobalSection 的 author/company 和三项 `STL2STP IGES processor` 文案。
+STEP 保留 `STEPControl_AsIs`、`compgraph=true`；metadata 刻意不复刻原版硬编码，
+与 SEWING 一样默认空、由调用者配置，详见后文。
 文件名 metadata 使用最终 basename，不使用原子写出的临时文件名。
 如 reference 一样，不覆盖 schema/unit/precision；OCCT 8.0.1 的未修改默认值为
 STEP AP214IS、STEP/IGES MM、precision mode Average。原进程配置未有证据，
@@ -142,7 +141,7 @@ STEP AP214IS、STEP/IGES MM、precision mode Average。原进程配置未有证�
 保留本库此前行为：非零面积三角面按绕序用 `MakePolygon` / `MakeFace` 构造，
 `BRepBuilderAPI_Sewing(tolerance,true,true,true,false)`，闭合 shell 在可定向时
 构造 solid，开放 shell 保持 shell；多个组件放入 compound。
-STEP 显式 AP214IS / MM / product `STL2STP`；IGES 使用 MM。
+STEP 显式 AP214IS / MM；IGES 使用 MM。metadata 与 ORIGINAL 使用同一管线。
 `sewing_tolerance` 默认 **1e-6 模型坐标单位**，不是 reference 的公差。
 
 ### 独立共面合并与 CLI
@@ -159,11 +158,113 @@ IGES topology 是导出前 B-Rep，不是 IGES geometry read-back。
 ```sh
 stl2stp-cli convert in.stl out.step --mode original
 stl2stp-cli convert in.stl out.step --mode sewing --merge-coplanar
+stl2stp-cli convert in.stl out.step --author '致知屋' --org '测试公司' --product '测试产品' --description '测试描述'
 ```
 
 省略 `--mode` 等价于 `original`。CLI 在导出前打印 `mode=original` 或 `mode=sewing`；
 未知、重复或缺值选项失败。完整原始行号、隐式公差、prompt 和 API 替代见
 `docs/original-conversion.md`；实测拓扑与测试边界见 `docs/core-validation.md`。
+
+## 文件 metadata：默认空（OCCT 8.0.1 实测）
+
+四个字段都是 UTF-8、NUL 结尾 C 字符串；`NULL` 和 `""` 均表示空，
+`options=NULL` 也不会恢复旧硬编码。库在首次 callback 和获取 exchange mutex **之前**
+将四个字符串复制为私有 `std::string`，不保存 caller 指针。调用者只需在同步调用期间
+提供有效内存，不必保留到调用之后；不能与最初的复制并发修改这些字符串。
+默认文件不含 `VINCENT`、`STL2STP` 或 `STL TO STEP FILE`。
+
+| 字段 | STEP | IGES |
+| --- | --- | --- |
+| `author` | `FILE_NAME.author` 的唯一列表元素 | Global 参数 21 author |
+| `organization` | `FILE_NAME.organization` 的唯一列表元素 | Global 参数 22 company |
+| `product` | `FILE_NAME.originating_system`，每个 `PRODUCT.id` / `PRODUCT.name` | Global 参数 3 send/product、5 system id |
+| `description` | `FILE_DESCRIPTION.description` 的唯一列表元素 | Start section（IGES Global 没有 description 槽位） |
+
+两格式的文件名均使用最终输出 basename（含扩展名），不使用事务临时路径。
+STEP `PRODUCT.description` 不另写 description，保持 writer 的空值。
+IGES receiver、interface/preprocessor version、application protocol 都明确设为空，
+不是从宿主用户/组织/系统推断。IGES description 不冒用 application protocol 字段。
+
+### 参数名、默认回退和清空范围
+
+核对源文件（相对只读 `OCCT-8.0.1/src/`）：
+
+- `DataExchange/TKDESTEP/APIHeaderSection/APIHeaderSection_MakeHeader.cxx` 默认注入
+  `Author`、`Open CASCADE`、`Open CASCADE STEP processor 8.0`、
+  `Open CASCADE 8.0`、authorisation `Unknown`、当前 timestamp 和 `Open CASCADE Model`。
+  本库在 Transfer 后用 MakeHeader setter 全部覆盖；preprocessor、authorisation、timestamp
+  都能清空，实测均为 `''`，**不是强制保留字段**。
+- `DataExchange/TKDESTEP/STEPConstruct/STEPConstruct_ContextTool.cxx::GetProductName`
+  在 `write.step.product.name=""` 时回退成 `Product`，并可追加层级序号。
+  本库每次设置该全局参数并恢复，同时在 Transfer 后遍历 `StepBasic_Product`
+  明确设置 id/name；实测默认是 `PRODUCT('','','',(#8))`，不会残留 `Product` / 序号。
+- `DataExchange/TKDEIGES/IGESData/IGESData.cxx` 注册的真实文本参数为
+  `write.iges.header.author`、`write.iges.header.company`、`write.iges.header.product`、
+  `write.iges.header.receiver`；没有猜测使用 `write.iges.header.system` 等不存在的键。
+  author 原默认宿主用户名，product 原默认 `Open CASCADE IGES processor 8.0`。
+  本库每次设置上述四个参数并恢复，ComputeModel 后再覆盖模型 GlobalSection。
+  system id、preprocessor/interface version、creation date、last-change date 全都可以清空；
+  实测默认 Global 参数 3、5、6、12、18、21、22、25、26 均是空参数。
+
+默认 cube 的实际 STEP header（两模式一致）：
+
+```text
+FILE_DESCRIPTION((''),'2;1');
+FILE_NAME('default.step','',(''),(''),'','','');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }'));
+```
+
+**仍然非空的是格式/几何所需值，而不是被迫泄漏的作者或应用 metadata：**
+
+| 范围 | 实测值（cube，未改 OCCT 全局 schema/unit/precision） |
+| --- | --- |
+| STEP filename | `default.step`（按实际 basename 改变） |
+| STEP implementation level / schema | `2;1` / `AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }` |
+| STEP AP214 data context | `international standard`、`automotive_design`、`2000`、`core data for automotive mechanical design processes`；PRODUCT_CONTEXT `mechanical`；PRODUCT_DEFINITION `design`；PRODUCT_DEFINITION_CONTEXT `part definition` / `design`；product category `part` |
+| STEP geometric context | `2D SPACE`、`Context #1`、`3D Context with UNIT and UNCERTAINTY`；MM length、radian、steradian；uncertainty `1.E-07`，标签 `distance_accuracy_value` / `confusion accuracy` |
+| IGES filename（参数 4） | `default.igs`（按实际 basename 改变） |
+| IGES 分隔符 | 参数 / record 默认 `,` / `;`（Global 前两个槽位为空表示默认分隔符） |
+| IGES 数字能力（7–11） | `32,308,15,308,15` |
+| IGES scale / units（13–15） | `1.,2,2HMM`（scale 1，unit flag 2，MM） |
+| IGES line weight（16–17） | `1,0.01` |
+| IGES resolution / max coordinate（19–20） | `1E-07,1.`（随模型/公差变化） |
+| IGES version / drafting standard（23–24） | `11,0`（IGES 5.3，未指定 drafting standard） |
+
+这些结构/单位/精度字段不属于四个文本选项，刻意保留，不通过清空破坏几何语义。
+ORIGINAL 仍尊重外部配置的 schema/unit/precision；SEWING 仍为 AP214IS/MM。
+没有强制非空的作者、组织、产品、描述、处理器版本、授权或日期字段。
+空日期可以被 OCCT 写出且 ReadFile 成功，不等于通过 ISO/IGES 严格规范校验；
+本次未认证其它 CAD/严格 schema validator 对空 timestamp/date 的兼容性。
+
+### 中文编码与 OCCT 限制
+
+STEP writer 的 `StepData_StepWriter.cxx::CleanTextForSend` 不自动把 UTF-8 转成
+ISO 10303-21 `\X2\...\X0\`。本库实测原始 UTF-8，例如 `('致知屋')`、`('测试公司')`；
+OCCT 默认 `read.step.codepage=UTF8` 时 MakeHeader 和 PRODUCT 回读得到原字符串。
+非 ASCII 文件 basename 也按相同方式写出/回读；ASCII 单引号由 writer 加倍。
+外部 reader 应明确支持 UTF-8；不是宣称所有 Part-21/CAD reader 都接受此编码。
+OCCT 还会解释字符串中的 STEP 控制 directive，因此不要将 `\X2\...\X0\` 等
+文本当作必然逐字回读的普通文字。本库未更改 OCCT 的 directive 解释规则。
+
+IGES GlobalSection 使用 `TCollection_HAsciiString::Length()`，即 **UTF-8 字节数**，
+并保留原始字节：`9H致知屋`、`12H测试公司`，不是 `2H` / `4H`。
+固定记录按 72 字节数据 + 8 字节 section/序号切分；Hollerith 可跨记录。
+实测 OCCT GlobalSection author/company/send/system id 回读均得到原字符串。
+setter 会把开头形如 `6H...` 的输入误当成 Hollerith，本库先包一层长度前缀，
+保证用户的字面字符串 `6Hliteral` 也不被剥掉。
+
+OCCT `IGESData_GlobalSection.cxx::Params` 使用 `char text[200]`，`MakeHollerith`
+使用无边界 `Sprintf`。因此本库对 IGES author/organization/product/最终 basename
+各限制 **195 UTF-8 字节**（195 + `195H` + NUL = 200）；超限返回 ARGUMENT，
+不截断、不写文件。STEP 不受此上限限制。
+IGES 的四个 metadata 文本和 basename 不允许 CR/LF（ARGUMENT），避免原始换行
+破坏 80 字节物理记录；description 无 195 字节上限，但仍须为单行。
+
+IGES description 写在 Start section，原始 UTF-8 保留；但 OCCT 8.0.1 的
+`IGESFile/IGESFile_Read.cxx::IGESFile_ReadHeader` 用 signed `char > 32` 去掉行尾空白，
+会把行尾高位 UTF-8 字节也去掉。实测纯中文 `测试描述` 写出正确，OCCT 回读 Start
+却为空；ASCII description 可正常回读。测试同时断言原始 Start 字节和此 OCCT 限制，
+没有伪称中文 Start 能经 OCCT 无损回读。没有修改只读 OCCT 安装/源码。
 
 ## Progress、取消与线程
 
@@ -182,7 +283,12 @@ progress 的 1 表示结果准备好发布；取消 callback 即使在该时刻�
 
 同一 handle 的所有操作（包括读取诊断和 destroy）必须由调用者串行化。
 不同 handles 的 mesh 操作可并行；库内部 exchange mutex 串行化所有 OCCT exchange，
-因为 `Interface_Static` 是进程全局设置。STEP 参数操作后恢复。外部直接使用 OCCT 的调用
+因为 `Interface_Static` 是进程全局设置。锁覆盖构面、controller 初始化、所有参数设置、
+Transfer/AddShape/ComputeModel、header 修改、Write 和发布，也覆盖 STEP read-back。
+每次 export 用 RAII 保存/恢复所修改的 STEP schema/unit/product 和 IGES 四项 header 参数，
+成功、取消、异常路径都恢复；先有 controller 初始化，初始化的参数注册仍保留。
+不同 handles 的两种格式/两模式导出不能并行进入 OCCT，等待锁时仍轮询取消。
+外部直接使用 OCCT 的调用
 不受本 mutex 保护，必须由应用额外协调，不能同时修改相关 OCCT 全局参数。
 callback 不得重入库或销毁 handle，不得从 C/Objective-C/Swift callback 抛异常；
 UI 更新应 dispatch 到 main queue。跨线程取消用原子状态 + callback，不要用存在数据竞争的普通 int。

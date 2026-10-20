@@ -6,6 +6,7 @@ int main(void) {
     stl2stp_mesh_stats stats = {0};
     int valid = handle != 0 && options.merge_coplanar == 0 && options.sewing_tolerance > 0
         && options.mode == STL2STP_MODE_ORIGINAL && STL2STP_MODE_SEWING == 1
+        && !options.author && !options.organization && !options.product && !options.description
         && sizeof(stl2stp_mode) == sizeof(int32_t);
     if (handle) {
         valid = valid && stl2stp_get_mesh_stats(handle, &stats) == STL2STP_ERROR_EMPTY;

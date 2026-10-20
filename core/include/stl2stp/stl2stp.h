@@ -61,6 +61,10 @@ typedef struct stl2stp_export_options {
     double sewing_tolerance;
     int merge_coplanar;
     stl2stp_mode mode;
+    const char* author;
+    const char* organization;
+    const char* product;
+    const char* description;
 } stl2stp_export_options;
 
 stl2stp_handle* stl2stp_create(void);

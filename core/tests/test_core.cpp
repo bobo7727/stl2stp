@@ -133,16 +133,15 @@ void mode_conversion(stl2stp_handle* handle, const std::filesystem::path& data,
             status(handle, stl2stp_export_iges(handle, path.u8string().c_str(), &options, &observer, &exported));
             const auto text = contents(path);
             validate_iges(text);
-            if (original) {
-                require(text.find("VINCENT") != std::string::npos && text.find("STL2STP IGES processor") != std::string::npos &&
-                        text.find("model.igs") != std::string::npos, "Original IGES metadata missing");
-            }
+            require(text.find("model.igs") != std::string::npos, "IGES header used temporary filename");
+            require(text.find("VINCENT") == std::string::npos && text.find("STL2STP") == std::string::npos,
+                    "Default IGES metadata must be empty");
         } else {
             status(handle, stl2stp_export_step(handle, path.u8string().c_str(), &options, &observer, &exported));
             const auto text = contents(path);
             if (original) {
-                for (const auto field : {"STL2STP 1.0.0", "VINCENT", "STL TO STEP FILE", "STL2STP STEP processor"}) {
-                    require(text.find(field) != std::string::npos, std::string("Original STEP metadata missing: ") + field);
+                for (const auto field : {"STL2STP", "VINCENT", "STL TO STEP FILE"}) {
+                    require(text.find(field) == std::string::npos, std::string("Default STEP metadata leaked: ") + field);
                 }
                 require(text.find(path.filename().u8string()) != std::string::npos, "Header used temporary filename");
                 const auto shell = text.find("CLOSED_SHELL(");

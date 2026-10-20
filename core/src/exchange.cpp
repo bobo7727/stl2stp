@@ -27,6 +27,7 @@
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
 #include <StepData_StepModel.hxx>
+#include <StepBasic_Product.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <Standard_Failure.hxx>
@@ -355,6 +356,29 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
         require_path(path);
         require_mesh(handle->mesh);
         const auto options = supplied ? *supplied : stl2stp_default_export_options();
+        const std::string author = options.author ? options.author : "";
+        const std::string organization = options.organization ? options.organization : "";
+        const std::string product_name = options.product ? options.product : "";
+        const std::string description = options.description ? options.description : "";
+        const std::string filename = std::filesystem::u8path(path).filename().u8string();
+        auto text = [](const std::string& value) {
+            return Handle(TCollection_HAsciiString)(new TCollection_HAsciiString(value.c_str()));
+        };
+        auto iges_text = [&](const std::string& value) {
+            return text(value.empty() ? "" : std::to_string(value.size()) + "H" + value);
+        };
+        if (!step) {
+            for (const auto* value : {&author, &organization, &product_name, &filename}) {
+                if (value->size() > 195) {
+                    throw Error(STL2STP_ERROR_ARGUMENT, "IGES global strings cannot exceed 195 UTF-8 bytes");
+                }
+            }
+            for (const auto* value : {&author, &organization, &product_name, &filename, &description}) {
+                if (value->find_first_of("\r\n") != std::string::npos) {
+                    throw Error(STL2STP_ERROR_ARGUMENT, "IGES metadata must not contain CR or LF");
+                }
+            }
+        }
         if (!std::isfinite(options.sewing_tolerance) || options.sewing_tolerance <= 0) {
             throw Error(STL2STP_ERROR_ARGUMENT, "Sewing tolerance must be finite and positive");
         }
@@ -382,45 +406,61 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
                 unit = std::make_unique<StaticSetting>("write.step.unit", "MM");
             }
             STEPControl_Writer writer;
-            StaticSetting product("write.step.product.name", original ? "STL2STP 1.0.0" : "STL2STP");
+            StaticSetting product("write.step.product.name", product_name.c_str());
             const auto transferred = writer.Transfer(shape, STEPControl_AsIs, true, transfer_progress->Start());
             transfer_progress->checkpoint();
             if (transferred != IFSelect_RetDone) {
                 throw Error(STL2STP_ERROR_OCCT, "STEP transfer failed");
             }
             progress.report(0.88);
-            if (original) {
-                APIHeaderSection_MakeHeader header(writer.Model(false));
-                header.SetName(new TCollection_HAsciiString(std::filesystem::u8path(path).filename().u8string().c_str()));
-                header.SetAuthorValue(1, new TCollection_HAsciiString("VINCENT"));
-                header.SetOrganizationValue(1, new TCollection_HAsciiString("VINCENT"));
-                header.SetOriginatingSystem(new TCollection_HAsciiString("STL2STP"));
-                header.SetDescriptionValue(1, new TCollection_HAsciiString("STL TO STEP FILE"));
-                header.SetPreprocessorVersion(new TCollection_HAsciiString("STL2STP STEP processor"));
+            const auto model = writer.Model(false);
+            APIHeaderSection_MakeHeader header(model);
+            header.SetName(text(filename));
+            header.SetAuthorValue(1, text(author));
+            header.SetOrganizationValue(1, text(organization));
+            header.SetOriginatingSystem(text(product_name));
+            header.SetDescriptionValue(1, text(description));
+            header.SetPreprocessorVersion(text(""));
+            header.SetAuthorisation(text(""));
+            header.SetTimeStamp(text(""));
+            for (int index = 1; index <= model->NbEntities(); ++index) {
+                const auto product_entity = Handle(StepBasic_Product)::DownCast(model->Value(index));
+                if (!product_entity.IsNull()) {
+                    product_entity->SetId(text(product_name));
+                    product_entity->SetName(text(product_name));
+                }
             }
             if (writer.Write(temporary.c_str()) != IFSelect_RetDone) {
                 throw Error(STL2STP_ERROR_IO, "STEP write failed");
             }
         } else {
             IGESControl_Controller::Init();
+            StaticSetting author_setting("write.iges.header.author", author.c_str());
+            StaticSetting company_setting("write.iges.header.company", organization.c_str());
+            StaticSetting product_setting("write.iges.header.product", product_name.c_str());
+            StaticSetting receiver_setting("write.iges.header.receiver", "");
             IGESControl_Writer writer(original ? Interface_Static::CVal("write.iges.unit") : "MM",
                                      Interface_Static::IVal("write.brep.mode"));
-            if (original) {
-                IGESData_GlobalSection section(writer.Model()->GlobalSection());
-                section.SetAuthorName(new TCollection_HAsciiString("VINCENT"));
-                section.SetCompanyName(new TCollection_HAsciiString("VINCENT"));
-                section.SetFileName(new TCollection_HAsciiString(std::filesystem::u8path(path).filename().u8string().c_str()));
-                section.SetInterfaceVersion(new TCollection_HAsciiString("STL2STP IGES processor"));
-                section.SetSendName(new TCollection_HAsciiString("STL2STP IGES processor"));
-                section.SetSystemId(new TCollection_HAsciiString("STL2STP IGES processor"));
-                writer.Model()->SetGlobalSection(section);
-            }
             const bool added = writer.AddShape(shape, transfer_progress->Start());
             transfer_progress->checkpoint();
             if (!added) { throw Error(STL2STP_ERROR_OCCT, "IGES transfer failed"); }
             progress.report(0.88);
             writer.ComputeModel();
             progress.check();
+            IGESData_GlobalSection section(writer.Model()->GlobalSection());
+            section.SetAuthorName(iges_text(author));
+            section.SetCompanyName(iges_text(organization));
+            section.SetFileName(iges_text(filename));
+            section.SetInterfaceVersion(text(""));
+            section.SetSendName(iges_text(product_name));
+            section.SetSystemId(iges_text(product_name));
+            section.SetReceiveName(text(""));
+            section.SetDate(text(""));
+            section.SetLastChangeDate(text(""));
+            section.SetApplicationProtocol(text(""));
+            writer.Model()->SetGlobalSection(section);
+            writer.Model()->ClearStartSection();
+            if (!description.empty()) { writer.Model()->AddStartLine(description.c_str()); }
             if (!writer.Write(temporary.c_str(), false)) {
                 throw Error(STL2STP_ERROR_IO, "IGES write failed");
             }
