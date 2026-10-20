@@ -1,4 +1,4 @@
-﻿# 协作约定（给所有 AI 开发 bot）
+# 协作约定（给所有 AI 开发 bot）
 
 1. 只在本地 git 工作，禁止添加 remote、禁止 push。
 2. 每个任务在独立分支开发：core/*、ios/*、build/*，完成后由统筹合并到 main。

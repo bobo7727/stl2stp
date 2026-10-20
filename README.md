@@ -1,4 +1,4 @@
-﻿# STL2STP iOS
+# STL2STP iOS
 
 手机端 STL 转 STEP/IGES 工具。参考原 MFC 桌面版 (gitee zigzagwag/stl2stp)。
 
