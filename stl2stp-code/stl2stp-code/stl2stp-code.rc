@@ -1,0 +1,631 @@
+//Microsoft Visual C++ 生成的资源脚本。
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// 从 TEXTINCLUDE 2 资源生成。
+//
+#ifndef APSTUDIO_INVOKED
+#include "targetver.h"
+#endif
+#include "afxres.h"
+#include "verrsrc.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+#ifdef APSTUDIO_INVOKED
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE
+BEGIN
+    "#ifndef APSTUDIO_INVOKED\r\n"
+    "#include ""targetver.h""\r\n"
+    "#endif\r\n"
+    "#include ""afxres.h""\r\n"
+    "#include ""verrsrc.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE
+BEGIN
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)\r\n"
+    "LANGUAGE 4, 2\r\n"
+    "#include ""res\\stl2stpcode.rc2""  // 非 Microsoft Visual C++ 编辑的资源\r\n"
+    "#include ""l.CHS\\afxres.rc""      // 标准组件\r\n"
+    "#include ""l.CHS\\afxprint.rc""    // 打印/打印预览资源\r\n"
+    "#if !defined(_AFXDLL)\r\n"
+    "#include ""l.CHS\\afxribbon.rc""        // MFC 功能区和控制条资源\r\n"
+    "#endif\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 图标
+//
+
+// ID 值最低的图标放在最前面，以确保应用程序图标
+// 在所有系统中保持一致。
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE 4, 2
+IDR_MAINFRAME           ICON         "res\\stl2stp-code.ico"
+IDR_stl2stpcodeTYPE         ICON         "res\\stl2stp-codeDoc.ico"
+#endif
+IDI_FILE_VIEW           ICON         "res\\file_view.ico"
+IDI_FILE_VIEW_HC        ICON         "res\\file_view_hc.ico"
+IDI_CLASS_VIEW          ICON         "res\\class_view.ico"
+IDI_CLASS_VIEW_HC       ICON         "res\\class_view_hc.ico"
+IDI_OUTPUT_WND          ICON         "res\\output_wnd.ico"
+IDI_OUTPUT_WND_HC       ICON         "res\\output_wnd_hc.ico"
+IDI_PROPERTIES_WND      ICON         "res\\properties_wnd.ico"
+IDI_PROPERTIES_WND_HC   ICON         "res\\properties_wnd_hc.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 位图
+//
+
+IDR_MAINFRAME           BITMAP                  "res\\Toolbar.bmp"
+IDR_MAINFRAME_256       BITMAP                  "res\\orig_tb_129.bmp"
+IDR_EFFECTS_TOOLBAR     BITMAP                  "res\\orig_tb_324.bmp"
+IDR_VIEW_TOOLBAR        BITMAP                  "res\\child_bar_merged.bmp"
+IDR_SORT                BITMAP                  "res\\sort.bmp"
+IDB_SORT_24             BITMAP                  "res\\orig_tb_172.bmp"
+IDB_FILE_VIEW           BITMAP                  "res\\fileview.bmp"
+IDB_FILE_VIEW_24        BITMAP                  "res\\fileview_hc.bmp"
+IDB_CLASS_VIEW          BITMAP                  "res\\classview.bmp"
+IDB_CLASS_VIEW_24       BITMAP                  "res\\classview_hc.bmp"
+IDR_EXPLORER            BITMAP                  "res\\explorer.bmp"
+IDB_EXPLORER_24         BITMAP                  "res\\orig_tb_170.bmp"
+IDR_MENU_IMAGES         BITMAP                  "res\\orig_tb_179.bmp"
+IDB_MENU_IMAGES_24      BITMAP                  "res\\orig_tb_180.bmp"
+IDR_PROPERTIES          BITMAP                  "res\\orig_tb_183.bmp"
+IDB_PROPERTIES_HC       BITMAP                  "res\\orig_tb_184.bmp"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 工具栏
+//
+
+IDR_MAINFRAME TOOLBAR 16, 15
+BEGIN
+    BUTTON      ID_FILE_NEW
+    BUTTON      ID_FILE_OPEN
+    BUTTON      ID_FILE_SAVE
+    SEPARATOR
+    BUTTON      ID_EDIT_CUT
+    BUTTON      ID_EDIT_COPY
+    BUTTON      ID_EDIT_PASTE
+    SEPARATOR
+    BUTTON      ID_FILE_PRINT
+    BUTTON      ID_APP_ABOUT
+END
+
+// 原版资源 129 的工具栏按钮表（原版子框架第一个可见工具栏行）：
+// 首按钮 0xE000=AFX_IDS_APP_TITLE 是无命令处理器的装饰按钮（原版如此）
+IDR_MAINFRAME_256 TOOLBAR 16, 15
+BEGIN
+    BUTTON      AFX_IDS_APP_TITLE
+    BUTTON      ID_FILE_NEW
+    SEPARATOR
+    BUTTON      ID_IMPORT_STL_MODEL
+    BUTTON      ID_EXPORT_IGES
+    BUTTON      ID_EXPORT_STEP
+    BUTTON      ID_MESH_SIMPLIFY
+END
+
+// 子框架工具栏（新 UI：原版 3D Viewer(32785) 与 Ray Tracing(324) 两行合并为一行；
+// 位图 child_bar_merged.bmp 由两块取证位图按按钮序合成——同时修正 P0 移除
+// 6 个死按钮后的按钮-位图索引错位（MFC 分隔符不占位图槽，LoadToolBarEx 源码取证）。
+// 【方案 A（WYSIWYG）】操纵器 附加/取消 两按钮移除——视口姿态编辑不被导出尊重。
+// 注：位图尾部的 2 个多余图像槽闲置无害（尾部删除不引起索引错位）
+IDR_VIEW_TOOLBAR TOOLBAR 16, 15
+BEGIN
+    BUTTON      ID_VIEW_FITALL
+    SEPARATOR
+    BUTTON      ID_VIEW_PROJ_BACK
+    BUTTON      ID_VIEW_PROJ_TOP
+    BUTTON      ID_VIEW_PROJ_LEFT
+    BUTTON      ID_VIEW_PROJ_FRONT
+    BUTTON      ID_VIEW_PROJ_RIGHT
+    BUTTON      ID_VIEW_PROJ_BOTTOM
+    BUTTON      ID_VIEW_PROJ_AXO
+    BUTTON      ID_VIEW_RESET
+    BUTTON      ID_HLR_OFF
+    BUTTON      ID_HLR_ON
+    SEPARATOR
+    BUTTON      ID_VIEW_RAYTRACING
+    BUTTON      ID_VIEW_SHADOW
+    BUTTON      ID_VIEW_REFLECTION
+    BUTTON      ID_VIEW_ANTIALIASING
+    BUTTON      ID_VIEW_GRID
+END
+
+
+IDR_SORT TOOLBAR 16, 15
+BEGIN
+    BUTTON      ID_SORT_MENU
+    BUTTON      ID_NEW_FOLDER
+END
+
+IDR_EXPLORER TOOLBAR 16, 15
+BEGIN
+    BUTTON      ID_PROPERTIES
+END
+
+IDR_MENU_IMAGES TOOLBAR 16, 15
+BEGIN
+    BUTTON      ID_WINDOW_MANAGER
+    SEPARATOR
+    BUTTON      ID_WINDOW_CASCADE
+    BUTTON      ID_WINDOW_TILE_HORZ
+    BUTTON      ID_TOOLS_MACRO
+    BUTTON      ID_SORTING_SORTALPHABETIC
+    BUTTON      ID_SORTING_SORTBYTYPE
+    BUTTON      ID_SORTING_SORTBYACCESS
+    BUTTON      ID_SORTING_GROUPBYTYPE
+END
+
+IDR_PROPERTIES TOOLBAR 16, 15
+BEGIN
+    BUTTON      ID_EXPAND_ALL
+    BUTTON      ID_SORTPROPERTIES
+END
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE 4, 2
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 菜单
+//
+
+IDR_MAINFRAME MENU
+BEGIN
+    POPUP "文件(&F)"
+    BEGIN
+        MENUITEM "新建(&N)\tCtrl+N",                ID_FILE_NEW
+        MENUITEM "打开(&O)...\tCtrl+O",            ID_FILE_OPEN
+        MENUITEM "最近的文件(&F)",                ID_FILE_MRU_FILE1
+        MENUITEM "关闭(&C)",                      ID_FILE_CLOSE
+        MENUITEM SEPARATOR
+        MENUITEM "退出(&X)",                       ID_APP_EXIT
+    END
+    POPUP "视图(&V)"
+    BEGIN
+        POPUP "工具栏和停靠窗口(&T)"
+        BEGIN
+            MENUITEM "<占位符>",           ID_VIEW_TOOLBAR
+        END
+        MENUITEM "状态栏(&S)",                 ID_VIEW_STATUS_BAR
+        MENUITEM SEPARATOR
+        MENUITEM "深色主题(&D)",                ID_VIEW_DARKTHEME
+    END
+    POPUP "帮助(&H)"
+    BEGIN
+        MENUITEM "关于 STL2STP(&A)...",          ID_APP_ABOUT
+    END
+END
+
+IDR_stl2stpcodeTYPE MENU
+BEGIN
+    POPUP "文件(&F)"
+    BEGIN
+        MENUITEM "新建(&N)\tCtrl+N",                ID_FILE_NEW
+        MENUITEM "关闭(&C)",                      ID_FILE_CLOSE
+        POPUP "导入"
+        BEGIN
+            MENUITEM "STL",                        ID_IMPORT_STL_MODEL
+        END
+        POPUP "导出"
+        BEGIN
+            MENUITEM "IGES",                       ID_EXPORT_IGES
+            MENUITEM "STEP",                       ID_EXPORT_STEP
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "最近的文件(&F)",                ID_FILE_MRU_FILE1
+        MENUITEM SEPARATOR
+        MENUITEM "退出(&X)",                       ID_APP_EXIT
+    END
+    POPUP "视图(&V)"
+    BEGIN
+        POPUP "工具栏和停靠窗口(&T)"
+        BEGIN
+            MENUITEM "<占位符>",           ID_VIEW_TOOLBAR
+        END
+        MENUITEM "状态栏(&S)",                 ID_VIEW_STATUS_BAR
+        MENUITEM SEPARATOR
+        MENUITEM "深色主题(&D)",                ID_VIEW_DARKTHEME
+    END
+    POPUP "工具(&T)"
+    BEGIN
+        MENUITEM "网格简化(&S)...",                ID_MESH_SIMPLIFY
+        MENUITEM "撤销上次简化(&U)",              ID_MESH_SIMPLIFY_UNDO
+    END
+    // 【新 UI P2·SDI 化阶段 1.2】“窗口(&W)”弹出已移除——新建窗口/层叠/平铺/
+    // 排列图标为 MDI 命令，SDI 单文档下无对象（命令 ID 保留 resource.h 作取证）
+    POPUP "帮助(&H)"
+    BEGIN
+        MENUITEM "关于 STL2STP(&A)...",          ID_APP_ABOUT
+    END
+END
+
+
+
+
+IDR_POPUP_EDIT MENU
+BEGIN
+	POPUP "导出"
+	BEGIN
+		MENUITEM "导出IGES",                    ID_EXPORT_IGES
+		MENUITEM "导出STEP",                    ID_EXPORT_STEP
+    END
+END
+
+IDR_POPUP_SORT MENU
+BEGIN
+    POPUP "排序"
+    BEGIN
+        MENUITEM "按字母顺序排序(&S)",         ID_SORTING_SORTALPHABETIC
+        MENUITEM "按类型排序(&T)",               ID_SORTING_SORTBYTYPE
+        MENUITEM "按访问排序(&E)",             ID_SORTING_SORTBYACCESS
+        MENUITEM "按类型分组(&Y)",              ID_SORTING_GROUPBYTYPE
+    END
+END
+
+IDR_POPUP_EXPLORER MENU
+BEGIN
+    POPUP "资源管理器"
+    BEGIN
+        MENUITEM "打开(&O)",                       ID_OPEN
+        MENUITEM "打开方式(&W)....",              ID_OPEN_WITH
+        MENUITEM SEPARATOR
+        MENUITEM "编译(&C)",                    ID_DUMMY_COMPILE
+        MENUITEM SEPARATOR
+        MENUITEM "剪切(&T)\tCtrl+X",                ID_EDIT_CUT
+        MENUITEM "复制(&C)\tCtrl+C",               ID_EDIT_COPY
+        MENUITEM "删除(&R)",                     ID_EDIT_CLEAR
+        MENUITEM SEPARATOR
+        MENUITEM "属性(&P)...",              ID_PROPERTIES
+    END
+END
+
+IDR_OUTPUT_POPUP MENU
+BEGIN
+    POPUP "弹出项"
+    BEGIN
+        MENUITEM "复制(&C)",                       ID_EDIT_COPY
+        MENUITEM "清除(&C)",                      ID_EDIT_CLEAR
+        MENUITEM SEPARATOR
+        MENUITEM "隐藏(&H)",                       ID_VIEW_OUTPUTWND
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 加速器
+//
+
+IDR_MAINFRAME ACCELERATORS
+BEGIN
+    "N",            ID_FILE_NEW,            VIRTKEY,CONTROL
+    "O",            ID_FILE_OPEN,           VIRTKEY,CONTROL
+    "S",            ID_FILE_SAVE,           VIRTKEY,CONTROL
+	"Z",            ID_EDIT_UNDO,           VIRTKEY,CONTROL
+	"X",            ID_EDIT_CUT,           VIRTKEY,CONTROL
+	"C",            ID_EDIT_COPY,           VIRTKEY,CONTROL
+	"V",            ID_EDIT_PASTE,           VIRTKEY,CONTROL
+    VK_BACK,        ID_EDIT_UNDO,           VIRTKEY,ALT
+    VK_DELETE,      ID_EDIT_CUT,            VIRTKEY,SHIFT
+    VK_INSERT,      ID_EDIT_COPY,          VIRTKEY,CONTROL
+    VK_INSERT,      ID_EDIT_PASTE,          VIRTKEY,SHIFT
+    VK_F6,          ID_NEXT_PANE,           VIRTKEY
+    VK_F6,          ID_PREV_PANE,           VIRTKEY,SHIFT
+END
+
+// 【新 UI P2·SDI 化阶段 1.2】SDI 主框架由文档模板 LoadFrame(IDR_stl2stpcodeTYPE)
+// 创建——130 原无加速键表（MDI 时代快捷键由主框架 128 承载），不补齐则
+// Ctrl+N/O/S 等全部静默失效。内容照抄 IDR_MAINFRAME 键表（设计定稿 4.2.2(d)）。
+IDR_stl2stpcodeTYPE ACCELERATORS
+BEGIN
+    "N",            ID_FILE_NEW,            VIRTKEY,CONTROL
+    "O",            ID_FILE_OPEN,           VIRTKEY,CONTROL
+    "S",            ID_FILE_SAVE,           VIRTKEY,CONTROL
+	"Z",            ID_EDIT_UNDO,           VIRTKEY,CONTROL
+	"X",            ID_EDIT_CUT,           VIRTKEY,CONTROL
+	"C",            ID_EDIT_COPY,           VIRTKEY,CONTROL
+	"V",            ID_EDIT_PASTE,           VIRTKEY,CONTROL
+    VK_BACK,        ID_EDIT_UNDO,           VIRTKEY,ALT
+    VK_DELETE,      ID_EDIT_CUT,            VIRTKEY,SHIFT
+    VK_INSERT,      ID_EDIT_COPY,          VIRTKEY,CONTROL
+    VK_INSERT,      ID_EDIT_PASTE,          VIRTKEY,SHIFT
+    VK_F6,          ID_NEXT_PANE,           VIRTKEY
+    VK_F6,          ID_PREV_PANE,           VIRTKEY,SHIFT
+END
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 对话框
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 171, 72
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "关于 STL2STP"
+FONT 9, "MS Shell Dlg"
+BEGIN
+    ICON            IDR_MAINFRAME,IDC_STATIC,14,14,20,20
+    LTEXT           "STL2STP（正式版），v1.0.2",IDC_STATIC,42,14,114,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2017",IDC_STATIC,42,26,114,8
+    DEFPUSHBUTTON   "确定",IDOK,114,51,50,14,WS_GROUP
+END
+
+// 复刻原版资源 333：网格简化比例输入对话框（黄色 J 按钮触发）
+// （新 UI 增补 IDC_SIMP_ESTIMATE：随输入实时显示预计简化后面数）
+IDD_MESH_SIMPLIFY DIALOGEX 0, 0, 278, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "请输入网格简化比例"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "确定",IDOK,161,65,50,14
+    PUSHBUTTON      "取消",IDCANCEL,215,65,50,14
+    LTEXT           "请输入网格简化比例（输入范围：0-1。简化比例越小，得到的STL模型中的面片数量越少）：",IDC_STATIC,19,16,229,25
+    EDITTEXT        IDC_SIMP_RATIO,94,38,77,15,ES_CENTER | ES_AUTOHSCROLL
+    LTEXT           "预计简化后的三角面数：—",IDC_SIMP_ESTIMATE,19,56,229,9
+END
+
+// 新 UI 增补：导出进度对话框（替代原版冻结式沙漏光标）——
+// 分阶段进度 + 当前阶段说明 + 可取消（取消发生在写盘前，不产生半成品文件）
+IDD_EXPORT_PROGRESS DIALOGEX 0, 0, 244, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION
+CAPTION "正在转换"
+FONT 9, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "正在准备…",IDC_EXPORT_STAGE,14,14,216,12
+    CONTROL         "",IDC_EXPORT_PROGRESS_BAR,"msctls_progress32",WS_VISIBLE | 0x1,14,34,216,13
+    PUSHBUTTON      "取消",IDCANCEL,97,58,50,14
+END
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 版本
+//
+
+VS_VERSION_INFO     VERSIONINFO
+  FILEVERSION       1,0,0,0
+  PRODUCTVERSION    1,0,0,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "有乌鸦的麦田"
+            VALUE "FileDescription", "STL2STP"
+            VALUE "FileVersion",     "1.0.2"
+            VALUE "InternalName",    "STL2STP.exe"
+            VALUE "LegalCopyright", "(C) <BIT>。保留所有权利。"
+            VALUE "OriginalFilename","STL2STP.exe"
+            VALUE "ProductName", "有乌鸦的麦田"
+            VALUE "ProductVersion",  "1.0.2"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0804, 1200
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 163
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 55
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// 字符串表
+//
+
+STRINGTABLE
+BEGIN
+// 非 Mac 应用程序将移除额外的两个子字符串
+// 复刻原版 STL2STP：IDR_MAINFRAME="STL2STP"，文档模板 docName="My"/未命名="未命名"
+// （新 UI 偏差：文档类型过滤器由残留的 VoxelMod Files (*.cvd) 改为 STL——菜单栏恢复
+//  可见后 Ctrl+O 打开对话框必须能选到 STL 文件；docName/未命名 保留原版取值）
+// 【新 UI P2·SDI 化阶段 1.2】windowTitle 首字段由空改 "STL2STP"：SDI 主框架经
+// LoadFrame(130) 取模板字符串首字段作框架基础标题（MDI 时代主框架用 128 自带），
+// 首字段为空则标题缺应用名；FWS_PREFIXTITLE（CFrameWnd::PreCreateWindow 对
+// FWS_ADDTOTITLE 框架自动附加）使 SDI 标题呈"文档 - 应用"格式（与原版 MDI
+// 子框架最大化时的取证格式一致）：载入后 "niuniu.stl - STL2STP"、空文档 "My - STL2STP"
+    IDR_MAINFRAME           "STL2STP"
+    IDR_stl2stpcodeTYPE         "STL2STP\nMy\n未命名\nSTL Files (*.stl)\n.stl\nSTL2STP.Document\nSTL2STP.Document"
+END
+STRINGTABLE
+BEGIN
+    AFX_IDS_APP_TITLE       "STL2STP"
+    AFX_IDS_IDLEMESSAGE     "就绪"
+END
+STRINGTABLE
+BEGIN
+    ID_INDICATOR_EXT        "EXT"
+    ID_INDICATOR_CAPS       "CAP"
+    ID_INDICATOR_NUM        "NUM"
+    ID_INDICATOR_SCRL       "SCRL"
+    ID_INDICATOR_OVR        "OVR"
+    ID_INDICATOR_REC        "REC"
+END
+STRINGTABLE
+BEGIN
+    ID_INDICATOR_MODEL_INFO "未载入模型"
+    ID_INDICATOR_MODEL_STATS "V 0 · E 0 · F 0"
+    ID_INDICATOR_VIEW_DIR   "视角"
+END
+STRINGTABLE
+BEGIN
+    ID_FILE_NEW             "创建新文档\n新建"
+    ID_FILE_OPEN            "打开现有文档\n打开"
+    ID_FILE_CLOSE           "关闭活动文档\n关闭"
+    ID_FILE_SAVE            "保存活动文档\n保存"
+    ID_FILE_SAVE_AS         "用新名称保存活动文档\n另存为"
+    ID_APP_ABOUT            "显示程序信息、版本号和版权信息\n关于"
+    ID_APP_EXIT             "退出应用程序；提示保存文档\n退出"
+    ID_FILE_MRU_FILE1       "打开此文档"
+    ID_FILE_MRU_FILE2       "打开此文档"
+    ID_FILE_MRU_FILE3       "打开此文档"
+    ID_FILE_MRU_FILE4       "打开此文档"
+    ID_FILE_MRU_FILE5       "打开此文档"
+    ID_FILE_MRU_FILE6       "打开此文档"
+    ID_FILE_MRU_FILE7       "打开此文档"
+    ID_FILE_MRU_FILE8       "打开此文档"
+    ID_FILE_MRU_FILE9       "打开此文档"
+    ID_FILE_MRU_FILE10      "打开此文档"
+    ID_FILE_MRU_FILE11      "打开此文档"
+    ID_FILE_MRU_FILE12      "打开此文档"
+    ID_FILE_MRU_FILE13      "打开此文档"
+    ID_FILE_MRU_FILE14      "打开此文档"
+    ID_FILE_MRU_FILE15      "打开此文档"
+    ID_FILE_MRU_FILE16      "打开此文档"
+    ID_NEXT_PANE            "切换到下一个窗格\n下一窗格"
+    ID_PREV_PANE            "切换回上一个窗格\n上一窗格"
+    ID_WINDOW_NEW           "为活动文档打开另一个窗口\n新建窗口"
+    ID_WINDOW_ARRANGE       "在窗口底部排列图标\n排列图标"
+    ID_WINDOW_CASCADE       "以重叠方式排列窗口\n层叠窗口"
+    ID_WINDOW_TILE_HORZ     "以不重叠的平铺方式排列窗口\n平铺窗口"
+    ID_WINDOW_TILE_VERT     "以不重叠的平铺方式排列窗口\n平铺窗口"
+    ID_WINDOW_SPLIT         "将活动窗口拆分为多个窗格\n拆分"
+    ID_EDIT_CLEAR           "清除所选内容\n清除"
+    ID_EDIT_CLEAR_ALL       "清除全部内容\n全部清除"
+    ID_EDIT_COPY            "复制所选内容，将其放入剪贴板\n复制"
+    ID_EDIT_CUT             "剪切所选内容，将其放入剪贴板\n剪切"
+    ID_EDIT_FIND            "查找指定的文本\n查找"
+    ID_EDIT_PASTE           "插入剪贴板内容\n粘贴"
+    ID_EDIT_REPEAT          "重复上一操作\n重复"
+    ID_EDIT_REPLACE         "用其他文本替换特定的文本\n替换"
+    ID_EDIT_SELECT_ALL      "选定整个文档\n全选"
+    ID_EDIT_UNDO            "撤消上一操作\n撤消"
+    ID_EDIT_REDO            "重做上次撤消的操作\n重做"
+    ID_VIEW_STATUS_BAR      "显示或隐藏状态栏\n切换状态栏"
+END
+
+STRINGTABLE
+BEGIN
+    AFX_IDS_SCSIZE          "更改窗口大小"
+    AFX_IDS_SCMOVE          "更改窗口位置"
+    AFX_IDS_SCMINIMIZE      "将窗口缩小成图标"
+    AFX_IDS_SCMAXIMIZE      "将窗口放大到最大尺寸"
+    AFX_IDS_SCNEXTWINDOW    "切换到下一个文档窗口"
+    AFX_IDS_SCPREVWINDOW    "切换到上一个文档窗口"
+    AFX_IDS_SCCLOSE         "关闭活动窗口并提示保存文档"
+    AFX_IDS_SCRESTORE       "将窗口恢复到正常大小"
+    AFX_IDS_SCTASKLIST      "激活任务列表"
+    AFX_IDS_MDICHILD        "激活此窗口"
+END
+
+
+STRINGTABLE
+BEGIN
+    IDS_STATUS_PANE1        "窗格 1"
+    IDS_STATUS_PANE2        "窗格 2"
+    IDS_TOOLBAR_STANDARD    "标准"
+    IDS_TOOLBAR_CUSTOMIZE   "自定义..."
+    ID_WINDOW_MANAGER       "窗口(&W)..."
+    IDS_FILE_VIEW           "文件"
+    IDS_CLASS_VIEW          "类视图"
+    IDS_EXPLORER            "资源管理器"
+    IDS_OUTPUT_WND          "输出"
+    IDS_BUILD_TAB           "生成"
+    IDS_DEBUG_TAB           "调试"
+    IDS_FIND_TAB            "查找"
+    IDS_PROPERTIES_WND      "属性"
+    IDS_EDIT_MENU           "编辑"
+    IDS_TASK_WND            "任务"
+END
+
+// 原版 STL2STP 命令提示（字符串表原文，用于工具栏提示与状态栏）
+STRINGTABLE
+BEGIN
+    ID_IMPORT_STL_MODEL     "导入STL模型"
+    ID_VOXELIZE             "体素化"
+    ID_VOXELIZE_PRECISE     "精确体素化"
+    ID_VIEW_REFLECTION      "反射"
+    ID_VIEW_SHADOW          "阴影"
+    ID_VIEW_ANTIALIASING    "反走样"
+    ID_VIEW_RAYTRACING      "光线跟踪"
+    ID_VIEW_GRID            "参考网格"
+    ID_MANIPULATOR_ATTACH   "操纵器"
+    ID_MANIPULATOR_DETACH   "取消操纵器"
+    ID_TOPO_OPTIMIZE        "三维拓扑优化"
+    ID_TEST_BUTTON          "测试按钮"
+    ID_TOPO_SMOOTH          "光顺化拓扑优化结果"
+    ID_EXPORT_IGES          "将STL格式转换为IGES格式"
+    ID_EXPORT_STEP          "将STL格式转换为STEP格式"
+    32835                   "将STL格式转换为STEP格式"
+    ID_MESH_SIMPLIFY        "对STL模型进行网格简化"
+END
+#endif
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// 从 TEXTINCLUDE 3 资源生成。
+//
+
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE 4, 2
+#include "res\\stl2stpcode.rc2"  // 非 Microsoft Visual C++ 编辑的资源
+#include "l.CHS\\afxres.rc"      // 标准组件
+#include "l.CHS\\afxprint.rc"  // 打印/打印预览资源
+#if !defined(_AFXDLL)
+#include "l.CHS\\afxribbon.rc"        // MFC 功能区和控件条资源
+#endif
+#endif
+#endif    // 不是 APSTUDIO_INVOKED

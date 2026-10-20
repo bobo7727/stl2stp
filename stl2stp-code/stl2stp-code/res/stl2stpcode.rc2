@@ -1,0 +1,17 @@
+//
+// stl2stpcode.RC2 - resources that are not edited by Microsoft Visual C++
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+
+// Manifest byte-identical to the original STL2STP.exe:
+// no Common-Controls v6 dependency -> classic (unthemed) UI rendering.
+1 24 "res\\app.manifest"
+
+/////////////////////////////////////////////////////////////////////////////

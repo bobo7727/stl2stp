@@ -1,0 +1,55 @@
+﻿STL2STP 完整工程包（源代码 + 可编译 + 可运行）
+====================================================
+
+目录结构
+--------
+stl2stp-code\     Visual Studio 2019 解决方案（stl2stp-code.sln）
+                  └─ stl2stp-code\  工程源码（全部 cpp/h/rc/资源）
+occt-build\       OpenCASCADE master SDK 编译子集
+                  ├─ inc\                  头文件（编译需要）
+                  └─ win64\vc14\bin + lib   Release 运行库与导入库
+stl2stp-code-occt\  已编译好的成品（免安装，拷走即用，见其内 使用说明.txt）
+转换能力说明书.txt（哪些 STL 能转 / STEP 产物用途 / 最佳流程）
+产品介绍与销售要点.txt（商业化定位/场景/优势/模式/合规要点）
+性能与使用场景分析.txt   性能实测、瓶颈解读、功能全景、适用场景与使用建议
+
+其他说明文档见目录结构所列各处；本文件到此为结构说明。
+
+一、用 VS2019 打开、编译、运行
+------------------------------
+1. 双击打开 stl2stp-code\stl2stp-code.sln（需 VS2019 且装有
+   "使用 C++ 的桌面开发"工作负载 + C++ MFC v142 组件）；
+2. 顶部配置选 Release | x64；
+3. 菜单"生成 → 生成解决方案"（F7 / Ctrl+Shift+B）；
+4. 运行：Ctrl+F5（或 F5 调试）——输出程序在
+   stl2stp-code\x64\Release\stl2stp-code-occt.exe，
+   依赖的 50 个 OpenCASCADE DLL 会由工程生成后事件自动拷到该目录。
+
+命令行编译等价方式：
+  D:\VS2019\MSBuild\Current\Bin\MSBuild.exe stl2stp-code\stl2stp-code.sln
+    -p:Configuration=Release -p:Platform=x64
+（本包已按此法在包内实测：编译零错误、产物运行正常。）
+
+二、注意
+--------
+1. Debug 配置未随包：包内 occt-build 只含 Release 库（lib/bin）；
+   如需 Debug 编译，从原工作区把 occt-build\win64\vc14\libd 与 bind
+   两目录拷到本包同位置即可（debug 运行库体积约 1.4GB，故未默认随附）。
+2. 源码为 GBK / UTF-8 混合编码（历史迁移形成）：Doc.cpp / View.cpp /
+   ExportStrings.h / TaskPane 等 UI 文件为 UTF-8（Doc/View 带个别历史
+   乱码注释岛，编辑时须避开）；MainFrm / FileView / resource.h 为 GBK。
+   改动前先确认文件编码，避免把中文注释写坏。
+3. 工程按相对路径引用 occt-build（$(ProjectDir)..\..\occt-build），
+   请保持 stl2stp-code\ 与 occt-build\ 的现有相对位置，勿单独移动。
+
+三、直接运行成品
+----------------
+不想编译时，进入 stl2stp-code-occt 文件夹，双击 stl2stp-code-occt.exe 即可
+（Windows 10/11 64 位，无需任何安装）。
+
+四、版本功能（当前构建）
+------------------------
+- STL 载入（进度对话框、可取消、截断容错）/ 统计 / QEM 网格简化（可撤销）
+- 导出 STEP / IGES（>10 万面确认框，与原版 v1.0.2 语义一致）
+- STEP 纯预览（B-Rep 拓扑统计，简化/导出禁用）
+- 深/浅双主题、标准视图自动居中、拖动旋转/平移

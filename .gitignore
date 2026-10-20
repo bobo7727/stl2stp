@@ -1,0 +1,27 @@
+# ===== Visual Studio / MSBuild 中间产物（可由编译自动重建）=====
+.vs/
+x64/
+ipch/
+[Bb]uild/
+
+# 预编译头 / 调试符号 / 目标文件等单文件产物
+*.pch
+*.pdb
+*.ipdb
+*.iobj
+*.obj
+*.ilk
+*.idb
+*.tlog
+*.log
+*.lastbuildstate
+*.aps
+*.res
+*.exp
+*.ncb
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
