@@ -12,7 +12,7 @@ Objective-C++ bridge 只需包含此头文件并持有 opaque `stl2stp_handle*`�
 | `stl2stp_create` | 创建空 handle；失败返回 `NULL` |
 | `stl2stp_destroy` | 销毁 handle；`NULL` 安全 |
 | `stl2stp_last_error` | 读取上次诊断，不清空；`NULL` 读取当前线程的创建/null-handle 诊断 |
-| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0`，四个文本 metadata 和 `timestamp` 指针均为 `NULL` |
+| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0`，四个文本 metadata 和 `timestamp` 指针均为 `NULL`，`merge_angular_tolerance=1e-4`，`strict_original=0` |
 | `stl2stp_load_stl` | 自动识别 binary/ASCII STL，精确坐标去重，成功后替换网格 |
 | `stl2stp_get_mesh_stats` | 返回 unique vertices、无向 unique edges、triangular faces 和 AABB |
 | `stl2stp_simplify` | QEM edge collapse，按目标三角面数简化当前网格 |
@@ -34,6 +34,13 @@ Objective-C++ bridge 只需包含此头文件并持有 opaque `stl2stp_handle*`�
 - `STL2STP_WARNING_PARTIAL`（1）：成功载入可用部分；文件截断、尾部不匹配、
   ASCII 语法不完整或零面积三角面被跳过。调用者应显示 `last_error`，不能当作完整模型。
 - `STL2STP_WARNING_TARGET_NOT_REACHED`（2）：正常结束并保留最佳简化结果，但未达到目标。
+- `STL2STP_WARNING_NOT_SOLID`（3，core/fixes 追加）：网格不封闭，已写成开放 shell（STEP
+  `SHELL_BASED_SURFACE_MODEL` / `OPEN_SHELL`，IGES 曲面），**没有实体**。UI 应提示“模型不封闭，已导出为曲面”。
+- `STL2STP_WARNING_REPAIRED`（4，core/fixes 追加）：输出有效，但输入被修复过：丢弃零面积三角形、
+  统一/翻转三角形朝向、非流形或校验失败时自动改用 SEWING、或共面合并结果无效而被撤销。详情见 `last_error`。
+- `STL2STP_WARNING_METADATA_CHANGED`（5，core/fixes 追加）：IGES metadata 含非 ASCII 字符，已替换为 `?`。
+- 同时出现多种情况时只返回一个码，优先级 NOT_SOLID > REPAIRED > METADATA_CHANGED；`last_error`
+  用 `; ` 列出全部说明。新增码只追加在末尾，已有数值永不改变。
 - `STL2STP_ERROR_ARGUMENT`（-1）：null handle/必需输出、空路径、零目标面数、非法公差。
 - `STL2STP_ERROR_IO`（-2）：输入/输出打开、读取、写入或发布失败。
 - `STL2STP_ERROR_FORMAT`（-3）：无完整有效三角面、非有限坐标、STL 范围溢出或无可转移 STEP。
@@ -65,6 +72,48 @@ if (mesh) {
 实际 bridge 应检查每个 status，并在下一次操作前读取 warning/error。
 export 的 `options=NULL` 等价于 default options；不要使用全零 options（公差 0 非法）。
 
+## core/fixes：导出校验与修复（2026-10-20 代码审查后）
+
+ORIGINAL 默认模式在建完 B-Rep 后不再“无条件包成一个 solid 并返回 OK”。除非
+`strict_original=1`，流程是：
+
+1. 焊点（与原版相同的 `Poly_MergeNodesTool`）后，丢弃面积小于 `1e-12 × 包围盒对角线²`
+   的三角形（共线/极细），计入 REPAIRED。
+2. 统计每条无向边被几个三角形使用。有边被 3 个以上三角形共用（非流形）→ 整体改用 SEWING（REPAIRED）。
+3. 按共享边做连通分量，沿 BFS 统一每个分量的三角形绕序；无法统一（不可定向）→ 改用 SEWING。
+   封闭分量按有符号体积判断内外，体积为负则整体翻转。有任何三角形被翻转 → REPAIRED。
+4. 每个封闭分量单独成一个 shell + solid；开放分量只写成 shell（NOT_SOLID）。多个分量放入 compound，
+   STEP 中写成多个 `MANIFOLD_SOLID_BREP` / `SHELL_BASED_SURFACE_MODEL`。
+5. 对结果做 `BRepCheck_Analyzer`；无效 → 改用 SEWING（REPAIRED）。
+6. 对**有效、封闭、朝向一致、单一连通**的输入，以上步骤不改变任何三角形，几何与拓扑和旧版完全一致
+   （见 `docs/core-validation.md` 的逐字节对比）。唯一的额外开销是一次 BRepCheck。
+
+SEWING 模式本身不变；若结果含开放 shell 或游离面，同样返回 NOT_SOLID。
+
+`strict_original=1` 保留旧版逐字节行为：不丢面、不定向、不拆分、不校验，开放/翻转网格仍会
+被写成无效实体并返回 OK。只用于和原桌面版逐字节对比，**不要在 App 中使用**。CLI：`--strict-original`。
+
+### 共面合并容差
+
+`merge_coplanar=1` 时：角度容差 `merge_angular_tolerance`（弧度，默认 `1e-4`，`0` 表示默认，
+允许范围 `[0, 0.1]`，否则 `STL2STP_ERROR_ARGUMENT`；CLI `--merge-angle`）。线性容差取
+`max(sewing_tolerance, 1e-6 × 包围盒对角线, 4 × FLT_EPSILON × 最大坐标绝对值)`，后一项覆盖 float32
+STL 的量化误差。合并前后各做一次 BRepCheck：原本有效、合并后无效时撤销合并，返回 REPAIRED。
+旧版没有设置角度容差，OCCT 默认 `1e-12` rad，斜放的平面几乎合并不了。
+
+### STEP 写出
+
+不再“先写临时 STEP 再整份逐字符重写一遍”。`STEPControl_Writer::WriteStream` 直接写进一个
+流式过滤器（`StepStringFilter`），一次完成 `\X2\005C\X0\` → `\\` 和长字符串换行合并，
+1 MB 分块落盘，分块时检查取消。输出字节与旧实现相同（测试与逐字节对比确认）。
+
+### IGES metadata 只写 ASCII
+
+IGES 5.3 的字符串常量是 ASCII；按字符计数的读取器遇到 UTF-8 会读错 Hollerith 长度。
+author / organization / product / description / 文件名中每个非 ASCII 码点（以及非法 UTF-8 字节）
+替换为 `?`，返回 `STL2STP_WARNING_METADATA_CHANGED`。195 字节上限按替换后的 ASCII 计算。
+STEP 不受影响，仍用 `\X2\`/`\X4\` 无损编码。单引号在 STEP 中按规范写成两个单引号，不替换。
+
 ## STL 与 QEM 语义
 
 Binary STL 读取声明面数和文件长度，最多取两者容许的完整 50-byte records。
@@ -74,12 +123,20 @@ ASCII 使用 classic locale，完整 `endfacet` 才接纳一个 facet，支持�
 没有 `endsolid`、半个 facet 或非法尾部保留完整前缀并报告 warning。
 任意位置的 NaN/Inf 坐标会失败，不静默接受；零面积三角面从非退化视图中跳过并报告 warning。
 原始 facet 顺序另保留供 ORIGINAL 焊接使用；重复顶点面由原式索引过滤，不写入 B-Rep。
-三个不同节点的共线面在 ORIGINAL 不作面积过滤。
+三个不同节点的共线面：`strict_original=1` 时 ORIGINAL 照原版构面；默认在导出时丢弃并返回 REPAIRED。
 只有共线面时仍能带 warning 载入，但 mesh stats 的 faces/edges 为 0，
-ORIGINAL 会尝试构面，SEWING、QEM 和 STL save 返回 `STL2STP_ERROR_FORMAT`。
+两种模式的导出（默认设置）、QEM 和 STL save 都返回 `STL2STP_ERROR_FORMAT`。
 `vertices` 和 AABB 包含读取保存的节点（可能有仅由共线面引用的节点），
 `faces`/`edges` 统计非退化视图，不能把 stats.faces 当成 ORIGINAL 一定写出的面数。
 坐标焊接仅使用 exact equality，**不是**公差聚类；统计包含三角面内部的对角线。
+
+**core/fixes 之后的 QEM**（详见 `docs/CHANGES-from-original.md` 第 9 节）：面 quadric 按面积加权；
+开放边界边（以及非流形边）加“过该边、垂直于相邻面”的约束平面（权重 `1e3 × 边长²`），开放网格不再
+从边界被“吃掉”；坍缩前检查 link condition、对顶点度数（内部 >3、边界 >2）、合并后度数 ≥3、
+“两端都在边界但边不在边界”禁止坍缩，保证结果是流形且无重复面；第一阶段要求相邻面法向夹角
+余弦 > 0.25 且三角形质量不低于 0.05（或不比原来差），达不到目标时第二阶段只放宽这两项几何检查；
+最优点求解的条件数判断与截断范围都相对于模型尺寸，结果与单位无关。下面一段描述的是迁移时的基础，
+其中“normal-flip guard”现已被上述检查取代。
 
 QEM 迁移了 reference `MeshSimplify.cpp` 的平面 quadrics、3×3 最优点求解、
 端点/中点回退、greedy priority queue、normal-flip guard 和每条边最多 16 次延迟重试。
@@ -124,8 +181,9 @@ C header 测试检查其大小为 4 bytes。不要用 `-fshort-enums` 编译 bri
 若 OCCT 构造失败返回 `STL2STP_ERROR_OCCT`，不能保证任意共线/非法网格都成功。
 额外检查有限坐标、float32 key 范围和 OCCT int 索引范围，超界返回 FORMAT。
 
-开放/断开输入同样先组装单 solid，**不代表它是有效闭合实体**；回读可以变成多个
-shells/solids。例如 two-shells 导出前 1 solid / 1 shell，OCCT 8.0.1 回读为 2 / 2。
+（以下为 `strict_original=1` 的旧行为。）开放/断开输入同样先组装单 solid，**不代表它是有效闭合实体**；
+回读可以变成多个 shells/solids。例如 two-shells 导出前 1 solid / 1 shell，OCCT 8.0.1 回读为 2 / 2。
+默认（`strict_original=0`）见上文“core/fixes：导出校验与修复”：two-shells 导出为 2 solids。
 没有隐含 100000 面上限，没有交互确认或自动简化，相当于桌面大面数提示选择“是”。
 UI 应自行提示/限流；CLI 只有显式 `--simplify N` 才执行简化。
 
@@ -301,11 +359,9 @@ CR/LF，防止 directive 或加倍单引号被 OCCT 的 72 列换行拆开。
 长字符串和非 ASCII basename 也通过。测试直接比较原 UTF-8 值，不需要 encoded-form
 fallback 或自定义解码器；文件字节另以独立的固定 hex 对照验证，避免只测试同一编解码器。
 
-IGES GlobalSection 使用 `TCollection_HAsciiString::Length()`，即 **UTF-8 字节数**，
-并保留原始字节：`9H致知屋`、`12H测试公司`，不是 `2H` / `4H`。
-IGES 没有 STEP 的 Unicode directive，保留现有 UTF-8 byte-count Hollerith，避免把
-STEP 转义当作 IGES 字面字符串，或改用未约定的本地代码页导致中文/非 BMP 损失；
-这是当前可无损 OCCT GlobalSection 回读的策略，不保证所有旧 CAD 接受 UTF-8。
+**core/fixes 起 IGES metadata 只写 ASCII**：非 ASCII 码点替换为 `?` 并返回
+`STL2STP_WARNING_METADATA_CHANGED`（例如 `致知屋` → `3H???`，`测试公司` → `4H????`）。旧版保留原始 UTF-8
+字节（`9H致知屋`），CAD 验证中发现按字符计数的读取器会读崩，因此改为 ASCII。
 固定记录按 72 字节数据 + 8 字节 section/序号切分；Hollerith 可跨记录。
 实测 OCCT GlobalSection author/company/send/system id 回读均得到原字符串。
 setter 会把开头形如 `6H...` 的输入误当成 Hollerith，本库先包一层长度前缀，
@@ -313,16 +369,13 @@ setter 会把开头形如 `6H...` 的输入误当成 Hollerith，本库先包一
 
 OCCT `IGESData_GlobalSection.cxx::Params` 使用 `char text[200]`，`MakeHollerith`
 使用无边界 `Sprintf`。因此本库对 IGES author/organization/product/最终 basename
-各限制 **195 UTF-8 字节**（195 + `195H` + NUL = 200）；超限返回 ARGUMENT，
+各限制 **195 字节**（按 ASCII 替换后计算；195 + `195H` + NUL = 200）；超限返回 ARGUMENT，
 不截断、不写文件。STEP 不受此上限限制。
 IGES 的四个 metadata 文本和 basename 不允许 CR/LF（ARGUMENT），避免原始换行
 破坏 80 字节物理记录；description 无 195 字节上限，但仍须为单行。
 
-IGES description 写在 Start section，原始 UTF-8 保留；但 OCCT 8.0.1 的
-`IGESFile/IGESFile_Read.cxx::IGESFile_ReadHeader` 用 signed `char > 32` 去掉行尾空白，
-会把行尾高位 UTF-8 字节也去掉。实测纯中文 `测试描述` 写出正确，OCCT 回读 Start
-却为空；ASCII description 可正常回读。测试同时断言原始 Start 字节和此 OCCT 限制，
-没有伪称中文 Start 能经 OCCT 无损回读。没有修改只读 OCCT 安装/源码。
+IGES description 写在 Start section，同样先转成 ASCII。旧版的“纯中文 Start 经 OCCT 回读为空”
+（`IGESFile_ReadHeader` 用 signed `char > 32` 去行尾空白）因此不再出现：`测试描述` 写成 `????`，可原样回读。
 
 ## Progress、取消与线程
 
