@@ -1,5 +1,6 @@
 #include "internal.hpp"
 
+#include <BRepCheck_Analyzer.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -30,6 +31,7 @@
 #include <StepBasic_Product.hxx>
 #include <TCollection_HAsciiString.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <ShapeFix_Shape.hxx>
 #include <Standard_Failure.hxx>
 #include <Standard_Version.hxx>
 #include <TopExp.hxx>
@@ -55,6 +57,8 @@
 #include <memory>
 #include <mutex>
 #include <map>
+#include <streambuf>
+#include <unordered_map>
 
 namespace stl2stp {
 namespace {
@@ -190,53 +194,172 @@ std::string step_text(const std::string& utf8) {
     return encoded;
 }
 
-void normalize_step_strings(const std::string& path, Progress& progress) {
-    std::ifstream input(std::filesystem::u8path(path), std::ios::binary);
-    OutputFile normalized(path.c_str());
-    std::ofstream output(normalized.temporary(), std::ios::binary);
-    if (!input || !output) { throw Error(STL2STP_ERROR_IO, "Cannot normalize STEP strings"); }
-    const std::string marker = "\\X2\\005C\\X0\\";
-    std::string pending;
-    bool in_string = false;
-    bool quote_pending = false;
-    auto emit = [&](char byte) {
-        pending += byte;
-        while (!pending.empty()) {
-            if (pending == marker) { output << "\\\\"; pending.clear(); break; }
-            if (marker.compare(0, pending.size(), pending) == 0) { break; }
-            output.put(pending.front());
-            pending.erase(0, 1);
+// OCCT writes "\" inside STEP strings as \X2\005C\X0\ and wraps long strings across lines.
+// This filter sits between STEPControl_Writer::WriteStream and the file and, in a single pass,
+// rewrites \X2\005C\X0\ to the ISO 10303-21 "\\" escape and joins wrapped string lines.
+// (Previously the whole file was re-read and re-written character by character.)
+class StepStringFilter : public std::streambuf {
+public:
+    StepStringFilter(std::ostream& sink, Progress& progress) : sink_(sink), progress_(progress) {
+        setp(buffer_.data(), buffer_.data() + buffer_.size());
+        out_.reserve(chunk + 64);
+    }
+
+    void finish() {
+        if (failure_) { std::rethrow_exception(failure_); }
+        drain();
+        out_ += pending_;
+        pending_.clear();
+        if (quote_pending_) { out_ += '\''; }
+        if (in_string_ && !quote_pending_) { throw Error(STL2STP_ERROR_IO, "Unterminated STEP string"); }
+        flush_out();
+    }
+
+protected:
+    // Exceptions must not escape into std::ostream (it would swallow them and only set badbit),
+    // so failures (I/O, cancellation) are stored and rethrown by finish().
+    int_type overflow(int_type character) override {
+        if (failure_) { return traits_type::eof(); }
+        try {
+            drain();
+            if (!traits_type::eq_int_type(character, traits_type::eof())) { process(traits_type::to_char_type(character)); }
+            return traits_type::not_eof(character);
+        } catch (...) {
+            failure_ = std::current_exception();
+            return traits_type::eof();
         }
-    };
-    char character;
-    std::size_t count = 0;
-    while (input.get(character)) {
-        if (++count % 65536 == 0) { progress.check(); }
-        if (in_string && (character == '\n' || character == '\r')) { continue; }
-        if (quote_pending) {
-            quote_pending = false;
-            if (character == '\'') { emit('\''); emit('\''); continue; }
-            output << pending << '\'';
-            pending.clear();
-            in_string = false;
+    }
+
+    int sync() override {
+        if (failure_) { return -1; }
+        try {
+            drain();
+            return 0;
+        } catch (...) {
+            failure_ = std::current_exception();
+            return -1;
         }
-        if (!in_string) {
-            output.put(character);
-            in_string = character == '\'';
+    }
+
+private:
+    static constexpr std::size_t chunk = 1u << 20;
+
+    void drain() {
+        for (char* cursor = pbase(); cursor != pptr(); ++cursor) { process(*cursor); }
+        setp(buffer_.data(), buffer_.data() + buffer_.size());
+        if (out_.size() >= chunk) { flush_out(); }
+    }
+
+    void flush_out() {
+        sink_.write(out_.data(), static_cast<std::streamsize>(out_.size()));
+        out_.clear();
+        if (!sink_) { throw Error(STL2STP_ERROR_IO, "STEP write failed"); }
+        progress_.check();
+    }
+
+    void emit(char byte) {
+        static const std::string marker = "\\X2\\005C\\X0\\";
+        pending_ += byte;
+        while (!pending_.empty()) {
+            if (pending_ == marker) { out_ += "\\\\"; pending_.clear(); break; }
+            if (marker.compare(0, pending_.size(), pending_) == 0) { break; }
+            out_ += pending_.front();
+            pending_.erase(0, 1);
+        }
+    }
+
+    void process(char character) {
+        if (in_string_ && (character == '\n' || character == '\r')) { return; }
+        if (quote_pending_) {
+            quote_pending_ = false;
+            if (character == '\'') { emit('\''); emit('\''); return; }
+            out_ += pending_;
+            out_ += '\'';
+            pending_.clear();
+            in_string_ = false;
+        }
+        if (!in_string_) {
+            out_ += character;
+            in_string_ = character == '\'';
         } else if (character == '\'') {
-            quote_pending = true;
+            quote_pending_ = true;
         } else {
             emit(character);
         }
     }
-    output << pending;
-    if (quote_pending) { output.put('\''); }
-    if (in_string && !quote_pending) { throw Error(STL2STP_ERROR_IO, "Unterminated STEP string"); }
-    output.close();
-    if (!input.eof() || !output) { throw Error(STL2STP_ERROR_IO, "Cannot normalize STEP strings"); }
-    input.close();
-    normalized.commit();
+
+    std::ostream& sink_;
+    Progress& progress_;
+    std::array<char, 1u << 16> buffer_{};
+    std::string out_;
+    std::string pending_;
+    bool in_string_ = false;
+    bool quote_pending_ = false;
+    std::exception_ptr failure_;
+};
+
+// IGES 5.3 string constants are ASCII; non-ASCII readers mis-count Hollerith lengths.
+// Every non-ASCII code point (and every invalid UTF-8 byte) becomes '?'.
+std::string iges_ascii(const std::string& utf8, bool& changed) {
+    std::string result;
+    result.reserve(utf8.size());
+    for (std::size_t cursor = 0; cursor < utf8.size();) {
+        const auto first = static_cast<unsigned char>(utf8[cursor]);
+        if (first < 0x80) { result += static_cast<char>(first); ++cursor; continue; }
+        std::size_t length = first >= 0xf0 && first <= 0xf4 ? 4 : first >= 0xe0 ? 3 : first >= 0xc2 && first <= 0xdf ? 2 : 1;
+        if (first >= 0xf5) { length = 1; }
+        std::size_t consumed = 1;
+        while (consumed < length && cursor + consumed < utf8.size() &&
+               (static_cast<unsigned char>(utf8[cursor + consumed]) & 0xc0) == 0x80) { ++consumed; }
+        cursor += consumed;
+        result += '?';
+        changed = true;
+    }
+    return result;
 }
+
+struct Notes {
+    bool not_solid = false;
+    bool repaired = false;
+    bool metadata = false;
+    std::string text;
+
+    void add(bool Notes::*flag, const std::string& message) {
+        this->*flag = true;
+        if (text.find(message) != std::string::npos) { return; }
+        if (!text.empty()) { text += "; "; }
+        text += message;
+    }
+
+    stl2stp_status status() const {
+        return not_solid ? STL2STP_WARNING_NOT_SOLID : repaired ? STL2STP_WARNING_REPAIRED :
+               metadata ? STL2STP_WARNING_METADATA_CHANGED : STL2STP_OK;
+    }
+};
+
+struct Scale {
+    double diagonal = 0;
+    double magnitude = 0;
+};
+
+Scale model_scale(const Mesh& mesh) {
+    Scale scale;
+    if (mesh.points.empty()) { return scale; }
+    Point minimum = mesh.points.front(), maximum = minimum;
+    for (const auto& point : mesh.points) {
+        minimum = {std::min(minimum.coordinate_x, point.coordinate_x), std::min(minimum.coordinate_y, point.coordinate_y),
+                   std::min(minimum.coordinate_z, point.coordinate_z)};
+        maximum = {std::max(maximum.coordinate_x, point.coordinate_x), std::max(maximum.coordinate_y, point.coordinate_y),
+                   std::max(maximum.coordinate_z, point.coordinate_z)};
+        scale.magnitude = std::max({scale.magnitude, std::abs(point.coordinate_x), std::abs(point.coordinate_y),
+                                    std::abs(point.coordinate_z)});
+    }
+    const auto extent = subtract(maximum, minimum);
+    scale.diagonal = std::sqrt(dot(extent, extent));
+    return scale;
+}
+
+bool shape_valid(const TopoDS_Shape& shape) { return !shape.IsNull() && BRepCheck_Analyzer(shape).IsValid(); }
 
 class Indicator : public Message_ProgressIndicator {
 public:
@@ -295,6 +418,23 @@ private:
     std::string previous_;
 };
 
+class IntegerSetting {
+public:
+    IntegerSetting(const char* name, int value) : name_(name), previous_(Interface_Static::IVal(name)) {
+        if (!Interface_Static::SetIVal(name, value)) {
+            throw Error(STL2STP_ERROR_OCCT, "Cannot configure OCCT parameter: " + name_);
+        }
+    }
+
+    ~IntegerSetting() {
+        try { Interface_Static::SetIVal(name_.c_str(), previous_); } catch (...) {}
+    }
+
+private:
+    std::string name_;
+    int previous_;
+};
+
 std::unique_lock<std::timed_mutex> exchange_lock(Progress& progress) {
     std::unique_lock<std::timed_mutex> lock(exchange_mutex, std::defer_lock);
     while (!lock.try_lock_for(std::chrono::milliseconds(10))) { progress.check(); }
@@ -317,19 +457,45 @@ stl2stp_topology count_topology(const TopoDS_Shape& shape) {
     return result;
 }
 
-TopoDS_Shape merge_shape(const TopoDS_Shape& shape, const stl2stp_export_options& options, Progress& progress) {
+// Coplanar merge. Tolerances are relative to the model: OCCT's default angular tolerance (1e-12 rad)
+// never matches float32 STL facets of a rotated plane. The merged shape is validated and the
+// unmerged shape is kept if merging made it invalid.
+TopoDS_Shape merge_shape(const TopoDS_Shape& shape, const stl2stp_export_options& options, const Scale& scale,
+                         Notes& notes, Progress& progress) {
     if (!options.merge_coplanar) { return shape; }
+    const double angular = options.merge_angular_tolerance > 0 ? options.merge_angular_tolerance : 1e-4;
+    const double linear = std::max({options.sewing_tolerance, 1e-6 * scale.diagonal,
+                                    4.0 * double(std::numeric_limits<float>::epsilon()) * scale.magnitude});
+    const bool valid_before = shape_valid(shape);
+    progress.check();
     ShapeUpgrade_UnifySameDomain unify(shape, true, true, false);
-    unify.SetLinearTolerance(options.sewing_tolerance);
+    unify.SetLinearTolerance(linear);
+    unify.SetAngularTolerance(angular);
     unify.Build();
     progress.check();
     if (unify.Shape().IsNull()) {
         throw Error(STL2STP_ERROR_OCCT, "Coplanar merge produced no shape");
     }
-    return unify.Shape();
+    ShapeFix_Shape fix(unify.Shape());
+    fix.Perform();
+    progress.check();
+    const TopoDS_Shape merged = fix.Shape().IsNull() ? unify.Shape() : fix.Shape();
+    if (valid_before && !shape_valid(merged)) {
+        notes.add(&Notes::repaired, "coplanar merge skipped because the merged shape was invalid");
+        return shape;
+    }
+    return merged;
 }
 
-TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options& options, Progress& progress) {
+// ORIGINAL mode (default). Faithful port of the desktop RebuildShapeFromMesh: one planar face per
+// triangle, shared edges, no sewing. Unless strict_original is set, the result is made safe:
+// zero-area triangles are dropped, each edge-connected component is consistently oriented
+// (inverted components are reversed), each closed component becomes its own solid, open components
+// are written as open shells, and the result is validated with BRepCheck. Returns a null shape when
+// the input needs SEWING mode instead (non-manifold or non-orientable mesh, or invalid result).
+// For a valid, closed, consistently oriented, single-component mesh the output is unchanged.
+TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options& options, const Scale& scale,
+                                 Notes& notes, Progress& progress) {
     const auto& input = mesh.original_triangles.empty() ? mesh.triangles : mesh.original_triangles;
     if (input.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
         mesh.points.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
@@ -378,6 +544,93 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
                           static_cast<std::size_t>(triangle.Value(2) - 1),
                           static_cast<std::size_t>(triangle.Value(3) - 1)});
         progress.check();
+    }
+    const bool strict = options.strict_original != 0;
+    std::vector<std::size_t> component(source.size(), 0);
+    std::vector<char> component_closed{1};
+    if (!strict) {
+        const double minimum_cross = 2e-12 * scale.diagonal * scale.diagonal;
+        auto node = [&](std::size_t index) { return triangulation->Node(static_cast<int>(index + 1)).XYZ(); };
+        std::vector<Triangle> kept;
+        kept.reserve(source.size());
+        for (const auto& triangle : source) {
+            const gp_XYZ normal = (node(triangle[1]) - node(triangle[0])).Crossed(node(triangle[2]) - node(triangle[0]));
+            if (normal.SquareModulus() > minimum_cross * minimum_cross) { kept.push_back(triangle); }
+        }
+        if (kept.size() != source.size()) {
+            notes.add(&Notes::repaired, std::to_string(source.size() - kept.size()) + " zero-area triangle(s) dropped");
+            source.swap(kept);
+        }
+        if (source.empty()) { throw Error(STL2STP_ERROR_FORMAT, "No non-degenerate triangles to convert"); }
+        progress.check();
+        struct Use { std::size_t triangle; bool forward; };
+        struct EdgeUses { Use first{}; Use second{}; std::size_t count = 0; };
+        std::unordered_map<uint64_t, EdgeUses> uses;
+        uses.reserve(source.size() * 2);
+        auto key = [](std::size_t first, std::size_t second) {
+            return (uint64_t(std::min(first, second)) << 32) | uint64_t(std::max(first, second));
+        };
+        for (std::size_t index = 0; index < source.size(); ++index) {
+            for (std::size_t corner = 0; corner < 3; ++corner) {
+                const auto first = source[index][corner], second = source[index][(corner + 1) % 3];
+                auto& entry = uses[key(first, second)];
+                const Use use{index, first < second};
+                if (entry.count == 0) { entry.first = use; } else if (entry.count == 1) { entry.second = use; }
+                if (++entry.count > 2) {
+                    notes.add(&Notes::repaired, "non-manifold edges: converted with sewing mode");
+                    return {};
+                }
+            }
+        }
+        progress.check();
+        const std::size_t unvisited = std::numeric_limits<std::size_t>::max();
+        std::fill(component.begin(), component.end(), unvisited);
+        std::vector<char> flipped(source.size(), 0);
+        component_closed.clear();
+        std::vector<std::size_t> queue;
+        for (std::size_t seed = 0; seed < source.size(); ++seed) {
+            if (component[seed] != unvisited) { continue; }
+            const std::size_t current = component_closed.size();
+            component_closed.push_back(1);
+            component[seed] = current;
+            queue.assign(1, seed);
+            while (!queue.empty()) {
+                const auto triangle = queue.back();
+                queue.pop_back();
+                for (std::size_t corner = 0; corner < 3; ++corner) {
+                    const auto& entry = uses[key(source[triangle][corner], source[triangle][(corner + 1) % 3])];
+                    if (entry.count < 2) { component_closed[current] = 0; continue; }
+                    const bool mine_is_first = entry.first.triangle == triangle;
+                    const Use& mine = mine_is_first ? entry.first : entry.second;
+                    const Use& other = mine_is_first ? entry.second : entry.first;
+                    const char required = static_cast<char>(other.forward == (mine.forward != (flipped[triangle] != 0)));
+                    if (component[other.triangle] == unvisited) {
+                        component[other.triangle] = current;
+                        flipped[other.triangle] = required;
+                        queue.push_back(other.triangle);
+                    } else if (flipped[other.triangle] != required) {
+                        notes.add(&Notes::repaired, "non-orientable mesh: converted with sewing mode");
+                        return {};
+                    }
+                }
+            }
+            progress.check();
+        }
+        std::vector<double> volume(component_closed.size(), 0.0);
+        for (std::size_t index = 0; index < source.size(); ++index) {
+            const auto& t = source[index];
+            const gp_XYZ first = node(t[0]), second = node(flipped[index] ? t[2] : t[1]), third = node(flipped[index] ? t[1] : t[2]);
+            volume[component[index]] += first.Dot(second.Crossed(third));
+        }
+        std::size_t reoriented = 0;
+        for (std::size_t index = 0; index < source.size(); ++index) {
+            const auto part = component[index];
+            if (component_closed[part] && volume[part] < 0) { flipped[index] = !flipped[index]; }
+            if (flipped[index]) { std::swap(source[index][1], source[index][2]); ++reoriented; }
+        }
+        if (reoriented) {
+            notes.add(&Notes::repaired, std::to_string(reoriented) + " triangle(s) re-oriented (inconsistent or inverted normals)");
+        }
     }
     BRep_Builder builder;
     std::vector<TopoDS_Vertex> vertices;
@@ -432,22 +685,48 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
         if (faces.size() % 64 == 0) { progress.report(0.4 + 0.22 * double(faces.size()) / double(triangles.size())); }
     }
     progress.report(0.62);
-    TopoDS_Shell shell;
-    builder.MakeShell(shell);
-    for (const auto& face : faces) {
-        builder.Add(shell, face);
+    std::vector<TopoDS_Shell> shells(component_closed.size());
+    for (auto& shell : shells) { builder.MakeShell(shell); }
+    for (std::size_t index = 0; index < faces.size(); ++index) {
+        builder.Add(shells[component[index]], faces[index]);
         progress.check();
     }
-    BRepTools::Update(shell);
-    TopoDS_Solid solid;
-    builder.MakeSolid(solid);
-    builder.Add(solid, shell);
-    const auto shape = merge_shape(solid, options, progress);
+    std::vector<TopoDS_Shape> parts;
+    for (std::size_t index = 0; index < shells.size(); ++index) {
+        BRepTools::Update(shells[index]);
+        if (strict || component_closed[index]) {
+            TopoDS_Solid solid;
+            builder.MakeSolid(solid);
+            builder.Add(solid, shells[index]);
+            parts.push_back(solid);
+        } else {
+            parts.push_back(shells[index]);
+        }
+    }
+    TopoDS_Shape shape = parts.front();
+    if (parts.size() > 1) {
+        TopoDS_Compound compound;
+        builder.MakeCompound(compound);
+        for (const auto& part : parts) { builder.Add(compound, part); }
+        shape = compound;
+    }
+    if (!strict) {
+        progress.check();
+        if (!shape_valid(shape)) {
+            notes.add(&Notes::repaired, "original-mode result failed BRep validation: converted with sewing mode");
+            return {};
+        }
+        if (std::find(component_closed.begin(), component_closed.end(), 0) != component_closed.end()) {
+            notes.add(&Notes::not_solid, "mesh is not closed: open parts exported as shell/surfaces, not as solids");
+        }
+    }
+    shape = merge_shape(shape, options, scale, notes, progress);
     progress.report(0.7);
     return shape;
 }
 
-TopoDS_Shape make_sewing_shape(const Mesh& mesh, const stl2stp_export_options& options, Progress& progress) {
+TopoDS_Shape make_sewing_shape(const Mesh& mesh, const stl2stp_export_options& options, const Scale& scale,
+                               Notes& notes, Progress& progress) {
     BRepBuilderAPI_Sewing sewing(options.sewing_tolerance, true, true, true, false);
     std::size_t index = 0;
     for (const auto& triangle : mesh.triangles) {
@@ -478,7 +757,7 @@ TopoDS_Shape make_sewing_shape(const Mesh& mesh, const stl2stp_export_options& o
         throw Error(STL2STP_ERROR_OCCT, "Sewing produced no shape");
     }
     progress.report(0.62);
-    sewn = merge_shape(sewn, options, progress);
+    sewn = merge_shape(sewn, options, scale, notes, progress);
     BRep_Builder builder;
     TopoDS_Compound compound;
     builder.MakeCompound(compound);
@@ -509,6 +788,11 @@ TopoDS_Shape make_sewing_shape(const Mesh& mesh, const stl2stp_export_options& o
         add(explorer.Current());
     }
     progress.report(0.7);
+    std::size_t solids = 0;
+    for (TopExp_Explorer explorer(compound, TopAbs_SOLID); explorer.More(); explorer.Next()) { ++solids; }
+    if (solids < components) {
+        notes.add(&Notes::not_solid, "mesh is not closed: open parts exported as shell/surfaces, not as solids");
+    }
     if (components == 0) { return sewn; }
     if (components == 1) { return only; }
     return compound;
@@ -537,13 +821,14 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
         require_path(path);
         require_mesh(handle->mesh);
         const auto options = supplied ? *supplied : stl2stp_default_export_options();
-        const std::string author = options.author ? options.author : "";
-        const std::string organization = options.organization ? options.organization : "";
-        const std::string product_name = options.product ? options.product : "";
-        const std::string description = options.description ? options.description : "";
+        Notes notes;
+        std::string author = options.author ? options.author : "";
+        std::string organization = options.organization ? options.organization : "";
+        std::string product_name = options.product ? options.product : "";
+        std::string description = options.description ? options.description : "";
         const std::string supplied_timestamp = options.timestamp ? options.timestamp : "";
         Timestamp timestamp;
-        const std::string filename = std::filesystem::u8path(path).filename().u8string();
+        std::string filename = std::filesystem::u8path(path).filename().u8string();
         auto text = [](const std::string& value) {
             return Handle(TCollection_HAsciiString)(new TCollection_HAsciiString(value.c_str()));
         };
@@ -552,19 +837,30 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
             return text(value.empty() ? "" : std::to_string(value.size()) + "H" + value);
         };
         if (!step) {
-            for (const auto* value : {&author, &organization, &product_name, &filename}) {
-                if (value->size() > 195) {
-                    throw Error(STL2STP_ERROR_ARGUMENT, "IGES global strings cannot exceed 195 UTF-8 bytes");
-                }
-            }
             for (const auto* value : {&author, &organization, &product_name, &filename, &description}) {
                 if (value->find_first_of("\r\n") != std::string::npos) {
                     throw Error(STL2STP_ERROR_ARGUMENT, "IGES metadata must not contain CR or LF");
                 }
             }
+            bool changed = false;
+            for (auto* value : {&author, &organization, &product_name, &filename, &description}) {
+                *value = iges_ascii(*value, changed);
+            }
+            if (changed) {
+                notes.add(&Notes::metadata, "IGES metadata must be ASCII: non-ASCII characters were replaced with '?'");
+            }
+            for (const auto* value : {&author, &organization, &product_name, &filename}) {
+                if (value->size() > 195) {
+                    throw Error(STL2STP_ERROR_ARGUMENT, "IGES global strings cannot exceed 195 bytes");
+                }
+            }
         }
         if (!std::isfinite(options.sewing_tolerance) || options.sewing_tolerance <= 0) {
             throw Error(STL2STP_ERROR_ARGUMENT, "Sewing tolerance must be finite and positive");
+        }
+        if (!std::isfinite(options.merge_angular_tolerance) || options.merge_angular_tolerance < 0 ||
+            options.merge_angular_tolerance > 0.1) {
+            throw Error(STL2STP_ERROR_ARGUMENT, "Merge angular tolerance must be in [0, 0.1] radians (0 = default)");
         }
         if (options.mode != STL2STP_MODE_ORIGINAL && options.mode != STL2STP_MODE_SEWING) {
             throw Error(STL2STP_ERROR_ARGUMENT, "Unknown conversion mode");
@@ -577,8 +873,15 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
         auto lock = exchange_lock(progress);
         timestamp = timestamp_value(options.timestamp ? supplied_timestamp.c_str() : nullptr);
         const bool original = options.mode == STL2STP_MODE_ORIGINAL;
-        const auto shape = original ? make_original_shape(handle->mesh, options, progress)
-                                    : make_sewing_shape(handle->mesh, options, progress);
+        const auto scale = model_scale(handle->mesh);
+        TopoDS_Shape shape;
+        if (original) { shape = make_original_shape(handle->mesh, options, scale, notes, progress); }
+        if (shape.IsNull()) {
+            if (handle->mesh.triangles.empty()) {
+                throw Error(STL2STP_ERROR_FORMAT, "No non-collinear triangles for sewing");
+            }
+            shape = make_sewing_shape(handle->mesh, options, scale, notes, progress);
+        }
         const auto counts = count_topology(shape);
         OutputFile output(path);
         const std::string temporary = output.temporary().u8string();
@@ -590,6 +893,11 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
                 schema = std::make_unique<StaticSetting>("write.step.schema", "AP214IS");
                 unit = std::make_unique<StaticSetting>("write.step.unit", "MM");
             }
+            // After a coplanar merge vertex/edge tolerances vary; write the greatest one as the file
+            // uncertainty so readers that trust it (no healing) accept the merged faces. Without merge all
+            // tolerances are equal, so the default (Average) is kept and the output is unchanged.
+            std::unique_ptr<IntegerSetting> precision;
+            if (options.merge_coplanar) { precision = std::make_unique<IntegerSetting>("write.precision.mode", 1); }
             STEPControl_Writer writer;
             StaticSetting product("write.step.product.name", product_name.c_str());
             const auto transferred = writer.Transfer(shape, STEPControl_AsIs, true, transfer_progress->Start());
@@ -615,10 +923,16 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
                     product_entity->SetName(step_string(product_name));
                 }
             }
-            if (writer.Write(temporary.c_str()) != IFSelect_RetDone) {
-                throw Error(STL2STP_ERROR_IO, "STEP write failed");
-            }
-            normalize_step_strings(temporary, progress);
+            std::ofstream file(output.temporary(), std::ios::binary);
+            if (!file) { throw Error(STL2STP_ERROR_IO, "Cannot open STEP output"); }
+            StepStringFilter filter(file, progress);
+            std::ostream stream(&filter);
+            const auto written = writer.WriteStream(stream);
+            stream.flush();
+            filter.finish();
+            if (written != IFSelect_RetDone || !stream) { throw Error(STL2STP_ERROR_IO, "STEP write failed"); }
+            file.close();
+            if (!file) { throw Error(STL2STP_ERROR_IO, "STEP write failed"); }
         } else {
             IGESControl_Controller::Init();
             StaticSetting author_setting("write.iges.header.author", author.c_str());
@@ -654,7 +968,8 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
         progress.report(1);
         output.commit();
         if (topology) { *topology = counts; }
-        return STL2STP_OK;
+        handle->error = notes.text;
+        return notes.status();
     });
 }
 
