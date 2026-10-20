@@ -22,7 +22,7 @@ void require_path(const char* path) {
 }
 
 void require_mesh(const Mesh& mesh) {
-    if (mesh.triangles.empty()) {
+    if (mesh.triangles.empty() && mesh.original_triangles.empty()) {
         throw Error(STL2STP_ERROR_EMPTY, "No mesh loaded");
     }
 }
@@ -98,17 +98,13 @@ struct MeshBuilder {
     Mesh mesh;
     std::map<std::tuple<double, double, double>, std::size_t> lookup;
     bool skipped = false;
+    bool has_original_triangle = false;
 
     void add(const std::array<Point, 3>& points) {
         for (const Point& point : points) {
             if (!std::isfinite(point.coordinate_x) || !std::isfinite(point.coordinate_y) || !std::isfinite(point.coordinate_z)) {
                 throw Error(STL2STP_ERROR_FORMAT, "STL contains non-finite coordinates");
             }
-        }
-        const Point normal = cross(subtract(points[1], points[0]), subtract(points[2], points[0]));
-        if (!(dot(normal, normal) > 0) || !std::isfinite(dot(normal, normal))) {
-            skipped = true;
-            return;
         }
         Triangle triangle{};
         for (std::size_t corner = 0; corner < 3; ++corner) {
@@ -119,6 +115,21 @@ struct MeshBuilder {
             }
             triangle[corner] = insertion.first->second;
         }
+        if (triangle[0] == triangle[1] || triangle[1] == triangle[2] || triangle[0] == triangle[2]) {
+            if (mesh.original_triangles.empty()) { mesh.original_triangles = mesh.triangles; }
+            mesh.original_triangles.push_back(triangle);
+            skipped = true;
+            return;
+        }
+        has_original_triangle = true;
+        const Point normal = cross(subtract(points[1], points[0]), subtract(points[2], points[0]));
+        if (!(dot(normal, normal) > 0) || !std::isfinite(dot(normal, normal))) {
+            if (mesh.original_triangles.empty()) { mesh.original_triangles = mesh.triangles; }
+            mesh.original_triangles.push_back(triangle);
+            skipped = true;
+            return;
+        }
+        if (!mesh.original_triangles.empty()) { mesh.original_triangles.push_back(triangle); }
         mesh.triangles.push_back(triangle);
     }
 };
@@ -263,7 +274,7 @@ const char* stl2stp_last_error(const stl2stp_handle* handle) {
     return handle ? handle->error.c_str() : stl2stp::thread_error.c_str();
 }
 
-stl2stp_export_options stl2stp_default_export_options(void) { return {1e-6, 0}; }
+stl2stp_export_options stl2stp_default_export_options(void) { return {1e-6, 0, STL2STP_MODE_ORIGINAL}; }
 
 stl2stp_status stl2stp_load_stl(stl2stp_handle* handle, const char* path,
                                const stl2stp_callbacks* callbacks) {
@@ -293,13 +304,14 @@ stl2stp_status stl2stp_load_stl(stl2stp_handle* handle, const char* path,
         if (stream.bad()) {
             throw stl2stp::Error(STL2STP_ERROR_IO, "Failed reading STL input");
         }
-        if (builder.mesh.triangles.empty()) {
+        if (builder.mesh.triangles.empty() && !builder.has_original_triangle) {
             throw stl2stp::Error(STL2STP_ERROR_FORMAT, "No complete non-degenerate STL triangles");
         }
         if (partial || builder.skipped) {
             handle->error = "Loaded complete triangles only: truncated/malformed data or degenerate facets";
         }
         progress.report(1);
+        builder.mesh.original_weld_required = true;
         handle->mesh = std::move(builder.mesh);
         return partial || builder.skipped ? STL2STP_WARNING_PARTIAL : STL2STP_OK;
     });
@@ -344,6 +356,9 @@ stl2stp_status stl2stp_simplify(stl2stp_handle* handle, uint64_t target_faces,
         if (!target_faces || target_faces > std::numeric_limits<std::size_t>::max()) {
             throw stl2stp::Error(STL2STP_ERROR_ARGUMENT, "Target face count must be positive and addressable");
         }
+        if (handle->mesh.triangles.empty()) {
+            throw stl2stp::Error(STL2STP_ERROR_FORMAT, "No non-collinear triangles for simplification");
+        }
         stl2stp::Progress progress(callbacks);
         progress.report(0);
         if (target_faces >= handle->mesh.triangles.size()) {
@@ -365,6 +380,9 @@ stl2stp_status stl2stp_save_stl(stl2stp_handle* handle, const char* path,
                                const stl2stp_callbacks* callbacks) {
     return stl2stp::protect(handle, [&] {
         stl2stp::require_mesh(handle->mesh);
+        if (handle->mesh.triangles.empty()) {
+            throw stl2stp::Error(STL2STP_ERROR_FORMAT, "No non-collinear triangles for STL output");
+        }
         if (handle->mesh.triangles.size() > std::numeric_limits<uint32_t>::max()) {
             throw stl2stp::Error(STL2STP_ERROR_FORMAT, "Too many faces for binary STL uint32 count");
         }

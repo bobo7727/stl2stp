@@ -48,9 +48,19 @@ typedef struct stl2stp_topology {
     uint64_t vertices;
 } stl2stp_topology;
 
+typedef enum stl2stp_mode
+#ifdef __cplusplus
+    : int32_t
+#endif
+{
+    STL2STP_MODE_ORIGINAL = 0,
+    STL2STP_MODE_SEWING = 1
+} stl2stp_mode;
+
 typedef struct stl2stp_export_options {
     double sewing_tolerance;
     int merge_coplanar;
+    stl2stp_mode mode;
 } stl2stp_export_options;
 
 stl2stp_handle* stl2stp_create(void);

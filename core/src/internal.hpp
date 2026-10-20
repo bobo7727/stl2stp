@@ -46,6 +46,8 @@ using Triangle = std::array<std::size_t, 3>;
 struct Mesh {
     std::vector<Point> points;
     std::vector<Triangle> triangles;
+    std::vector<Triangle> original_triangles;
+    bool original_weld_required = false;
 };
 
 struct Error : std::runtime_error {

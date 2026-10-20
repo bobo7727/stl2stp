@@ -12,6 +12,7 @@ set_target_properties(stl2stp-c-api-test PROPERTIES C_STANDARD 99 C_STANDARD_REQ
 add_test(NAME stl2stp.c_header COMMAND stl2stp-c-api-test)
 
 set(_data "${CMAKE_CURRENT_BINARY_DIR}/data")
+configure_file(data/small_zero-area-duplicate.stl "${_data}/zero-area-duplicate.stl" COPYONLY)
 add_test(NAME stl2stp.fixtures COMMAND stl2stp-fixture-generator "${_data}")
 set_tests_properties(stl2stp.fixtures PROPERTIES FIXTURES_SETUP stl2stp_data)
 
@@ -20,6 +21,11 @@ if(NOT STL2STP_WITH_OCCT)
     list(APPEND _mesh_tests disabled_exchange)
 endif()
 set(_exchange_tests step step_merge readback two_shells iges exchange_errors cancel_exchange)
+foreach(_mode original sewing)
+    foreach(_fixture cube two_shells degenerate_duplicate duplicate_open collinear collinear_only truncated iges)
+        list(APPEND _exchange_tests "${_mode}_${_fixture}")
+    endforeach()
+endforeach()
 foreach(_test IN LISTS _mesh_tests)
     add_test(NAME stl2stp.${_test} COMMAND stl2stp-tests "${_test}" "${_data}" "${_data}/output-${_test}")
     set_tests_properties(stl2stp.${_test} PROPERTIES FIXTURES_REQUIRED stl2stp_data LABELS mesh TIMEOUT 120)
@@ -43,10 +49,24 @@ set_tests_properties(stl2stp.cli_info stl2stp.cli_simplify stl2stp.cli_invalid P
 if(STL2STP_WITH_OCCT)
     add_test(NAME stl2stp.cli_convert COMMAND stl2stp-cli convert "${_data}/cube-binary.stl" "${_data}/cli-cube.step" --merge-coplanar)
     set_tests_properties(stl2stp.cli_convert PROPERTIES FIXTURES_REQUIRED stl2stp_data FIXTURES_SETUP cli_step
-        PASS_REGULAR_EXPRESSION "readback solids=.*faces=6" TIMEOUT 180)
+        PASS_REGULAR_EXPRESSION "mode=original" TIMEOUT 180)
     add_test(NAME stl2stp.cli_readback COMMAND stl2stp-cli readback "${_data}/cli-cube.step")
     set_tests_properties(stl2stp.cli_readback PROPERTIES FIXTURES_REQUIRED cli_step PASS_REGULAR_EXPRESSION "faces=6")
     add_test(NAME stl2stp.cli_iges COMMAND stl2stp-cli convert "${_data}/cube-binary.stl" "${_data}/cli-cube.igs" --simplify 8)
     set_tests_properties(stl2stp.cli_iges PROPERTIES FIXTURES_REQUIRED stl2stp_data PASS_REGULAR_EXPRESSION "output_bytes=" TIMEOUT 180)
+    foreach(_mode original sewing)
+        add_test(NAME stl2stp.cli_mode_${_mode} COMMAND stl2stp-cli convert "${_data}/two-shells.stl"
+            "${_data}/cli-${_mode}.step" --mode ${_mode})
+        set_tests_properties(stl2stp.cli_mode_${_mode} PROPERTIES FIXTURES_REQUIRED stl2stp_data
+            PASS_REGULAR_EXPRESSION "mode=${_mode}" TIMEOUT 180)
+    endforeach()
+    add_test(NAME stl2stp.cli_mode_invalid COMMAND stl2stp-cli convert "${_data}/cube-binary.stl"
+        "${_data}/invalid-mode.step" --mode invalid)
+    add_test(NAME stl2stp.cli_mode_missing COMMAND stl2stp-cli convert "${_data}/cube-binary.stl"
+        "${_data}/missing-mode.step" --mode)
+    add_test(NAME stl2stp.cli_mode_duplicate COMMAND stl2stp-cli convert "${_data}/cube-binary.stl"
+        "${_data}/duplicate-mode.step" --mode original --mode sewing)
+    set_tests_properties(stl2stp.cli_mode_invalid stl2stp.cli_mode_missing stl2stp.cli_mode_duplicate PROPERTIES
+        FIXTURES_REQUIRED stl2stp_data WILL_FAIL TRUE)
 endif()
 endif()

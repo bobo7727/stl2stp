@@ -63,7 +63,7 @@ void usage() {
     std::cerr << "Usage:\n"
               << "  stl2stp-cli info <in.stl>\n"
               << "  stl2stp-cli simplify <in.stl> <out.stl> --faces N\n"
-              << "  stl2stp-cli convert <in.stl> <out.step|out.igs> [--merge-coplanar] [--simplify N]\n"
+              << "  stl2stp-cli convert <in.stl> <out.step|out.igs> [--mode original|sewing] [--merge-coplanar] [--simplify N]\n"
               << "  stl2stp-cli readback <in.step>\n";
 }
 
@@ -88,6 +88,7 @@ int main(int argc, char** argv) {
         uint64_t target = 0;
         auto options = stl2stp_default_export_options();
         bool merge_given = false;
+        bool mode_given = false;
         if (command == "info") {
             if (argc != 3) { usage(); return 2; }
         } else {
@@ -97,6 +98,12 @@ int main(int argc, char** argv) {
                 if (command == "convert" && argument == "--merge-coplanar" && !merge_given) {
                     options.merge_coplanar = 1;
                     merge_given = true;
+                } else if (command == "convert" && argument == "--mode" && !mode_given && index + 1 < argc) {
+                    const std::string selected = argv[++index];
+                    if (selected == "original") { options.mode = STL2STP_MODE_ORIGINAL; }
+                    else if (selected == "sewing") { options.mode = STL2STP_MODE_SEWING; }
+                    else { throw std::runtime_error("Mode must be original or sewing"); }
+                    mode_given = true;
                 } else if (((command == "simplify" && argument == "--faces") ||
                             (command == "convert" && argument == "--simplify")) && !target && index + 1 < argc) {
                     target = face_count(argv[++index]);
@@ -115,6 +122,7 @@ int main(int argc, char** argv) {
         if (command == "simplify") {
             timed("save", [&] { check(handle.get(), stl2stp_save_stl(handle.get(), argv[3], &callbacks)); });
         } else {
+            std::cout << "mode=" << (options.mode == STL2STP_MODE_ORIGINAL ? "original" : "sewing") << '\n';
             const auto extension = lowercase(std::filesystem::u8path(argv[3]).extension().u8string());
             stl2stp_topology counts{};
             if (extension == ".step" || extension == ".stp") {

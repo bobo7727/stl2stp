@@ -12,12 +12,12 @@ Objective-C++ bridge 只需包含此头文件并持有 opaque `stl2stp_handle*`�
 | `stl2stp_create` | 创建空 handle；失败返回 `NULL` |
 | `stl2stp_destroy` | 销毁 handle；`NULL` 安全 |
 | `stl2stp_last_error` | 读取上次诊断，不清空；`NULL` 读取当前线程的创建/null-handle 诊断 |
-| `stl2stp_default_export_options` | 返回 `sewing_tolerance=1e-6`、`merge_coplanar=0` |
+| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0` |
 | `stl2stp_load_stl` | 自动识别 binary/ASCII STL，精确坐标去重，成功后替换网格 |
 | `stl2stp_get_mesh_stats` | 返回 unique vertices、无向 unique edges、triangular faces 和 AABB |
 | `stl2stp_simplify` | QEM edge collapse，按目标三角面数简化当前网格 |
 | `stl2stp_save_stl` | 写 little-endian binary STL；法向由顶点绕序重新计算 |
-| `stl2stp_export_step` | Sewing 后写 STEP AP214IS，可返回导出形状的 topology |
+| `stl2stp_export_step` | 按 ORIGINAL / SEWING 模式写 STEP，可返回导出前的 topology |
 | `stl2stp_export_iges` | 同一 B-Rep 管线写 IGES，可返回导出前 B-Rep topology |
 | `stl2stp_read_step` | STEP read-back，返回 unique topology counts，不改变当前网格 |
 
@@ -26,6 +26,7 @@ Objective-C++ bridge 只需包含此头文件并持有 opaque `stl2stp_handle*`�
 去重；shells 包含 solid 内的 shell，**不能**把 solids 与 shells 相加作为组件数。
 导出时 `topology` 可为 `NULL`；read-back 时必须提供输出地址。
 失败或取消不写入 stats/topology 输出结构体。
+**导出前与 STEP 回读的计数不保证一致**：writer/reader 可修复/拆分无效或不连通拓扑。
 
 ## 返回码与错误处理
 
@@ -71,7 +72,13 @@ Binary STL 读取声明面数和文件长度，最多取两者容许的完整 50
 通过长度与非文本字节识别，不能只按首词判定 ASCII。
 ASCII 使用 classic locale，完整 `endfacet` 才接纳一个 facet，支持多个 `solid`。
 没有 `endsolid`、半个 facet 或非法尾部保留完整前缀并报告 warning。
-任意位置的 NaN/Inf 坐标会失败，不静默接受；零面积三角面跳过并报告 warning。
+任意位置的 NaN/Inf 坐标会失败，不静默接受；零面积三角面从非退化视图中跳过并报告 warning。
+原始 facet 顺序另保留供 ORIGINAL 焊接使用；重复顶点面由原式索引过滤，不写入 B-Rep。
+三个不同节点的共线面在 ORIGINAL 不作面积过滤。
+只有共线面时仍能带 warning 载入，但 mesh stats 的 faces/edges 为 0，
+ORIGINAL 会尝试构面，SEWING、QEM 和 STL save 返回 `STL2STP_ERROR_FORMAT`。
+`vertices` 和 AABB 包含读取保存的节点（可能有仅由共线面引用的节点），
+`faces`/`edges` 统计非退化视图，不能把 stats.faces 当成 ORIGINAL 一定写出的面数。
 坐标焊接仅使用 exact equality，**不是**公差聚类；统计包含三角面内部的对角线。
 
 QEM 迁移了 reference `MeshSimplify.cpp` 的平面 quadrics、3×3 最优点求解、
@@ -83,24 +90,80 @@ QEM 迁移了 reference `MeshSimplify.cpp` 的平面 quadrics、3×3 最优点�
 这些改进意味着不保证与原桌面版逐顶点/逐字节相同的简化结果。
 normal-flip guard 不是非流形输入修复器，也不承诺任意模型严格保拓扑。
 
-## Sewing 与导出边界
+## Conversion mode 与导出边界
 
-所有 triangle 的原始绕序保留，以 `MakePolygon` / `MakeFace` 构造平面 face，
-然后使用 `BRepBuilderAPI_Sewing(tolerance, true, true, true, false)`。
-默认 tolerance 是 **1e-6 模型坐标单位**；可由 export options 覆盖为有限正数。
-`merge_coplanar` 默认关闭；开启时使用 `ShapeUpgrade_UnifySameDomain` 合并 faces/edges，
-不拟合曲面。闭合 shell 在 OCCT 可定向时构造 solid，开放 shell 保持 shell，
-多个组件放在 compound 中，不强行把不相交组件放进一个 shell。
-STL 没有单位字段，当前按输入数字直接作为 mm 写出 STEP/IGES；不自动缩放。
-IGES 按 OCCT `write.brep.mode` 默认值工作。返回的 IGES topology 是导出前的 B-Rep，
-不是 IGES read-back（公共接口只提供 STEP read-back）。
+```c
+typedef enum stl2stp_mode {
+    STL2STP_MODE_ORIGINAL = 0,
+    STL2STP_MODE_SEWING = 1
+} stl2stp_mode;
+```
 
-**与提供的 reference 不一致之处必须明确：** 实际检查的
-`stl2stp-codeDoc.cpp::RebuildShapeFromMesh` 使用共享边、手工单 shell + solid 组装，
-没有 `BRepBuilderAPI_Sewing`，也没有 Sewing tolerance。任务描述中的
-“与原始 Sewing 相同公差”在该源码中不存在可对照值；本库按任务要求新增 Sewing，
-1e-6 是本库明确默认值，不能宣称已复刻原始 Sewing 参数。
-不迁移 MFC UI、渲染、注册表、显示降采样、undo 和硬编码作者/company/header 文案。
+`stl2stp_export_options` 保留原字段顺序，在末尾追加 `stl2stp_mode mode`。
+C++17 声明固定 underlying type 为 `int32_t`，使任意 C 传入的 32-bit 枚举值
+都可以安全验证，不先触发 UBSan 的 invalid enum load；C99 端使用普通 enum，
+C header 测试检查其大小为 4 bytes。不要用 `-fshort-enums` 编译 bridge。
+未知 mode 返回 `STL2STP_ERROR_ARGUMENT`，不改变文件或 topology。
+这不是旧已编译客户端的 ABI 兼容承诺：新增字段可能占原来的尾部 padding；
+原客户端没有初始化它，**库和 bridge 必须一起重新编译**。
+建议总是使用 `stl2stp_default_export_options()` 初始化，不手工猜结构体布局。
+
+**默认是 ORIGINAL，不是 SEWING**，因为所给桌面导出算法共享节点/边并直接
+组装一个 shell/solid，没有 Sewing。`options=NULL` 也使用 ORIGINAL。
+`merge_coplanar` 是两模式独立可选项，默认关闭。
+
+### ORIGINAL (`STL2STP_MODE_ORIGINAL`)
+
+复现 reference 的 `MakeVertex` → 共享无向 `MakeEdge` → `MakeWire`（仅显式反转
+第一条带负号的边）→ `MakeFace` → `BRep_Builder` 单 shell → `BRepTools::Update`
+→ 无条件单 solid 顺序。不 Sewing，不自动按组件分壳，不强制修复面方向。
+未简化 STL 的 ORIGINAL 视图使用 `RWStl` 相同的 `Poly_MergeNodesTool(M_PI/2,0.0)`
+及 float32 键焊接；简化结果直接用自己的共享节点，不再次按 STL 键焊接。
+只过滤重复节点的退化面，保留节点不同的共线面和重复三角形，交给 OCCT 构面。
+若 OCCT 构造失败返回 `STL2STP_ERROR_OCCT`，不能保证任意共线/非法网格都成功。
+额外检查有限坐标、float32 key 范围和 OCCT int 索引范围，超界返回 FORMAT。
+
+开放/断开输入同样先组装单 solid，**不代表它是有效闭合实体**；回读可以变成多个
+shells/solids。例如 two-shells 导出前 1 solid / 1 shell，OCCT 8.0.1 回读为 2 / 2。
+没有隐含 100000 面上限，没有交互确认或自动简化，相当于桌面大面数提示选择“是”。
+UI 应自行提示/限流；CLI 只有显式 `--simplify N` 才执行简化。
+
+STEP 保留 `STEPControl_AsIs`、`compgraph=true`、product `STL2STP 1.0.0`，
+author/organization `VINCENT`、originating system `STL2STP`、description
+`STL TO STEP FILE`、preprocessor `STL2STP STEP processor`。
+IGES 保留 GlobalSection 的 author/company 和三项 `STL2STP IGES processor` 文案。
+文件名 metadata 使用最终 basename，不使用原子写出的临时文件名。
+如 reference 一样，不覆盖 schema/unit/precision；OCCT 8.0.1 的未修改默认值为
+STEP AP214IS、STEP/IGES MM、precision mode Average。原进程配置未有证据，
+不能声称历史桌面输出精度/单位恒等于这些 8.0.1 默认值。
+
+### SEWING (`STL2STP_MODE_SEWING`)
+
+保留本库此前行为：非零面积三角面按绕序用 `MakePolygon` / `MakeFace` 构造，
+`BRepBuilderAPI_Sewing(tolerance,true,true,true,false)`，闭合 shell 在可定向时
+构造 solid，开放 shell 保持 shell；多个组件放入 compound。
+STEP 显式 AP214IS / MM / product `STL2STP`；IGES 使用 MM。
+`sewing_tolerance` 默认 **1e-6 模型坐标单位**，不是 reference 的公差。
+
+### 独立共面合并与 CLI
+
+`merge_coplanar=1` 使用 `ShapeUpgrade_UnifySameDomain` 合并 faces/edges，
+不拟合曲面；对 ORIGINAL 已组装的形状或 SEWING 的 sewn shape 应用同一选项。
+`sewing_tolerance` 同时用于共面合并；所有模式都要求它是有限正数，
+但 ORIGINAL 且 merge 关闭时不用它改变建模公差。
+STL 本身没有单位字段，不自动推断或缩放单位。
+IGES 保留 reference 的旧键 `write.brep.mode` 查询；8.0.1 未注册此键，`IVal` 返回 0，
+并非新版 `write.iges.brep.mode` 可选项；详见 `docs/original-conversion.md`。
+IGES topology 是导出前 B-Rep，不是 IGES geometry read-back。
+
+```sh
+stl2stp-cli convert in.stl out.step --mode original
+stl2stp-cli convert in.stl out.step --mode sewing --merge-coplanar
+```
+
+省略 `--mode` 等价于 `original`。CLI 在导出前打印 `mode=original` 或 `mode=sewing`；
+未知、重复或缺值选项失败。完整原始行号、隐式公差、prompt 和 API 替代见
+`docs/original-conversion.md`；实测拓扑与测试边界见 `docs/core-validation.md`。
 
 ## Progress、取消与线程
 

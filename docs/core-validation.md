@@ -1,6 +1,132 @@
 # 核心库验证交接（2026-10-20）
 
-## 当前状态：完整 OCCT 构建与回归通过
+## 双模式验证（当前工作，基于 `9ec394a`）
+
+默认已经改为 `STL2STP_MODE_ORIGINAL`，因为 reference 的导出重建没有 Sewing。
+`STL2STP_MODE_SEWING` 保留前版管线；`merge_coplanar` 在两模式独立可选。
+接口与旧二进制 bridge 必须一起重新编译，不能把新增 mode 的尾部字段当成旧 ABI 承诺。
+原始构造顺序、所有参数的显式/默认边界、100000 面 UI 语义以及 OCCT 8.x 替代
+见 `docs/original-conversion.md`，使用方法见 `docs/core-api.md`。
+
+本次保持 `core/extract` / HEAD `9ec394a`；没有 commit、remote、push、checkout、
+reset 或 stash。所有新代码、文档、fixture、构建/测试日志写在仓库内，
+OCCT install/source 仅只读，未触碰其它 home 项目。以下历史 25 项/性能数据对应
+**前版默认 SEWING**，不能用来代表本次 ORIGINAL；新增性能数据由统筹补充。
+
+### 模式测试范围
+
+保留原有 25 项，新增两模式各 8 个 CTest case，以及 5 个 CLI mode case，共 46 项。
+`original_*` / `sewing_*` 分别检查 cube、two-shells、退化+重复 cube、
+手写重复面小夹具、共线面、只有共线面、截断输入和 IGES。
+cube / two-shells 的每个 case 同时检查 merge OFF / ON。
+
+- `core/tests/data/small_zero-area-duplicate.stl` 是小型手写 ASCII fixture：
+  一个有效 facet、一个重复顶点零面积 facet、一个与首面相同的副本。
+  两模式都过滤重复节点 facet，保留 2 个重复有效面，不擅自去重三角面。
+- `degenerate-duplicate.stl` 由 generator 产生：12 面 cube + 重复顶点面 + 首面副本。
+  从 14 records 保留 13 faces；ORIGINAL 的共享边计数必须仍为 18。
+- `collinear.stl` 是 cube 加一个三点不同的共线面。ORIGINAL 保留它交给 OCCT，
+  SEWING 保持面积过滤；不能把“零面积”一律误读为 reference 会跳过。
+- `collinear-only.stl` 验证 loader 保留 ORIGINAL 可用的源视图，clean stats 为 0 faces；
+  ORIGINAL 在本 fixture 上成功导出，SEWING/QEM/STL save 返回 FORMAT。
+  SEWING 的失败不替换既有目标文件或 topology，不残留临时目录。
+- truncated binary 声明 12 faces，只有 5 个完整 records + 17 bytes 尾部；
+  load 必须返回 PARTIAL，继续导出并回读 5 faces，不能静默当作完整 cube。
+- ORIGINAL 的 STEP 检查原 product/author/description/preprocessor、最终 basename，
+  并检查文件中仅一个 `CLOSED_SHELL`：两不相交 cube 和开放输入也不能被构造器
+  主动改成多 shell 的 SEWING 算法。这里的实体名不构成模型有效性证明。
+- 两模式 IGES 都验证 80-column records、sections/序号/counters；ORIGINAL 另检查
+  `VINCENT`、processor 和最终 filename。公共 API 尚未增加 IGES geometry read-back。
+- C99 header case 检查默认 ORIGINAL、枚举值及 4-byte enum；exchange errors 检查
+  非法 mode=99 安全返回 ARGUMENT。第一次 UBSan 发现非固定 enum 的非法值读取，
+  已通过 C++ `int32_t` underlying type 修复，而不是去掉非法值测试或关闭 sanitizer。
+- CLI 检查省略 mode 的 default ORIGINAL、显式 original/sewing 输出模式名，
+  unknown/missing/duplicate mode 均失败。保留 readback、merge、simplify 和 IGES CLI case。
+- 原有取消 case 现在对两模式分别在 0 / 0.45 / 0.8 / 1 请求取消 STEP/IGES，
+  验证文件/topology 不变、无临时目录；不声称无 progress hook 的 OCCT 阶段可即时取消。
+
+### OCCT 8.0.1 拓扑断言
+
+每项按 `solids / shells / faces / edges / vertices` 计数；回读列是本安装的
+实际 STEP reader 结果，不是简单复制 export 计数。无 merge 除非另行标注。
+
+| fixture | mode | export S/Sh/F/E/V | STEP read-back S/Sh/F/E/V |
+| --- | --- | --- | --- |
+| cube | 两模式 | 1/1/12/18/8 | 1/1/12/18/8 |
+| cube，merge ON | 两模式 | 1/1/6/12/8 | 1/1/6/12/8 |
+| two-shells | ORIGINAL | 1/1/24/36/16 | 2/2/24/36/16 |
+| two-shells | SEWING | 2/2/24/36/16 | 2/2/24/36/16 |
+| two-shells，merge ON | ORIGINAL | 1/1/12/24/16 | 2/2/12/24/16 |
+| two-shells，merge ON | SEWING | 2/2/12/24/16 | 2/2/12/24/16 |
+| degenerate-duplicate cube | ORIGINAL | 1/1/13/18/8 | 1/2/13/18/8 |
+| degenerate-duplicate cube | SEWING | 1/1/13/21/11 | 1/2/13/21/11 |
+| small duplicate ASCII | 两模式 | 1/1/2/3/3 | 1/1/2/3/3 |
+| cube + collinear | ORIGINAL | 1/1/13/20/9 | 1/2/13/20/9 |
+| cube + collinear | SEWING | 1/1/12/18/8 | 1/1/12/18/8 |
+| collinear-only | ORIGINAL | 1/1/1/3/3 | 0/1/1/2/2 |
+| collinear-only | SEWING | FORMAT，不写出 | 不适用 |
+| truncated binary | ORIGINAL | 1/1/5/12/8 | 0/2/5/12/8 |
+| truncated binary | SEWING | 0/2/5/12/9 | 0/2/5/12/9 |
+
+ORIGINAL 的 faces 对应原始节点重复过滤后存活的 facets（merge OFF），
+不是 core clean stats 的面积过滤面数。共享 edges/vertices 与单 shell/solid 来自
+reference 的明确构造；回读拆壳、降级和退化边处理来自 OCCT，不能“修复”测试期望
+来掩盖两模式构造算法不同。上述不是对非法/非流形几何的正式有效性验收。
+
+### 本次构建与日志
+
+真实 OCCT 8.0.1 shared libraries；gcc-10 / g++-10（GCC 10.5.0），C++17。
+Release 使用 `build/core-linux`；Debug 使用 `build/core-linux-debug-ubsan`，
+C/C++ flags 均为 `-Wall -Wextra -Wpedantic -Werror -fsanitize=undefined
+-fno-sanitize-recover=undefined`。预编译 OCCT 本身没有重新插桩。
+本次配置/构建/CTest 命令的 `TMPDIR` 都指向仓库 `build/tmp`，没有设置全局环境。
+
+```sh
+mkdir -p build/tmp
+TMPDIR="$PWD/build/tmp" cmake -S core -B build/core-linux -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10 \
+  -DOCCT_ROOT="$HOME/occt-install" -DSTL2STP_WITH_OCCT=ON
+TMPDIR="$PWD/build/tmp" cmake --build build/core-linux --parallel 4
+TMPDIR="$PWD/build/tmp" ctest --test-dir build/core-linux --output-on-failure -j 6
+
+TMPDIR="$PWD/build/tmp" cmake -S core -B build/core-linux-debug-ubsan -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10 \
+  -DCMAKE_CXX_FLAGS="-Wall -Wextra -Wpedantic -Werror -fsanitize=undefined -fno-sanitize-recover=undefined" \
+  -DCMAKE_C_FLAGS="-Wall -Wextra -Wpedantic -Werror -fsanitize=undefined -fno-sanitize-recover=undefined" \
+  -DOCCT_ROOT="$HOME/occt-install" -DSTL2STP_WITH_OCCT=ON
+TMPDIR="$PWD/build/tmp" cmake --build build/core-linux-debug-ubsan --parallel 4
+TMPDIR="$PWD/build/tmp" UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+  ctest --test-dir build/core-linux-debug-ubsan --output-on-failure -j 6
+```
+
+完整最终日志（gitignored）：`build/core-linux/ctest-modes-validation.log` 和
+`build/core-linux-debug-ubsan/ctest-modes-validation.log`。
+
+Release 最终摘要：
+
+```text
+100% tests passed, 0 tests failed out of 46
+
+Label Time Summary:
+mesh    =   1.60 sec*proc (10 tests)
+occt    =   3.67 sec*proc (23 tests)
+
+Total Test time (real) =   2.00 sec
+```
+
+Debug `-Werror` / UBSan 最终摘要（无编译 warning 或 sanitizer 诊断）：
+
+```text
+100% tests passed, 0 tests failed out of 46
+
+Label Time Summary:
+mesh    =   2.74 sec*proc (10 tests)
+occt    =   3.21 sec*proc (23 tests)
+
+Total Test time (real) =   2.29 sec
+```
+
+## 历史基线：25 项完整 OCCT 回归（前版默认 SEWING）
 
 分支仍为 `core/extract`。未 commit、未添加 remote、未 push，未修改 reference。
 已有 `.gitattributes` / `.gitignore` / `AGENTS.md` / `README.md` 工作区改动保留原样。
@@ -100,7 +226,7 @@ TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel`，本次还�
 
 实际验证的是 Linux + OCCT 8.0.1；OCCT 7.9 和 iOS static builds 尚未独立构建验证。
 
-## 原始逻辑的差异
+## 历史基线的原始逻辑差异（本次 ORIGINAL 已补齐构造及 metadata）
 
 - 实际 reference 使用手工单 shell/solid，不含 Sewing 或 Sewing tolerance；
   按任务需求新增 per-triangle Sewing（默认 1e-6），不能声称此参数忠实复刻原始值。
@@ -134,3 +260,32 @@ official archive 校验、统筹使用的 OCCT recipe 与 core 构建命令见 `
 - STEP 约 2.6 KB/面，导出约 0.87 ms/面，基本呈线性；先做 QEM 简化是减小体积最有效的手段。
 - 2 万面的 STEP 回读需要 10–12 s。在 `/mnt/d` 上单次测到过 32 s，属于 I/O 波动。
 - OCCT 的 STEP writer 会在 stdout 打印带颜色的 Transfer 统计；iOS 集成前应通过 `Message` 静默掉。
+
+## 统筹独立复测：ORIGINAL 与 SEWING 对比（2026-10-20，WSL Ubuntu 20.04，12 核，Release，g++-10，OCCT 8.0.1）
+
+在 `build/v2-release` 和 `build/v2-debug-ubsan` 从零构建：Release 0 warning，46/46 通过；Debug `-Werror` + UBSan（`-fno-sanitize-recover`）46/46 通过，0 条 `runtime error`。
+
+### 19,800 面 UV 球（输出写到 WSL ext4 `~/stl2stp-work/bench`，3 次交替运行）
+
+| 模式 | 导出 ms（3 次） | STEP 字节 | 回读 ms | 回读 solids/shells/faces/edges/vertices | 峰值内存 |
+|---|---|---:|---:|---|---:|
+| ORIGINAL | 3885 / 4170 / 4331 | 48,554,145 | 6930–7217 | 1/1/19800/29700/9902 | 448 MB |
+| SEWING | 8401 / 8492 / 8874 | 51,183,093 | 7280–7603 | 1/1/19800/29700/9902 | 468 MB |
+
+ORIGINAL 导出约快 2 倍（省掉 Sewing），文件约小 5%（同一 shape 复用同一组边/顶点）。
+
+### 其它组合（输出写到 `/mnt/d`，单次运行；/mnt/d 写入较慢，耗时只用于看量级）
+
+| 输入 / 选项 | ORIGINAL：导出 ms，字节，回读 faces | SEWING：导出 ms，字节，回读 faces |
+|---|---|---|
+| 球 + `--merge-coplanar` | 8388，47,867,342，19408 | 16967，50,391,239，19408 |
+| 球 + `--simplify 9900` | 5219，24,255,046，9900 | 8469，25,547,311，9900 |
+| 球 → IGES | 9579，40,219,416，峰值 175 MB | 14095，40,219,416，峰值 271 MB |
+| cube | 27，24,429，1 solid / 12 faces | 44，26,038，1 solid / 12 faces |
+| two-shells | 34，47,445；导出 1 solid / 1 shell，回读 2 solids / 2 shells | 65，53,846；导出、回读均为 2 solids |
+| zero-area + duplicate | 18，5,458，2 faces | 31，5,457，2 faces |
+| truncated-binary（5 个完整面） | 28，12,360；导出 1 solid，回读 0 solids / 2 shells | 22，15,887；导出、回读均为 0 solids / 2 shells |
+
+说明：
+- ORIGINAL 和桌面版一样，把所有面放进一个 shell 和一个 solid，所以 two-shells 导出时只有 1 个 solid。OCCT STEP reader 回读时会按连通域拆成 2 个；开放网格（截断文件）回读时 solid 会降级成 shell。
+- ORIGINAL 的 STEP 头部写入原版元数据：作者和组织为 `VINCENT`，产品名为 `STL2STP 1.0.0`，描述为 `STL TO STEP FILE`。

@@ -78,6 +78,91 @@ void no_temporary_files(const std::filesystem::path& directory) {
 }
 
 #if STL2STP_WITH_OCCT
+void validate_iges(const std::string& text);
+
+void topology_matches(const stl2stp_topology& actual, const stl2stp_topology& expected, const std::string& stage) {
+    require(actual.solids == expected.solids && actual.shells == expected.shells && actual.faces == expected.faces &&
+            actual.edges == expected.edges && actual.vertices == expected.vertices,
+            stage + " topology S/Sh/F/E/V = " + std::to_string(actual.solids) + "/" + std::to_string(actual.shells) +
+            "/" + std::to_string(actual.faces) + "/" + std::to_string(actual.edges) + "/" + std::to_string(actual.vertices));
+}
+
+void mode_conversion(stl2stp_handle* handle, const std::filesystem::path& data,
+                     const std::filesystem::path& output, bool original, const std::string& fixture) {
+    auto options = stl2stp_default_export_options();
+    options.mode = original ? STL2STP_MODE_ORIGINAL : STL2STP_MODE_SEWING;
+    const bool partial = fixture == "degenerate_duplicate" || fixture == "duplicate_open" || fixture == "collinear" ||
+        fixture == "collinear_only" || fixture == "truncated";
+    const std::string input = fixture == "two_shells" ? "two-shells.stl" :
+        fixture == "degenerate_duplicate" ? "degenerate-duplicate.stl" :
+        fixture == "duplicate_open" ? "zero-area-duplicate.stl" :
+        fixture == "collinear_only" ? "collinear-only.stl" :
+        fixture == "collinear" ? "collinear.stl" : fixture == "truncated" ? "truncated-binary.stl" : "cube-binary.stl";
+    status(handle, stl2stp_load_stl(handle, (data / input).u8string().c_str(), nullptr),
+           partial ? STL2STP_WARNING_PARTIAL : STL2STP_OK);
+    if (fixture == "collinear_only") {
+        require(stats(handle).faces == 0, "Clean mesh should exclude collinear-only facet");
+        status(handle, stl2stp_simplify(handle, 1, nullptr), STL2STP_ERROR_FORMAT);
+        status(handle, stl2stp_save_stl(handle, (output / "collinear.stl").u8string().c_str(), nullptr), STL2STP_ERROR_FORMAT);
+        if (!original) {
+            const auto path = output / "rejected.step";
+            sentinel(path);
+            stl2stp_topology untouched{123, 0, 0, 0, 0};
+            status(handle, stl2stp_export_step(handle, path.u8string().c_str(), &options, nullptr, &untouched), STL2STP_ERROR_FORMAT);
+            status(handle, stl2stp_export_iges(handle, path.u8string().c_str(), &options, nullptr, &untouched), STL2STP_ERROR_FORMAT);
+            require(contents(path) == "original output" && untouched.solids == 123, "Empty sewing input changed output");
+            no_temporary_files(output);
+            return;
+        }
+    }
+    for (const int merge : {0, 1}) {
+        if (merge && fixture != "cube" && fixture != "two_shells") { break; }
+        options.merge_coplanar = merge;
+        stl2stp_topology expected{1, 1, merge ? 6u : 12u, merge ? 12u : 18u, 8};
+        if (fixture == "two_shells") { expected = {original ? 1u : 2u, original ? 1u : 2u, merge ? 12u : 24u, merge ? 24u : 36u, 16}; }
+        if (fixture == "degenerate_duplicate") { expected = {1, 1, 13, original ? 18u : 21u, original ? 8u : 11u}; }
+        if (fixture == "duplicate_open") { expected = {1, 1, 2, 3, 3}; }
+        if (fixture == "collinear" && original) { expected = {1, 1, 13, 20, 9}; }
+        if (fixture == "collinear_only") { expected = {1, 1, 1, 3, 3}; }
+        if (fixture == "truncated") { expected = {original ? 1u : 0u, original ? 1u : 2u, 5, 12, original ? 8u : 9u}; }
+        const auto path = output / (fixture == "iges" ? "model.igs" : merge ? "merged.step" : "model.step");
+        stl2stp_topology exported{};
+        ProgressState progress;
+        auto observer = callbacks(progress);
+        if (fixture == "iges") {
+            status(handle, stl2stp_export_iges(handle, path.u8string().c_str(), &options, &observer, &exported));
+            const auto text = contents(path);
+            validate_iges(text);
+            if (original) {
+                require(text.find("VINCENT") != std::string::npos && text.find("STL2STP IGES processor") != std::string::npos &&
+                        text.find("model.igs") != std::string::npos, "Original IGES metadata missing");
+            }
+        } else {
+            status(handle, stl2stp_export_step(handle, path.u8string().c_str(), &options, &observer, &exported));
+            const auto text = contents(path);
+            if (original) {
+                for (const auto field : {"STL2STP 1.0.0", "VINCENT", "STL TO STEP FILE", "STL2STP STEP processor"}) {
+                    require(text.find(field) != std::string::npos, std::string("Original STEP metadata missing: ") + field);
+                }
+                require(text.find(path.filename().u8string()) != std::string::npos, "Header used temporary filename");
+                const auto shell = text.find("CLOSED_SHELL(");
+                require(shell != std::string::npos && text.find("CLOSED_SHELL(", shell + 1) == std::string::npos,
+                        "Original writer must receive exactly one shell, including open/disconnected input");
+            }
+            stl2stp_topology expected_read = expected;
+            if (fixture == "two_shells") { expected_read.solids = 2; expected_read.shells = 2; }
+            if (fixture == "degenerate_duplicate" || (fixture == "collinear" && original)) { expected_read.shells = 2; }
+            if (fixture == "truncated") { expected_read.solids = 0; expected_read.shells = 2; }
+            if (fixture == "collinear_only") { expected_read = {0, 1, 1, 2, 2}; }
+            stl2stp_topology read{};
+            status(handle, stl2stp_read_step(handle, path.u8string().c_str(), nullptr, &read));
+            topology_matches(read, expected_read, "readback");
+        }
+        progress_complete(progress);
+        topology_matches(exported, expected, "export");
+    }
+}
+
 void validate_iges(const std::string& text) {
     const std::string sections = "SGDPT";
     std::array<uint64_t, 5> counts{};
@@ -261,6 +346,9 @@ int main(int argc, char** argv) {
             cube_stats(handle.get());
             no_temporary_files(output);
 #if STL2STP_WITH_OCCT
+        } else if (mode.rfind("original_", 0) == 0 || mode.rfind("sewing_", 0) == 0) {
+            const bool original = mode.rfind("original_", 0) == 0;
+            mode_conversion(handle.get(), data, output, original, mode.substr(original ? 9 : 7));
         } else if (mode == "step" || mode == "step_merge" || mode == "readback") {
             load("cube-binary.stl");
             auto options = stl2stp_default_export_options();
@@ -293,6 +381,7 @@ int main(int argc, char** argv) {
             const auto path = (output / "two.step").u8string();
             stl2stp_topology exported{}, read{};
             auto options = stl2stp_default_export_options();
+            options.mode = STL2STP_MODE_SEWING;
             for (const int merge : {0, 1}) {
                 options.merge_coplanar = merge;
                 status(handle.get(), stl2stp_export_step(handle.get(), path.c_str(), &options, nullptr, &exported));
@@ -320,6 +409,10 @@ int main(int argc, char** argv) {
             const auto path = (output / "invalid.step").u8string();
             status(handle.get(), stl2stp_export_step(handle.get(), path.c_str(), &options, nullptr, nullptr), STL2STP_ERROR_ARGUMENT);
             require(!std::filesystem::exists(std::filesystem::u8path(path)), "Invalid export created output");
+            options = stl2stp_default_export_options();
+            options.mode = static_cast<stl2stp_mode>(99);
+            status(handle.get(), stl2stp_export_step(handle.get(), path.c_str(), &options, nullptr, nullptr), STL2STP_ERROR_ARGUMENT);
+            require(!std::filesystem::exists(std::filesystem::u8path(path)), "Invalid mode created output");
             stl2stp_topology counts{};
             status(handle.get(), stl2stp_read_step(handle.get(), (data / "missing.step").u8string().c_str(), nullptr, &counts), STL2STP_ERROR_IO);
             status(handle.get(), stl2stp_read_step(handle.get(), path.c_str(), nullptr, nullptr), STL2STP_ERROR_ARGUMENT);
@@ -327,19 +420,25 @@ int main(int argc, char** argv) {
         } else if (mode == "cancel_exchange") {
             load("cube-binary.stl");
             const auto path = output / "cancel.step";
-            for (const double threshold : {0.0, 0.45, 0.8, 1.0}) {
-                sentinel(path);
-                ProgressState progress;
-                progress.cancel_at = threshold;
-                auto observer = callbacks(progress);
-                stl2stp_topology counts{123, 0, 0, 0, 0};
-                status(handle.get(), stl2stp_export_step(handle.get(), path.u8string().c_str(), nullptr, &observer, &counts), STL2STP_ERROR_CANCELLED);
-                require(contents(path) == "original output" && counts.solids == 123, "Cancelled STEP export changed output");
-                require(progress.monotonic, "Cancelled OCCT progress not monotonic");
-                progress = {};
-                progress.cancel_at = threshold;
-                status(handle.get(), stl2stp_export_iges(handle.get(), path.u8string().c_str(), nullptr, &observer, &counts), STL2STP_ERROR_CANCELLED);
-                require(contents(path) == "original output", "Cancelled IGES export changed output");
+            for (const auto conversion_mode : {STL2STP_MODE_ORIGINAL, STL2STP_MODE_SEWING}) {
+                auto options = stl2stp_default_export_options();
+                options.mode = conversion_mode;
+                for (const double threshold : {0.0, 0.45, 0.8, 1.0}) {
+                    sentinel(path);
+                    ProgressState progress;
+                    progress.cancel_at = threshold;
+                    auto observer = callbacks(progress);
+                    stl2stp_topology counts{123, 0, 0, 0, 0};
+                    status(handle.get(), stl2stp_export_step(handle.get(), path.u8string().c_str(), &options, &observer, &counts), STL2STP_ERROR_CANCELLED);
+                    require(contents(path) == "original output" && counts.solids == 123, "Cancelled STEP export changed output");
+                    require(progress.monotonic, "Cancelled OCCT progress not monotonic");
+                    progress = {};
+                    progress.cancel_at = threshold;
+                    status(handle.get(), stl2stp_export_iges(handle.get(), path.u8string().c_str(), &options, &observer, &counts), STL2STP_ERROR_CANCELLED);
+                    require(contents(path) == "original output" && counts.solids == 123, "Cancelled IGES export changed output");
+                    require(progress.monotonic, "Cancelled IGES progress not monotonic");
+                    no_temporary_files(output);
+                }
             }
             status(handle.get(), stl2stp_export_step(handle.get(), path.u8string().c_str(), nullptr, nullptr, nullptr));
             ProgressState progress;

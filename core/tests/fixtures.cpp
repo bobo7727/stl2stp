@@ -161,6 +161,13 @@ int main(int argc, char** argv) {
         auto degenerate = triangles;
         degenerate.push_back({Point{0, 0, 0}, Point{0, 0, 0}, Point{0, 0, 0}});
         binary(directory / "degenerate.stl", degenerate);
+        auto duplicate = degenerate;
+        duplicate.push_back(triangles.front());
+        binary(directory / "degenerate-duplicate.stl", duplicate);
+        auto collinear = triangles;
+        collinear.push_back({Point{0, 0, 0}, Point{0.5f, 0, 0}, Point{1, 0, 0}});
+        binary(directory / "collinear.stl", collinear);
+        binary(directory / "collinear-only.stl", {collinear.back()});
         auto nonfinite = triangles;
         nonfinite[0][0][0] = std::numeric_limits<float>::infinity();
         binary(directory / "nonfinite.stl", nonfinite);
