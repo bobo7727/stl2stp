@@ -64,6 +64,7 @@ void usage() {
               << "  stl2stp-cli info <in.stl>\n"
               << "  stl2stp-cli simplify <in.stl> <out.stl> --faces N\n"
               << "  stl2stp-cli convert <in.stl> <out.step|out.igs> [--mode original|sewing] [--merge-coplanar] [--simplify N]\n"
+              << "      [--merge-angle RADIANS] [--strict-original]\n"
               << "      [--author TEXT] [--org TEXT] [--product TEXT] [--description TEXT] [--timestamp ISO8601]\n"
               << "  stl2stp-cli readback <in.step>\n";
 }
@@ -90,6 +91,8 @@ int main(int argc, char** argv) {
         auto options = stl2stp_default_export_options();
         bool merge_given = false;
         bool mode_given = false;
+        bool strict_given = false;
+        bool angle_given = false;
         if (command == "info") {
             if (argc != 3) { usage(); return 2; }
         } else {
@@ -99,6 +102,19 @@ int main(int argc, char** argv) {
                 if (command == "convert" && argument == "--merge-coplanar" && !merge_given) {
                     options.merge_coplanar = 1;
                     merge_given = true;
+                } else if (command == "convert" && argument == "--strict-original" && !strict_given) {
+                    options.strict_original = 1;
+                    strict_given = true;
+                } else if (command == "convert" && argument == "--merge-angle" && !angle_given && index + 1 < argc) {
+                    const std::string value = argv[++index];
+                    std::size_t used = 0;
+                    double angle = -1;
+                    try { angle = std::stod(value, &used); } catch (const std::exception&) { used = 0; }
+                    if (used != value.size() || !(angle > 0 && angle <= 0.1)) {
+                        throw std::runtime_error("--merge-angle must be a number in (0, 0.1] radians");
+                    }
+                    options.merge_angular_tolerance = angle;
+                    angle_given = true;
                 } else if (command == "convert" && argument == "--mode" && !mode_given && index + 1 < argc) {
                     const std::string selected = argv[++index];
                     if (selected == "original") { options.mode = STL2STP_MODE_ORIGINAL; }

@@ -275,7 +275,7 @@ const char* stl2stp_last_error(const stl2stp_handle* handle) {
 }
 
 stl2stp_export_options stl2stp_default_export_options(void) {
-    return {1e-6, 0, STL2STP_MODE_ORIGINAL, nullptr, nullptr, nullptr, nullptr, nullptr};
+    return {1e-6, 0, STL2STP_MODE_ORIGINAL, nullptr, nullptr, nullptr, nullptr, nullptr, 1e-4, 0};
 }
 
 stl2stp_status stl2stp_load_stl(stl2stp_handle* handle, const char* path,
@@ -370,7 +370,7 @@ stl2stp_status stl2stp_simplify(stl2stp_handle* handle, uint64_t target_faces,
         auto result = stl2stp::simplify_mesh(handle->mesh, static_cast<std::size_t>(target_faces), progress);
         const bool reached = result.triangles.size() <= target_faces;
         if (!reached) {
-            handle->error = "QEM stopped before target: remaining collapses would flip faces or candidates exhausted";
+            handle->error = "QEM stopped before target: remaining collapses would break manifold topology or fold faces";
         }
         progress.report(1);
         handle->mesh = std::move(result);

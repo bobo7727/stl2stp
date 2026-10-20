@@ -13,6 +13,10 @@ typedef enum stl2stp_status {
     STL2STP_OK = 0,
     STL2STP_WARNING_PARTIAL = 1,
     STL2STP_WARNING_TARGET_NOT_REACHED = 2,
+    /* Appended in core/fixes (values are stable; never renumber). */
+    STL2STP_WARNING_NOT_SOLID = 3,          /* open/non-closable input: written as shell(s)/surfaces, no solid */
+    STL2STP_WARNING_REPAIRED = 4,           /* output is valid but input was repaired (see stl2stp_last_error) */
+    STL2STP_WARNING_METADATA_CHANGED = 5,   /* IGES metadata was not ASCII and was rewritten to ASCII */
     STL2STP_ERROR_ARGUMENT = -1,
     STL2STP_ERROR_IO = -2,
     STL2STP_ERROR_FORMAT = -3,
@@ -57,6 +61,7 @@ typedef enum stl2stp_mode
     STL2STP_MODE_SEWING = 1
 } stl2stp_mode;
 
+/* Always start from stl2stp_default_export_options() so fields appended in later versions get defaults. */
 typedef struct stl2stp_export_options {
     double sewing_tolerance;
     int merge_coplanar;
@@ -66,6 +71,9 @@ typedef struct stl2stp_export_options {
     const char* product;
     const char* description;
     const char* timestamp;
+    /* Appended in core/fixes. */
+    double merge_angular_tolerance; /* radians, coplanar merge; default 1e-4, valid range (0, 0.1] */
+    int strict_original;            /* 1 = legacy ORIGINAL output without validation/repair (may be invalid); default 0 */
 } stl2stp_export_options;
 
 stl2stp_handle* stl2stp_create(void);
