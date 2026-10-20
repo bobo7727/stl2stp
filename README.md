@@ -1,39 +1,39 @@
-# stl2stp
+# STL2STP — STL 转 STEP/IGES 桌面工具（完整交付包）
 
-#### 介绍
-{**以下是 Gitee 平台说明，您可以替换此简介**
-Gitee 是 OSCHINA 推出的基于 Git 的代码托管平台（同时支持 SVN）。专为开发者提供稳定、高效、安全的云端软件开发协作平台
-无论是个人、团队、或是企业，都能够用 Gitee 实现代码托管、项目管理、协作开发。企业项目请看 [https://gitee.com/enterprises](https://gitee.com/enterprises)}
+基于 Visual Studio 2019 MFC 与 OpenCASCADE 的 STL → STEP/IGES 转换工具。
+本仓库为完整工程包：**源代码 + 可编译 + 可运行成品 + 产品文档**。
 
-#### 软件架构
-软件架构说明
+## 目录结构
 
+| 目录 | 说明 |
+| --- | --- |
+| `stl2stp-code/` | Visual Studio 2019 解决方案（`stl2stp-code.sln`）与 MFC 全部源码 |
+| `occt-build/` | OpenCASCADE Release 编译子集：`inc` 头文件 + `win64` 运行库（编译所需） |
+| `stl2stp-code-occt/` | 已编译成品：免安装，进入目录双击 `stl2stp-code-occt.exe` 即用 |
 
-#### 安装教程
+**产品文档**
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+- `项目说明.txt` — 目录结构、编译与运行步骤、混合编码注意事项
+- `转换能力说明书.txt` — 哪些 STL 能转 / STEP 产物用途 / 最佳流程
+- `产品介绍与销售要点.txt` — 商业化定位 / 场景 / 优势 / 模式 / 合规要点
+- `性能与使用场景分析.txt` — 性能实测、瓶颈解读、功能全景、适用场景与使用建议
 
-#### 使用说明
+## 编译（VS2019，Release | x64）
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1. 需 VS2019 且装有「使用 C++ 的桌面开发」工作负载 + C++ MFC v142 组件；
+2. 打开 `stl2stp-code/stl2stp-code.sln`，配置选 **Release | x64**，「生成 → 生成解决方案」；
+3. 依赖的 50 个 OpenCASCADE DLL 由工程生成后事件自动拷到输出目录；
+4. `stl2stp-code/` 与 `occt-build/` 按相对路径引用，**相对位置不可变动**；
+5. 注意：源码为 GBK / UTF-8 混合编码（历史迁移形成），编辑前先确认文件编码。
 
-#### 参与贡献
+## 直接运行成品
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+进入 `stl2stp-code-occt/`，双击 `stl2stp-code-occt.exe`（Windows 10/11 64 位，无需任何安装）。
 
+## 主要功能
 
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+- STL 载入：进度对话框、可取消、截断容错；模型统计
+- QEM 网格简化（可撤销）
+- 导出 STEP / IGES（>10 万面确认框，语义与原版 v1.0.2 一致）
+- STEP 纯预览（B-Rep 拓扑统计）
+- 深/浅双主题、标准视图自动居中、拖动旋转/平移

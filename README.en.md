@@ -1,36 +1,34 @@
-# stl2stp
+# STL2STP — STL to STEP/IGES Desktop Tool (Complete Package)
 
-#### Description
-{**When you're done, you can delete the content in this README and update the file with details for others getting started with your repository**}
+A STL → STEP/IGES conversion tool built on Visual Studio 2019 MFC and OpenCASCADE.
+This repository is a complete deliverable package: **source code + buildable + runnable binary + product docs**.
 
-#### Software Architecture
-Software architecture description
+## Layout
 
-#### Installation
+| Folder | Description |
+| --- | --- |
+| `stl2stp-code/` | Visual Studio 2019 solution (`stl2stp-code.sln`) with full MFC source |
+| `occt-build/` | OpenCASCADE Release subset: `inc` headers + `win64` runtime libraries (required for building) |
+| `stl2stp-code-occt/` | Prebuilt product: portable, just run `stl2stp-code-occt.exe` |
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+**Product docs (in Chinese)**: `项目说明.txt` (structure & build guide), `转换能力说明书.txt` (conversion capabilities), `产品介绍与销售要点.txt` (product & sales points), `性能与使用场景分析.txt` (performance & scenarios).
 
-#### Instructions
+## Build (VS2019, Release | x64)
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+1. Requires VS2019 with the "Desktop development with C++" workload and the C++ MFC v142 components;
+2. Open `stl2stp-code/stl2stp-code.sln`, select **Release | x64**, and Build Solution;
+3. The 50 OpenCASCADE DLL dependencies are copied to the output directory automatically by the post-build event;
+4. `stl2stp-code/` references `occt-build/` by relative path — keep their relative locations unchanged;
+5. Note: sources are a mix of GBK / UTF-8 encodings — check a file's encoding before editing.
 
-#### Contribution
+## Run the prebuilt binary
 
-1.  Fork the repository
-2.  Create Feat_xxx branch
-3.  Commit your code
-4.  Create Pull Request
+Open the `stl2stp-code-occt/` folder and double-click `stl2stp-code-occt.exe` (Windows 10/11 64-bit, no installation needed).
 
+## Main features
 
-#### Gitee Feature
-
-1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
-2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
-3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
-4.  The most valuable open source project [GVP](https://gitee.com/gvp)
-5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
-6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+- STL loading with progress dialog, cancellation, truncation tolerance; model statistics
+- QEM mesh simplification (undoable)
+- Export to STEP / IGES (confirmation dialog for >100k faces, semantics identical to v1.0.2)
+- STEP view-only preview (B-Rep topology statistics)
+- Dark/light themes, auto-centered standard views, drag to rotate/pan
