@@ -90,7 +90,14 @@ build/                           # 所有构建输出与日志，被 .gitignore 
 | `c0a553a` | 18:52 | core：文件头 metadata 可配置，默认为空（去掉原版硬编码 VINCENT/STL2STP 以及 OCCT 默认的 “Open CASCADE …”）；`Interface_Static` 用 RAII 保存/恢复；CLI `--author/--org/--product/--description`；测试 46 → 85 |
 | `6344109` | 19:05 | core：默认写当前 UTC 时间戳，可覆盖；STEP 非 ASCII 按 ISO 10303-21 编码为 `\X2\`/`\X4\`；IGES 日期写参数 18/25；CLI `--timestamp`；测试 85 → 104 |
 | `65e30ad` | 19:10 | core：IGES 日期字段（18/25）一律换算为 UTC（处理跨日/跨年/闰年，小数秒截断）；STEP 时间戳原样写入 |
-| （本文提交） | — | docs：新增本文件 |
+| `4c71bcb` | 10-20 | docs：新增本文件 |
+| `bead9b8` | 10-20 | （`core/fixes`）test(review)：把代码审查发现写成会失败的 CTest |
+| `7d69df3` | 10-21 | （`core/fixes`）API：追加 NOT_SOLID/REPAIRED/METADATA_CHANGED 与 merge/strict 选项 |
+| `333839f` | 10-21 | （`core/fixes`）QEM：边界 quadric、link condition、面积加权、尺度无关检查 |
+| `3b7b63d` | 10-21 | （`core/fixes`）导出：ORIGINAL 校验修复、安全的共面合并、流式 STEP 过滤、IGES ASCII |
+| `4548f33` | 10-21 | （`core/fixes`）测试：review 用例、关闭 healing 读回、期望更新；测试 104 → 118 |
+| `e167caa` | 10-21 | （`core/fixes`）docs：core-api.md |
+| （本节提交） | 10-21 | （`core/fixes`）docs + 有界 sanitizer 脚本 `core/tools/run-sanitizer-ctest.sh`；第 9 节 |
 
 `git diff --stat main core/extract`（本文提交之前）：23 个文件，+4519 / −5。
 
@@ -708,8 +715,7 @@ SEWING + merge 的 cube 为 **15,937 字节**。
 
 ## 7. 已知限制与 TODO
 
-1. **OCCT 8.0.1 读不回纯中文 IGES Start section**：`IGESFile_ReadHeader` 用 signed `char > 32` 去掉行尾空白，
-   会把行尾的高位 UTF-8 字节也去掉。写出的字节是正确的，但 OCCT 回读得到空串；ASCII description 正常。测试如实断言了这一点。
+1. ~~OCCT 8.0.1 读不回纯中文 IGES Start section~~：`core/fixes` 起 IGES metadata 只写 ASCII（非 ASCII → `?`，返回 METADATA_CHANGED），此限制不再适用（9.2 第 7 条）。
 2. **OCCT 往 stdout 打印彩色统计**：STEP 写出时 OCCT 会输出 `Statistics on Transfer (Write)`（带 ANSI 颜色），本次 CLI 实测仍可见。
    iOS 集成前应通过 `Message` 系统静默掉。**未处理**。
 3. **没有在真实 CAD 中验证**【未验证】：SolidWorks 等能否正确导入 `\X2\`/`\X4\` STEP 和 UTF-8 Hollerith IGES 尚未测试；
@@ -722,8 +728,9 @@ SEWING + merge 的 cube 为 **15,937 字节**。
 7. **LGPL-2.1 合规**：OCCT 是 LGPL-2.1（带 OCCT exception）。iOS 只能静态链接，发布前需要评审许可证义务（如何允许用户重新链接、源码提供、声明等）。
 8. 与原版**不保证**逐字节一致：OCCT 7.0 → 8.0.1 的内部处理、动态公差、实体排序不同；QEM 有改进；时间戳和 metadata 是有意改变的。
 9. 没有隐含的 100000 面上限，也不会自动简化，相当于原版确认框里选“是”。UI 层需要自己提示或限流。
-10. 无进度挂钩的 OCCT 阶段（`Write`、`ComputeModel`、`UnifySameDomain`、`ReadFile`）不能立即取消。
+10. 无进度挂钩的 OCCT 阶段（`ComputeModel`、`UnifySameDomain`、`ReadFile`、IGES `Write`）不能立即取消；`core/fixes` 起 STEP 写盘每 1 MB 检查一次取消。
 11. `core/extract` 还**没有合并到 `main`**（等待 Bo 决定）。
+12. `core/fixes` 的其余未决问题见 9.6。
 
 ---
 
@@ -737,12 +744,104 @@ SEWING + merge 的 cube 为 **15,937 字节**。
 6. 获取本仓库：从 Bo 处拷贝 `D:\stl2stp-ios` 整个目录，或用 `git bundle` 传 `core/extract` 分支（不要添加 remote，也不要 push）。
    原版源码另外放到 `reference/stl2stp-master/`，只读，仅用于对照，构建不需要。
 7. `git checkout core/extract`，确认 `git log --oneline` 包含 `65e30ad … d1a8084` 和本文提交。
-8. 按 5.1 构建 Release，运行 `ctest`，应为 **104/104 通过**、0 warning。
-9. 按 5.1 构建 Debug `-Werror` + UBSan，运行 `ctest`，应为 **104/104 通过**，没有 `runtime error`。
+8. 按 5.1 构建 Release，运行 `ctest`，应为 **104/104 通过**、0 warning（`core/fixes`：**118/118**）。
+9. 按 5.1 构建 Debug `-Werror` + UBSan，运行 `ctest`，应为 **104/104 通过**，没有 `runtime error`（`core/fixes`：118/118；ASan 用 `core/tools/run-sanitizer-ctest.sh <dir> asan`）。
 10. 用 4.14 的 CLI 示例抽查：默认 STEP 头的作者、组织、产品都为空，时间为当前 UTC 并以 `Z` 结尾；
     中文 author 写成 `\X2\81F477E55C4B\X0\`；IGES 是 `9H致知屋`、`15H20261020.105200`。
 11. 可选：用 `build/core-linux/tests/stl2stp-fixture-generator <dir> --rings 200 --segments 200` 生成大模型，对照第 6 节的量级做性能复测。
 12. 可选：用真实 CAD（SolidWorks 等）打开导出的 STEP/IGES，并把结果反馈回来（第 7 节第 3 条）。
+
+---
+
+## 9. core/fixes：代码审查后的修复（分支 `core/fixes`，基于 `core/extract` `4c71bcb`）
+
+2026-10-20 的代码审查（box 上的 `stl2stp-review-and-research.md`）列出的问题，先写成会失败的 C++ 测试，
+再逐项修复。新测试可执行文件 `stl2stp-review-tests`，CTest 标签 `review`。读回 STEP 时**关闭 OCCT reader 端的
+shape healing**（`SetShapeProcessFlags(空)`），因为别的 CAD 拿到的是文件原样；不关的话 OCCT 读入时会自动修好，
+掩盖问题（一开始就是这样漏掉的）。
+
+### 9.1 复现结果（修复前，`core/extract` 4c71bcb）与修复后对照
+
+| 用例 | 修复前（4c71bcb，读回关闭 healing） | 修复后 |
+| --- | --- | --- |
+| 开口盒（缺 2 个三角形） | 返回 0，写成 solid，BRepCheck 无效，体积 0.8 | 返回 3（NOT_SOLID），1 个 open shell，有效 |
+| 一个三角形反向 | 无效 solid，体积 0.8333 | 返回 4（REPAIRED），有效，体积 1 |
+| 整体反向 | 体积 −1.0 | 返回 4，体积 +1.0，有效 |
+| 两立方体共享一条边（非流形） | 无效，体积 2 | 返回 4，改走 SEWING，1 个有效 solid，体积 2 |
+| 两个分离立方体 | 1 个 solid，无效 | 2 个 solid，有效，体积 2 |
+| 共线退化三角形 | 无效 | 返回 4，丢弃 1 个零面积三角形，有效 |
+| QEM 开放平面 800→200 | 面积 0.250024（边界塌缩） | 面积 1.000000（800→10 也是 1.0） |
+| QEM 立方体 1200→8 | 1 条非流形边、1 个重复面、体积 0.333、Euler 3 | 流形、无重复面、Euler 2、体积 0.5；1200→12 精确还原立方体 |
+| 旋转 float32 立方体 192 三角形 + merge | 129 个面 | 6 个面（n=10 / 1200 三角形也是 6） |
+| 旋转立方体 12 三角形 + merge | 9 个面 | 6 个面（ShapeFix 后有效） |
+| IGES 中文 metadata | UTF-8 Hollerith（OCCT 读不回 Start section） | ASCII `?` 替换，返回 5（METADATA_CHANGED） |
+| 封闭立方体（对照） | 有效 | 不变（逐字节相同） |
+| QEM 尺度不变性（0.001/1/1000） | 已通过 | 仍通过 |
+| 畸形 STL fuzz 300 例 | Release 无崩溃（242 个可加载） | Release/UBSan/ASan 均无崩溃、无报告（242 加载、31 导出） |
+
+
+### 9.2 改动
+
+1. **ORIGINAL 校验与修复**（`exchange.cpp::make_original_shape`）：丢弃面积 < `1e-12 × 对角线²` 的三角形；统计边使用次数，
+   非流形 → 改用 SEWING；BFS 统一每个连通分量的绕序，不可定向 → SEWING；封闭分量有符号体积为负则翻转；
+   每个封闭分量一个 solid、开放分量写成 open shell；最后 `BRepCheck_Analyzer`，无效 → SEWING。
+   有效、封闭、朝向一致、单连通的输入：三角形顺序与方向都不变，几何与旧版逐字节相同（9.4）。
+   `strict_original=1`（CLI `--strict-original`）保留旧行为。
+2. **新返回码**（追加，不改旧值）：`STL2STP_WARNING_NOT_SOLID=3`、`STL2STP_WARNING_REPAIRED=4`、
+   `STL2STP_WARNING_METADATA_CHANGED=5`；`last_error` 给出全部说明。SEWING 模式结果含开放 shell 时也返回 NOT_SOLID。
+3. **options 追加字段**：`merge_angular_tolerance`（默认 1e-4 rad，0 = 默认，范围 [0, 0.1]）、`strict_original`（默认 0）。
+   结构体变大，bridge 必须与新头文件一起重编译，始终用 `stl2stp_default_export_options()` 初始化。
+4. **QEM**（`simplify.cpp`）：面积加权 quadric；开放边界/非流形边加垂直约束平面（权重 1e3×边长²）；link condition、
+   对顶点度数、合并后度数、“两端在边界但边不在边界”检查；第一阶段法向夹角余弦 > 0.25 且三角形质量 ≥ 0.05（或不变差），
+   未达目标时第二阶段只放宽这两项；最优点的条件数判断和截断范围改为相对模型尺寸；被拒候选的重排惩罚也按尺度。
+5. **共面合并**：设置角度容差（默认 1e-4 rad），线性容差 `max(sewing_tolerance, 1e-6×对角线, 4×FLT_EPSILON×最大坐标)`；
+   合并后用 `ShapeFix_Shape` 修整，再做 BRepCheck，原本有效而合并后无效则撤销合并（REPAIRED）。
+6. **STEP 写出**：去掉“写完再整份逐字符重写”的 `normalize_step_strings`，改为 `WriteStream` + 流式过滤器
+   `StepStringFilter`，一次写盘，1 MB 分块，分块时检查取消；输出字节不变。
+7. **IGES metadata 只写 ASCII**：非 ASCII 码点 → `?`，返回 METADATA_CHANGED；单引号不替换（STEP 按规范写双单引号）。
+8. CLI：`--strict-original`、`--merge-angle RADIANS`。
+9. 测试：新增 `stl2stp-review-tests`（14 项），更新 `test_core.cpp` / `test_metadata.cpp` 中被有意改变的期望
+   （见 9.3）。
+
+### 9.3 有意改变的旧行为（测试已同步更新）
+
+- `collinear_only`（全部三角形共线）两种模式都拒绝导出（旧 ORIGINAL 会写出无效 solid）。
+- `two_shells`：ORIGINAL 由 1 个无效 solid 变成 2 个 solid。
+- `degenerate_duplicate`、`truncated`：返回 NOT_SOLID，写成 shell；`truncated` ORIGINAL 导出拓扑 0/2/5/12/8，读回 0/2/5/12/9。
+- `duplicate_open`、`collinear`、`zero_area_duplicate`（ORIGINAL）：返回 REPAIRED。
+- IGES 非 ASCII metadata / 文件名：写成 `?`，返回 METADATA_CHANGED；测试改为断言 `3H???`、`4H????`。
+- 共面合并：角度容差由 OCCT 默认 1e-12 改为 1e-4 rad，合并后先 ShapeFix 再 BRepCheck，无效则撤销；因此有效封闭输入在 `--merge-coplanar` 下的输出与旧版不同（例如 sphere-ascii 合并输出 47.3 MB → 30.9 MB）。
+
+
+### 9.4 与旧版逐字节对比（有效封闭输入）
+
+用 `core/extract` 与 `core/fixes` 的 Release CLI 对 `tests/data` 下全部 18 个 STL 以 ORIGINAL 模式导出（固定 `--timestamp` 与 metadata）：
+有效封闭输入 `cube-ascii`、`cube-binary`、`cube-solid-header`、`sphere`、`sphere-ascii`、`degenerate`、`cli-simplified` 的
+STEP 与 IGES **逐字节相同**。不同的只有有意改变的无效/开放输入（`collinear*`、`degenerate-duplicate`、`truncated-*`、`two-shells`、
+`zero-area-duplicate`）和本来就失败的输入（`empty-binary`、`huge-ascii`、`invalid`、`nonfinite`，两边都返回错误）。
+
+性能（sphere-ascii.stl 3.6 MB → 48 MB STEP，同一台机器，单次）：普通 STEP 导出 18.4 s → 14.3 s（去掉整文件逐字符重写）；
+`--merge-coplanar` 22.6 s → 16.5 s；`simplify --faces 2000` 0.19 s → 0.21 s。box 上的纯网格 harness：sphere 19800→2000 最大径向偏差
+0.00227 → 0.00199，最小三角形质量 0.421 → 0.244（更紧的翻转/质量检查的代价是更保守，第二阶段放宽）。
+
+
+### 9.5 测试结果
+
+- Release：**118/118** 通过，0 warning。
+- Debug `-Werror` + UBSan：**118/118** 通过，0 个 `runtime error`。
+- Debug `-Werror` + ASan + UBSan：**118/118** 通过，0 报告（`detect_leaks=0`，`setarch -R`，见 9.6）。
+- 统一用 `core/tools/run-sanitizer-ctest.sh` 跑 sanitizer：每测试 120 s 超时、日志上限 20 MB、目录超 2 GB 自动停止。
+
+
+### 9.6 仍未解决
+
+1. 旋转模型共面合并后，**关闭全部 reader healing** 读回时 OCCT 对部分平面报 `BRepCheck_UnorientableShape`（内存中与默认 healing 读回均有效）。
+   测试只断言 healing 读回有效；需要在真实 CAD 中确认。
+2. LeakSanitizer：OCCT 8.0.1 每次 transfer 在进程退出时留下约 7.6 MB（`Standard::Allocate`，栈无本项目帧），基线 `core/extract` 也有。默认关闭 LSan。
+3. gcc-10 ASan 在 WSL2 内核 6.18（高 `mmap_rnd_bits`）上偶发无限 `AddressSanitizer:DEADLYSIGNAL`，曾把日志写到 31 GB。
+   规避：`setarch -R` + 输出上限（脚本已内置）。根治需 `vm.mmap_rnd_bits=28`（需 root）或更新的 gcc/clang。
+4. `simplify` 在大目标比例下略慢（box 测 31→39 ms、41→60 ms），最小三角形质量下降，见 9.4。
+5. 共面合并输出与旧版不同（有意，容差更合理），未在真实 CAD 中验证。
 
 ---
 
