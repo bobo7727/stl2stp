@@ -141,6 +141,7 @@ if(STL2STP_WITH_OCCT)
     target_link_libraries(stl2stp-review-tests PRIVATE stl2stp-core)
     foreach(_case original_closed_cube original_open_box original_flipped_triangle original_inverted
             original_non_manifold_edge original_collinear_sliver original_disconnected
+            original_strict_legacy iges_non_ascii
             qem_open_boundary qem_link_condition qem_scale_invariance merge_rotated malformed_fuzz)
         add_test(NAME stl2stp.review_${_case} COMMAND stl2stp-review-tests ${_case} "${_data}/review-${_case}")
         set_tests_properties(stl2stp.review_${_case} PROPERTIES LABELS "review" TIMEOUT 300)

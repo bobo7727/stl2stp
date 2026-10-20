@@ -67,6 +67,26 @@ struct Metadata {
     }
 };
 
+// Mirror of the library rule: IGES metadata is ASCII; each non-ASCII code point becomes '?'.
+std::string iges_ascii(const std::string& utf8) {
+    std::string result;
+    for (std::size_t cursor = 0; cursor < utf8.size();) {
+        const auto first = static_cast<unsigned char>(utf8[cursor]);
+        if (first < 0x80) { result += static_cast<char>(first); ++cursor; continue; }
+        std::size_t length = first >= 0xf5 ? 1 : first >= 0xf0 ? 4 : first >= 0xe0 ? 3 : first >= 0xc2 ? 2 : 1;
+        std::size_t consumed = 1;
+        while (consumed < length && cursor + consumed < utf8.size() &&
+               (static_cast<unsigned char>(utf8[cursor + consumed]) & 0xc0) == 0x80) { ++consumed; }
+        cursor += consumed;
+        result += '?';
+    }
+    return result;
+}
+
+bool ascii_only(const std::string& text) {
+    return std::none_of(text.begin(), text.end(), [](char c) { return static_cast<unsigned char>(c) >= 0x80; });
+}
+
 std::vector<std::string> iges_parameters(const std::string& file) {
     std::istringstream records(file);
     std::string record;
@@ -202,8 +222,14 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
         }
     } else {
         const auto parameters = iges_parameters(file);
+        const Metadata original_expected = expected;
+        const Metadata ascii{iges_ascii(expected.author), iges_ascii(expected.organization), iges_ascii(expected.product),
+                             iges_ascii(expected.description)};
+        const auto& expected = ascii;
+        const std::string filename = iges_ascii(path.filename().u8string());
+        require(ascii_only(file), "IGES file must be pure ASCII");
         require(parameters[2] == expected.product && parameters[4] == expected.product, "IGES send/system differs");
-        require(parameters[3] == path.filename().u8string(), "IGES filename differs");
+        require(parameters[3] == filename, "IGES filename differs");
         require(parameters[20] == expected.author && parameters[21] == expected.organization,
                 "IGES author/company differs: " + std::to_string(parameters[20].size()) + "/" +
                 std::to_string(expected.author.size()) + " bytes; company=" + parameters[21]);
@@ -220,9 +246,9 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
         require(global.find("15H" + parameters[17]) != std::string::npos &&
                 global.rfind("15H" + parameters[17]) != global.find("15H" + parameters[17]),
                 "IGES dates must both be four-digit-year Hollerith strings");
-        if (expected.author == "致知屋") {
-            require(file.find("9H致知屋") != std::string::npos && file.find("12H测试公司") != std::string::npos,
-                    "IGES must count UTF-8 bytes, not Unicode characters");
+        if (original_expected.author == "致知屋") {
+            require(file.find("3H???") != std::string::npos && file.find("4H????") != std::string::npos,
+                    "IGES must replace non-ASCII metadata with ASCII '?' and count bytes");
         }
         IGESControl_Reader reader;
         require(reader.ReadFile(path.u8string().c_str()) == IFSelect_RetDone, "IGES read failed");
@@ -237,18 +263,12 @@ void verify(const std::filesystem::path& path, bool step, const Metadata& expect
                 "OCCT IGES author/company readback differs");
         require(value(section.SendName()) == expected.product && value(section.SystemId()) == expected.product,
                 "OCCT IGES send/system readback differs");
-        require(value(section.FileName()) == path.filename().u8string(), "OCCT IGES filename readback differs");
+        require(value(section.FileName()) == filename, "OCCT IGES filename readback differs");
         std::string description;
         for (int index = 1; index <= model->NbStartLines(); ++index) { description += model->StartLine(index); }
         const auto last = description.find_last_not_of(' ');
         description = last == std::string::npos ? "" : description.substr(0, last + 1);
-        if (expected.description == "测试描述") {
-            require(file.substr(0, expected.description.size()) == expected.description,
-                    "IGES Start must preserve raw UTF-8 description");
-            require(description.empty(), "Expected OCCT signed-char Start trimming limitation for Chinese");
-        } else {
-            require(description == expected.description, "OCCT IGES Start description differs");
-        }
+        require(description == expected.description, "OCCT IGES Start description differs");
     }
 }
 
@@ -262,6 +282,15 @@ Handle load(const std::filesystem::path& input) {
 void export_file(stl2stp_handle* handle, const std::filesystem::path& path, bool step,
                  const stl2stp_export_options* options, const stl2stp_callbacks* callbacks = nullptr,
                  stl2stp_status expected = STL2STP_OK) {
+    if (!step && expected == STL2STP_OK) {
+        bool non_ascii = !ascii_only(path.filename().u8string());
+        if (options) {
+            for (const char* field : {options->author, options->organization, options->product, options->description}) {
+                non_ascii = non_ascii || (field && !ascii_only(field));
+            }
+        }
+        if (non_ascii) { expected = STL2STP_WARNING_METADATA_CHANGED; }
+    }
     const auto status = step ? stl2stp_export_step(handle, path.u8string().c_str(), options, callbacks, nullptr) :
         stl2stp_export_iges(handle, path.u8string().c_str(), options, callbacks, nullptr);
     require(status == expected, "Export status " + std::to_string(status) + ": " + stl2stp_last_error(handle));

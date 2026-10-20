@@ -104,7 +104,9 @@ void mode_conversion(stl2stp_handle* handle, const std::filesystem::path& data,
         require(stats(handle).faces == 0, "Clean mesh should exclude collinear-only facet");
         status(handle, stl2stp_simplify(handle, 1, nullptr), STL2STP_ERROR_FORMAT);
         status(handle, stl2stp_save_stl(handle, (output / "collinear.stl").u8string().c_str(), nullptr), STL2STP_ERROR_FORMAT);
-        if (!original) {
+        {
+            // Both modes reject a mesh whose only facet is zero-area (ORIGINAL drops degenerate facets
+            // unless strict_original is set).
             const auto path = output / "rejected.step";
             sentinel(path);
             stl2stp_topology untouched{123, 0, 0, 0, 0};
@@ -119,40 +121,43 @@ void mode_conversion(stl2stp_handle* handle, const std::filesystem::path& data,
         if (merge && fixture != "cube" && fixture != "two_shells") { break; }
         options.merge_coplanar = merge;
         stl2stp_topology expected{1, 1, merge ? 6u : 12u, merge ? 12u : 18u, 8};
-        if (fixture == "two_shells") { expected = {original ? 1u : 2u, original ? 1u : 2u, merge ? 12u : 24u, merge ? 24u : 36u, 16}; }
-        if (fixture == "degenerate_duplicate") { expected = {1, 1, 13, original ? 18u : 21u, original ? 8u : 11u}; }
+        // core/fixes: ORIGINAL splits disconnected parts into separate solids, drops zero-area facets,
+        // falls back to SEWING for non-manifold input and writes open meshes as shells (NOT_SOLID).
+        if (fixture == "two_shells") { expected = {2, 2, merge ? 12u : 24u, merge ? 24u : 36u, 16}; }
+        if (fixture == "degenerate_duplicate") { expected = {1, 1, 13, 21, 11}; }
         if (fixture == "duplicate_open") { expected = {1, 1, 2, 3, 3}; }
-        if (fixture == "collinear" && original) { expected = {1, 1, 13, 20, 9}; }
-        if (fixture == "collinear_only") { expected = {1, 1, 1, 3, 3}; }
-        if (fixture == "truncated") { expected = {original ? 1u : 0u, original ? 1u : 2u, 5, 12, original ? 8u : 9u}; }
+        if (fixture == "truncated") { expected = {0, 2, 5, 12, original ? 8u : 9u}; }
+        stl2stp_status expected_status = STL2STP_OK;
+        if (fixture == "degenerate_duplicate" || fixture == "truncated") { expected_status = STL2STP_WARNING_NOT_SOLID; }
+        if (original && (fixture == "duplicate_open" || fixture == "collinear")) { expected_status = STL2STP_WARNING_REPAIRED; }
         const auto path = output / (fixture == "iges" ? "model.igs" : merge ? "merged.step" : "model.step");
         stl2stp_topology exported{};
         ProgressState progress;
         auto observer = callbacks(progress);
         if (fixture == "iges") {
-            status(handle, stl2stp_export_iges(handle, path.u8string().c_str(), &options, &observer, &exported));
+            status(handle, stl2stp_export_iges(handle, path.u8string().c_str(), &options, &observer, &exported), expected_status);
             const auto text = contents(path);
             validate_iges(text);
             require(text.find("model.igs") != std::string::npos, "IGES header used temporary filename");
             require(text.find("VINCENT") == std::string::npos && text.find("STL2STP") == std::string::npos,
                     "Default IGES metadata must be empty");
         } else {
-            status(handle, stl2stp_export_step(handle, path.u8string().c_str(), &options, &observer, &exported));
+            status(handle, stl2stp_export_step(handle, path.u8string().c_str(), &options, &observer, &exported), expected_status);
             const auto text = contents(path);
             if (original) {
                 for (const auto field : {"STL2STP", "VINCENT", "STL TO STEP FILE"}) {
                     require(text.find(field) == std::string::npos, std::string("Default STEP metadata leaked: ") + field);
                 }
                 require(text.find(path.filename().u8string()) != std::string::npos, "Header used temporary filename");
-                const auto shell = text.find("CLOSED_SHELL(");
-                require(shell != std::string::npos && text.find("CLOSED_SHELL(", shell + 1) == std::string::npos,
-                        "Original writer must receive exactly one shell, including open/disconnected input");
+                std::size_t closed_shells = 0;
+                for (auto at = text.find("CLOSED_SHELL("); at != std::string::npos; at = text.find("CLOSED_SHELL(", at + 1)) {
+                    ++closed_shells;
+                }
+                require(closed_shells == expected.solids, "Original writer must write one CLOSED_SHELL per solid");
             }
             stl2stp_topology expected_read = expected;
-            if (fixture == "two_shells") { expected_read.solids = 2; expected_read.shells = 2; }
-            if (fixture == "degenerate_duplicate" || (fixture == "collinear" && original)) { expected_read.shells = 2; }
-            if (fixture == "truncated") { expected_read.solids = 0; expected_read.shells = 2; }
-            if (fixture == "collinear_only") { expected_read = {0, 1, 1, 2, 2}; }
+            if (fixture == "degenerate_duplicate") { expected_read.shells = 2; }
+            if (fixture == "truncated") { expected_read.solids = 0; expected_read.shells = 2; expected_read.vertices = 9; }
             stl2stp_topology read{};
             status(handle, stl2stp_read_step(handle, path.u8string().c_str(), nullptr, &read));
             topology_matches(read, expected_read, "readback");
