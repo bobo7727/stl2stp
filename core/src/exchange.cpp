@@ -149,7 +149,13 @@ Timestamp timestamp_value(const char* supplied) {
     formatted << std::setfill('0') << std::setw(4) << year << std::setw(2) << month << std::setw(2) << day
               << '.' << std::setw(2) << utc_minutes / 60 << std::setw(2) << utc_minutes % 60
               << std::setw(2) << second;
-    return {iso, formatted.str()};
+    // STEP: same UTC instant in ISO 8601 extended form with Z; fractional seconds are kept verbatim.
+    std::ostringstream step;
+    step.imbue(std::locale::classic());
+    step << std::setfill('0') << std::setw(4) << year << '-' << std::setw(2) << month << '-' << std::setw(2) << day
+         << 'T' << std::setw(2) << utc_minutes / 60 << ':' << std::setw(2) << utc_minutes % 60 << ':'
+         << std::setw(2) << second << iso.substr(19, zone_begin - 19) << 'Z';
+    return {step.str(), formatted.str()};
 }
 
 std::string step_text(const std::string& utf8) {
