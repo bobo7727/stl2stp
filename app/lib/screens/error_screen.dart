@@ -13,12 +13,17 @@ enum ErrorKind { format, empty, tooBig, memory, cancelled, io, generic }
 
 /// Error / cancelled screens (ui-spec §4.11).
 class ErrorScreen extends StatelessWidget {
-  const ErrorScreen({super.key, required this.kind, this.code, this.details = '', this.faces, this.onPrimary});
+  const ErrorScreen(
+      {super.key, required this.kind, this.code, this.details = '', this.faces, this.onPrimary, this.notice});
   final ErrorKind kind;
   final int? code;
   final String details;
   final int? faces;
   final void Function(BuildContext context)? onPrimary;
+
+  /// Extra explanation shown under the body (e.g. why the app stopped the
+  /// conversion itself: memory pressure, background time used up).
+  final String? notice;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +71,10 @@ class ErrorScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: t.label)),
             const SizedBox(height: 8),
             Text(body, textAlign: TextAlign.center, style: TextStyle(fontSize: 15, color: t.label2)),
+            if (notice != null) ...[
+              const SizedBox(height: 16),
+              InfoBanner(key: const Key('errorNotice'), kind: BannerKind.warn, text: notice!),
+            ],
             const Spacer(flex: 2),
             if (onPrimary != null)
               FilledButton(key: const Key('errorPrimary'), onPressed: () => onPrimary!(context), child: Text(primary)),

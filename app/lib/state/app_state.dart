@@ -7,7 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/engine.dart';
 import '../core/estimate.dart';
+import '../core/memory_guard.dart';
 import '../core/models.dart';
+import '../platform/background_task.dart';
+import '../platform/haptics.dart';
 import '../purchase/free_tier.dart';
 import '../purchase/mock_purchase_service.dart';
 import '../purchase/purchase_service.dart';
@@ -22,7 +25,14 @@ class AppState extends ChangeNotifier {
     PurchaseService? purchase,
     this.limits = FreeTierLimits.none,
     this.estimator = const Estimator(),
-  }) : purchase = purchase ?? MockPurchaseService(prefs) {
+    this.memoryGuard = const MemoryGuard(),
+    int? memoryBudgetBytes,
+    BackgroundTasks? background,
+    Haptics? haptics,
+  })  : purchase = purchase ?? MockPurchaseService(prefs),
+        detectedMemoryBudget = memoryBudgetBytes ?? MemoryBudget.fallbackBytes,
+        background = background ?? BackgroundTasks(),
+        haptics = haptics ?? Haptics() {
     _history = HistoryStore(File(p.join(outputDir.path, 'history.json')));
     history = _history.load();
     this.purchase.addListener(notifyListeners);
@@ -42,6 +52,34 @@ class AppState extends ChangeNotifier {
 
   /// Time/size estimate model (coefficients + device factor, see estimate.dart).
   final Estimator estimator;
+
+  /// Peak-memory model for the pre-conversion check.
+  final MemoryGuard memoryGuard;
+
+  /// Device memory budget found at startup ([MemoryBudget.detect]).
+  final int detectedMemoryBudget;
+
+  /// iOS background task bridge (no-op elsewhere).
+  final BackgroundTasks background;
+
+  /// Haptic feedback (no-op on desktop).
+  final Haptics haptics;
+
+  /// Budget used for the memory check: the `memoryBudgetMB` preference when
+  /// set (configurable per device), else [detectedMemoryBudget].
+  int get memoryBudgetBytes {
+    final mb = prefs.getInt('memoryBudgetMB');
+    return mb != null && mb > 0 ? mb * 1000 * 1000 : detectedMemoryBudget;
+  }
+
+  set memoryBudgetMB(int? mb) {
+    if (mb == null || mb <= 0) {
+      prefs.remove('memoryBudgetMB');
+    } else {
+      prefs.setInt('memoryBudgetMB', mb);
+    }
+    notifyListeners();
+  }
 
   /// Faces above which we suggest simplifying / refuse (placeholders, ui-spec §2.2).
   static const largeFaces = 200000;

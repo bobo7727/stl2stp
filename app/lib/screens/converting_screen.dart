@@ -25,8 +25,17 @@ class ConvertingScreen extends StatefulWidget {
   State<ConvertingScreen> createState() => _ConvertingScreenState();
 }
 
-class _ConvertingScreenState extends State<ConvertingScreen> {
+class _ConvertingScreenState extends State<ConvertingScreen> with WidgetsBindingObserver {
   late final CancelToken _cancel;
+  late final AppState _state;
+
+  /// Why the conversion was cancelled by the app itself (not the user).
+  String? _autoCancelKey;
+  bool _running = true;
+  int? _backgroundTask;
+
+  /// Time spent with the app in the background during this conversion.
+  final _backgroundClock = Stopwatch();
   late final List<Stage> _stages = widget.request.stages;
   ConvertProgress? _progress;
   final _sw = Stopwatch();
@@ -36,8 +45,14 @@ class _ConvertingScreenState extends State<ConvertingScreen> {
   @override
   void initState() {
     super.initState();
-    final state = AppScope.read(context);
+    final state = _state = AppScope.read(context);
     _cancel = state.engine.newCancelToken();
+    WidgetsBinding.instance.addObserver(this);
+    state.haptics.start();
+    // iOS: keep running for a while if the user leaves the app (no-op elsewhere).
+    state.background
+        .begin('stl2stp-convert', onExpire: () => _autoCancel('x.background.expired'))
+        .then((id) => _running ? _backgroundTask = id : state.background.end(id));
     _sw.start();
     _tick = Timer.periodic(const Duration(milliseconds: 500), (_) => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _run(state));
@@ -45,8 +60,39 @@ class _ConvertingScreenState extends State<ConvertingScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tick?.cancel();
+    _endBackgroundTask();
     super.dispose();
+  }
+
+  void _endBackgroundTask() {
+    final id = _backgroundTask;
+    _backgroundTask = null;
+    if (id != null) _state.background.end(id);
+  }
+
+  /// Cancels the running conversion for an app-side reason ([reasonKey] is the
+  /// message shown on the error screen).
+  void _autoCancel(String reasonKey) {
+    if (!_running || _cancel.isCancelled) return;
+    _autoCancelKey = reasonKey;
+    _cancel.cancel();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    // iOS memory warning / Android onTrimMemory: stop cleanly before the OS kills the app.
+    _autoCancel('x.memory.pressure');
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      if (!_backgroundClock.isRunning) _backgroundClock.start();
+    } else if (state == AppLifecycleState.resumed) {
+      _backgroundClock.stop();
+    }
   }
 
   Future<void> _run(AppState state) async {
@@ -58,8 +104,15 @@ class _ConvertingScreenState extends State<ConvertingScreen> {
         if (mounted) setState(() => _progress = pr);
       }
     });
+    _running = false;
     _cancel.dispose();
     _sw.stop();
+    _endBackgroundTask();
+    if (r.ok) {
+      state.haptics.success();
+    } else if (r.status != CoreStatus.errorCancelled || _autoCancelKey != null) {
+      state.haptics.failure();
+    }
     if (!mounted) return;
     final nav = Navigator.of(context);
     if (r.ok) {
@@ -76,7 +129,10 @@ class _ConvertingScreenState extends State<ConvertingScreen> {
       nav.pushReplacement(MaterialPageRoute(builder: (_) => DoneScreen(request: widget.request, result: r, bytes: bytes)));
       return;
     }
+    final auto = _autoCancelKey;
     final kind = switch (r.status) {
+      CoreStatus.errorCancelled when auto == 'x.memory.pressure' => ErrorKind.memory,
+      CoreStatus.errorCancelled when auto != null => ErrorKind.generic,
       CoreStatus.errorCancelled => ErrorKind.cancelled,
       CoreStatus.errorMemory => ErrorKind.memory,
       CoreStatus.errorEmpty => ErrorKind.empty,
@@ -90,7 +146,8 @@ class _ConvertingScreenState extends State<ConvertingScreen> {
       builder: (_) => ErrorScreen(
         kind: kind,
         code: r.status,
-        details: r.message,
+        details: auto != null ? S.of(context).t(auto) : r.message,
+        notice: auto != null ? S.of(context).t(auto) : null,
         faces: model.info.faces,
         onPrimary: (ctx) {
           switch (kind) {
@@ -188,7 +245,8 @@ class _ConvertingScreenState extends State<ConvertingScreen> {
                 ),
               ),
             ),
-            Text(s.t('converting.keep_open'), style: TextStyle(fontSize: 12, color: t.label2)),
+            Text(s.t(_state.background.enabled ? 'x.converting.background' : 'converting.keep_open'),
+                style: TextStyle(fontSize: 12, color: t.label2)),
             Padding(
               padding: const EdgeInsets.all(16),
               child: SizedBox(
