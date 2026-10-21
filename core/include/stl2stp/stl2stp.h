@@ -74,6 +74,11 @@ typedef struct stl2stp_export_options {
     /* Appended in core/fixes. */
     double merge_angular_tolerance; /* radians, coplanar merge; default 1e-4, valid range (0, 0.1] */
     int strict_original;            /* 1 = legacy ORIGINAL output without validation/repair (may be invalid); default 0 */
+    /* Appended in core/weld. ORIGINAL mode joins vertices closer than the weld tolerance (grid hash, O(n)),
+       never joining two vertices of the same triangle. 0 = exact-coordinate joining as in the desktop
+       original. Ignored when strict_original is set (legacy output is always exact). */
+    int weld_vertices;              /* default 1 */
+    double weld_tolerance;          /* model units; <= 0 = automatic: max(1e-6 x bbox diagonal, 2 x FLT_EPSILON x max|coordinate|) */
 } stl2stp_export_options;
 
 stl2stp_handle* stl2stp_create(void);
@@ -83,6 +88,10 @@ stl2stp_export_options stl2stp_default_export_options(void);
 stl2stp_status stl2stp_load_stl(stl2stp_handle* handle, const char* path,
                                const stl2stp_callbacks* callbacks);
 stl2stp_status stl2stp_get_mesh_stats(stl2stp_handle* handle, stl2stp_mesh_stats* stats);
+/* Joins near-coincident vertices of the loaded mesh in place (same rule and tolerance as the export weld;
+   tolerance <= 0 = automatic). Call before stl2stp_simplify so QEM sees closed seams. Triangles that would
+   collapse are never created; *merged (optional) receives the number of vertices joined. */
+stl2stp_status stl2stp_weld_vertices(stl2stp_handle* handle, double tolerance, uint64_t* merged);
 stl2stp_status stl2stp_simplify(stl2stp_handle* handle, uint64_t target_faces,
                                const stl2stp_callbacks* callbacks);
 stl2stp_status stl2stp_save_stl(stl2stp_handle* handle, const char* path,

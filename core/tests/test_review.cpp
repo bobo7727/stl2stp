@@ -475,8 +475,10 @@ int main(int argc, char** argv) {
             std::cout << "input: " << describe(input) << '\n';
             require(input.boundary_edges == 128, "fixture must have the 128-edge pole hole");
             require(f.load("pole", mesh) == STL2STP_OK, "load pole");
+            auto exact = stl2stp_default_export_options();
+            exact.weld_vertices = 0;  // desktop-compatible exact joining
             StepReport before;
-            require(f.export_step("pole", stl2stp_default_export_options(), before) == STL2STP_WARNING_NOT_SOLID,
+            require(f.export_step("pole", exact, before) == STL2STP_WARNING_NOT_SOLID,
                     "unsimplified open sphere must warn NOT_SOLID");
             require(before.solids == 0, "open input must not become a solid");
             for (const std::size_t percent : {50, 25}) {
@@ -487,7 +489,7 @@ int main(int argc, char** argv) {
                 require(report.boundary_edges <= input.boundary_edges, "simplification opened the mesh further");
                 require(report.non_manifold_edges == 0 && report.duplicate_faces == 0, "simplified mesh not manifold");
                 StepReport after;
-                require(f.export_step("pole-" + std::to_string(percent), stl2stp_default_export_options(), after) ==
+                require(f.export_step("pole-" + std::to_string(percent), exact, after) ==
                             STL2STP_WARNING_NOT_SOLID, "simplified open sphere must still warn NOT_SOLID");
             }
             // SEWING mode (tolerance 1e-6 relative) closes the microscopic hole: one solid.
@@ -498,6 +500,80 @@ int main(int argc, char** argv) {
             const auto sewn_status = f.export_step("pole-sewing", sewing, sewn);
             std::cout << "sewing: status=" << sewn_status << " " << describe(sewn) << '\n';
             require(sewn_status >= 0 && sewn.solids == 1 && sewn.invalid_solids == 0, "sewing must close the pole into one solid");
+        } else if (which == "weld_open_pole") {
+            // core/weld: the open-pole sphere (64 south-pole points ~1e-15 apart) becomes one solid in ORIGINAL
+            // mode with the default weld, stays open with the weld off, and stays closed through QEM when welded
+            // first (stl2stp_weld_vertices).
+            const auto mesh = uv_sphere(64, 32, 25.0, false);
+            require(f.load("weld-pole", mesh) == STL2STP_OK, "load");
+            StepReport welded;
+            const auto status = f.export_step("weld-pole", stl2stp_default_export_options(), welded);
+            const std::string message = stl2stp_last_error(f.handle.get());
+            std::cout << "weld on: status=" << status << " msg='" << message << "' " << describe(welded) << '\n';
+            require(status == STL2STP_WARNING_REPAIRED, "weld must report REPAIRED");
+            require(message.find("63 near-coincident vertex(es) welded") != std::string::npos, "weld note must count 63 joins");
+            require(welded.solids == 1 && welded.free_shells == 0 && welded.invalid_solids == 0 && welded.valid, "weld on: 1 valid solid");
+            require(welded.faces == mesh.size(), "weld must keep every triangle");
+            auto off = stl2stp_default_export_options();
+            off.weld_vertices = 0;
+            StepReport open;
+            require(f.export_step("weld-pole-off", off, open) == STL2STP_WARNING_NOT_SOLID && open.solids == 0, "weld off: still open");
+            auto legacy = stl2stp_default_export_options();
+            legacy.strict_original = 1;  // legacy output is always exact, weld ignored
+            StepReport strict;
+            require(f.export_step("weld-pole-strict", legacy, strict) == STL2STP_OK, "strict legacy export");
+            for (const std::size_t percent : {50, 25}) {
+                require(f.load("weld-pole", mesh) == STL2STP_OK, "reload");
+                uint64_t merged = 0;
+                require(stl2stp_weld_vertices(f.handle.get(), 0, &merged) == STL2STP_OK && merged == 63, "API weld joins 63");
+                stl2stp_mesh_stats stats{};
+                require(stl2stp_get_mesh_stats(f.handle.get(), &stats) == STL2STP_OK, "stats");
+                require(stats.vertices == 1986 && stats.faces == mesh.size(), "welded sphere: 1986 vertices, all faces");
+                const std::size_t target = mesh.size() * percent / 100;
+                stl2stp_status simplified;
+                const auto report = f.simplify(target, simplified);
+                std::cout << percent << "% after weld: " << describe(report) << '\n';
+                require(report.boundary_edges == 0 && report.non_manifold_edges == 0, "welded sphere stays closed through QEM");
+                require(report.faces <= target && report.faces + 2 >= target, "target");
+                StepReport step;
+                const auto exported = f.export_step("weld-pole-" + std::to_string(percent), stl2stp_default_export_options(), step);
+                require(exported == STL2STP_OK && step.solids == 1 && step.valid, "simplified welded sphere: 1 solid");
+            }
+        } else if (which == "weld_guards") {
+            // Thin features survive: a 40 x 40 slab only 2x / 100x the automatic tolerance thick stays a slab.
+            for (const double thickness_factor : {2.0, 100.0}) {
+                auto slab = cube(4);
+                for (auto& t : slab) { for (auto& p : t) { p[0] *= 40; p[1] *= 40; } }
+                double diagonal = std::sqrt(40.0 * 40 * 2);
+                const double thickness = thickness_factor * 1e-6 * diagonal;
+                for (auto& t : slab) { for (auto& p : t) { p[2] *= thickness; } }
+                require(f.load("slab", slab) == STL2STP_OK, "load slab");
+                StepReport step;
+                const auto status = f.export_step("slab", stl2stp_default_export_options(), step);
+                std::cout << "slab " << thickness << ": status=" << status << " msg='" << stl2stp_last_error(f.handle.get())
+                          << "' " << describe(step) << '\n';
+                require(status == STL2STP_OK, "thin slab must not be welded (no REPAIRED note)");
+                require(step.solids == 1 && step.valid && std::abs(step.volume - 1600 * thickness) < 1e-3 * 1600 * thickness,
+                        "thin slab volume kept");
+                uint64_t merged = 99;
+                require(stl2stp_weld_vertices(f.handle.get(), 0, &merged) == STL2STP_OK && merged == 0, "API: nothing to weld on slab");
+            }
+            // Never collapse a triangle: p and q are 1e-7 apart but share a triangle (a real sliver) -> kept;
+            // r is 1e-7 from p and only in another triangle -> joined.
+            const Vec p{0, 0, 0}, q{1e-7, 0, 0}, r{0, 1e-7, 0};
+            std::vector<Tri> pieces{{p, q, Vec{0, 10, 0}}, {r, Vec{10, 0, 1}, Vec{10, 10, 1}}};
+            require(f.load("sliver", pieces) == STL2STP_OK, "load sliver");
+            uint64_t merged = 0;
+            require(stl2stp_weld_vertices(f.handle.get(), 0, &merged) == STL2STP_OK, "weld sliver");
+            stl2stp_mesh_stats stats{};
+            require(stl2stp_get_mesh_stats(f.handle.get(), &stats) == STL2STP_OK, "stats");
+            std::cout << "sliver: merged=" << merged << " vertices=" << stats.vertices << " faces=" << stats.faces << '\n';
+            require(merged == 1 && stats.vertices == 5 && stats.faces == 2, "sliver kept, r joined to p");
+            // Explicit override and argument checks.
+            require(f.load("weld-pole", uv_sphere(64, 32, 25.0, false)) == STL2STP_OK, "load");
+            require(stl2stp_weld_vertices(f.handle.get(), 1e-20, &merged) == STL2STP_OK && merged == 0,
+                    "override below the pole gap joins nothing");
+            require(stl2stp_weld_vertices(f.handle.get(), std::nan(""), &merged) == STL2STP_ERROR_ARGUMENT, "NaN rejected");
         } else if (which == "qem_scale_invariance") {
             // Same subdivided cube at 1e-3 and 1e3 scale must simplify to the same face count and relative volume.
             std::vector<double> volumes;

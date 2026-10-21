@@ -11,7 +11,7 @@ set(OCCT_INCLUDE_DIR "" CACHE PATH "Override OCCT headers (include/opencascade o
 set(OCCT_LIBRARY_DIR "" CACHE PATH "Override OCCT toolkit directory")
 set(OCCT_EXTRA_LIBRARIES "" CACHE STRING "Additional dependencies of a custom static OCCT build")
 
-add_library(stl2stp-core src/mesh.cpp src/simplify.cpp)
+add_library(stl2stp-core src/mesh.cpp src/simplify.cpp src/weld.cpp)
 add_library(stl2stp::core ALIAS stl2stp-core)
 target_compile_features(stl2stp-core PUBLIC cxx_std_17)
 set_target_properties(stl2stp-core PROPERTIES CXX_EXTENSIONS OFF POSITION_INDEPENDENT_CODE ON)
