@@ -1,3 +1,4 @@
+#include <cmath>
 #include <stl2stp/stl2stp.h>
 
 #include <chrono>
@@ -62,9 +63,9 @@ std::string lowercase(std::string text) {
 void usage() {
     std::cerr << "Usage:\n"
               << "  stl2stp-cli info <in.stl>\n"
-              << "  stl2stp-cli simplify <in.stl> <out.stl> --faces N\n"
+              << "  stl2stp-cli simplify <in.stl> <out.stl> --faces N [--no-weld] [--weld-tol UNITS]\n"
               << "  stl2stp-cli convert <in.stl> <out.step|out.igs> [--mode original|sewing] [--merge-coplanar] [--simplify N]\n"
-              << "      [--merge-angle RADIANS] [--strict-original]\n"
+              << "      [--merge-angle RADIANS] [--strict-original] [--no-weld] [--weld-tol UNITS]\n"
               << "      [--author TEXT] [--org TEXT] [--product TEXT] [--description TEXT] [--timestamp ISO8601]\n"
               << "  stl2stp-cli readback <in.step>\n";
 }
@@ -93,6 +94,8 @@ int main(int argc, char** argv) {
         bool mode_given = false;
         bool strict_given = false;
         bool angle_given = false;
+        bool weld_given = false;
+        bool weld_tol_given = false;
         if (command == "info") {
             if (argc != 3) { usage(); return 2; }
         } else {
@@ -105,6 +108,19 @@ int main(int argc, char** argv) {
                 } else if (command == "convert" && argument == "--strict-original" && !strict_given) {
                     options.strict_original = 1;
                     strict_given = true;
+                } else if (argument == "--no-weld" && !weld_given) {
+                    options.weld_vertices = 0;
+                    weld_given = true;
+                } else if (argument == "--weld-tol" && !weld_tol_given && index + 1 < argc) {
+                    const std::string value = argv[++index];
+                    std::size_t used = 0;
+                    double tolerance = -1;
+                    try { tolerance = std::stod(value, &used); } catch (const std::exception&) { used = 0; }
+                    if (used != value.size() || !(tolerance > 0) || !std::isfinite(tolerance)) {
+                        throw std::runtime_error("--weld-tol must be a positive number (model units)");
+                    }
+                    options.weld_tolerance = tolerance;
+                    weld_tol_given = true;
                 } else if (command == "convert" && argument == "--merge-angle" && !angle_given && index + 1 < argc) {
                     const std::string value = argv[++index];
                     std::size_t used = 0;
@@ -140,6 +156,11 @@ int main(int argc, char** argv) {
             if (command == "simplify" && !target) { throw std::runtime_error("simplify requires --faces N"); }
         }
         timed("load", [&] { check(handle.get(), stl2stp_load_stl(handle.get(), argv[2], &callbacks)); });
+        if (target && options.weld_vertices && !options.strict_original) {
+            uint64_t merged = 0;
+            timed("weld", [&] { check(handle.get(), stl2stp_weld_vertices(handle.get(), options.weld_tolerance, &merged)); });
+            std::cout << "welded_vertices=" << merged << '\n';
+        }
         if (target) {
             timed("simplify", [&] { check(handle.get(), stl2stp_simplify(handle.get(), target, &callbacks)); });
         }

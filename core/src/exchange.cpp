@@ -507,6 +507,20 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
         mesh.points.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
         throw Error(STL2STP_ERROR_FORMAT, "Original triangulation exceeds OCCT index range");
     }
+    const bool strict = options.strict_original != 0;
+    // Near-coincident vertex weld (core/weld); identity map when off or in strict legacy mode.
+    std::vector<std::size_t> representative;
+    if (options.weld_vertices && !strict) {
+        std::vector<const std::vector<Triangle>*> topology{&input};
+        auto weld = weld_points(mesh.points, topology, weld_tolerance(mesh.points, options.weld_tolerance), &progress);
+        if (weld.merged) {
+            std::ostringstream message;
+            message << weld.merged << " near-coincident vertex(es) welded (tolerance " << std::setprecision(3) << weld.tolerance << ")";
+            notes.add(&Notes::repaired, message.str());
+            representative.swap(weld.map);
+        }
+    }
+    auto at = [&](std::size_t index) { return representative.empty() ? index : representative[index]; };
     Handle(Poly_Triangulation) triangulation;
     if (mesh.original_weld_required) {
         Poly_MergeNodesTool weld(std::acos(-1.0) / 2.0, 0.0);
@@ -514,7 +528,7 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
         for (const auto& triangle : input) {
             gp_XYZ points[3];
             for (std::size_t corner = 0; corner < 3; ++corner) {
-                const auto& point = mesh.points[triangle[corner]];
+                const auto& point = mesh.points[at(triangle[corner])];
                 if (std::max({std::abs(point.coordinate_x), std::abs(point.coordinate_y), std::abs(point.coordinate_z)}) >
                     std::numeric_limits<float>::max()) {
                     throw Error(STL2STP_ERROR_FORMAT, "Original STL welding exceeds float32 range");
@@ -534,8 +548,8 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
         }
         for (std::size_t index = 0; index < input.size(); ++index) {
             const auto& triangle = input[index];
-            triangulation->SetTriangle(static_cast<int>(index + 1), Poly_Triangle(static_cast<int>(triangle[0] + 1),
-                static_cast<int>(triangle[1] + 1), static_cast<int>(triangle[2] + 1)));
+            triangulation->SetTriangle(static_cast<int>(index + 1), Poly_Triangle(static_cast<int>(at(triangle[0]) + 1),
+                static_cast<int>(at(triangle[1]) + 1), static_cast<int>(at(triangle[2]) + 1)));
             progress.check();
         }
     }
@@ -551,7 +565,6 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
                           static_cast<std::size_t>(triangle.Value(3) - 1)});
         progress.check();
     }
-    const bool strict = options.strict_original != 0;
     std::vector<std::size_t> component(source.size(), 0);
     std::vector<char> component_closed{1};
     if (!strict) {

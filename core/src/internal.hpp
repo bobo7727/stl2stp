@@ -103,6 +103,16 @@ private:
     std::filesystem::path temporary_;
 };
 
+// Near-coincident vertex weld (core/weld). map[i] is the representative of point i (map[r] == r).
+struct WeldResult {
+    std::vector<std::size_t> map;
+    std::size_t merged = 0;
+    double tolerance = 0;
+};
+double weld_tolerance(const std::vector<Point>& points, double requested);
+WeldResult weld_points(const std::vector<Point>& points, const std::vector<const std::vector<Triangle>*>& topology,
+                       double tolerance, Progress* progress = nullptr);
+
 void require_path(const char* path);
 void require_mesh(const Mesh& mesh);
 Mesh simplify_mesh(const Mesh& source, std::size_t target, Progress& progress);

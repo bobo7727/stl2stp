@@ -275,7 +275,7 @@ const char* stl2stp_last_error(const stl2stp_handle* handle) {
 }
 
 stl2stp_export_options stl2stp_default_export_options(void) {
-    return {1e-6, 0, STL2STP_MODE_ORIGINAL, nullptr, nullptr, nullptr, nullptr, nullptr, 1e-4, 0};
+    return {1e-6, 0, STL2STP_MODE_ORIGINAL, nullptr, nullptr, nullptr, nullptr, nullptr, 1e-4, 0, 1, 0.0};
 }
 
 stl2stp_status stl2stp_load_stl(stl2stp_handle* handle, const char* path,
