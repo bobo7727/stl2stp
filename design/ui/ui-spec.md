@@ -414,7 +414,7 @@ SF Symbols 对照：导入 `square.and.arrow.down`、分享 `square.and.arrow.up
 - 截图里的数值：示例_支架.stl 的面数、顶点、尺寸和大小，都由原型内置的演示网格实时计算；“示例_大模型.stl”的 60 万面、“示例_超大模型.stl”的 350 万面都是虚构的示例值；历史记录里的文件名和大小都是示例。
 
 ## 12. 未决事项
-1. 框架：SwiftUI 还是 Flutter（等 Bo 决定）。
+1. 框架：SwiftUI 还是 Flutter（已决定：Flutter，见 docs/flutter-app.md）。
 2. 价格、购买方式和免费额度（购买页目前是占位）。
 3. `LARGE` 和 `LIMIT` 阈值，以及估算系数，需要真机标定。
 4. 核心库待办 1～6（§8）。

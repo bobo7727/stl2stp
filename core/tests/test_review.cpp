@@ -627,7 +627,7 @@ int main(int argc, char** argv) {
         } else if (which == "iges_non_ascii") {
             require(f.load("cube", cube(1)) == STL2STP_OK, "load");
             auto options = stl2stp_default_export_options();
-            options.author = "致知屋 Bo";
+            options.author = "致知屋 Wu";
             options.organization = "Café";
             options.description = "测试";
             const auto path = f.output / "meta.igs";
@@ -638,9 +638,9 @@ int main(int argc, char** argv) {
             const std::string text((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
             require(std::none_of(text.begin(), text.end(), [](char c) { return static_cast<unsigned char>(c) >= 0x80; }),
                     "IGES output must be pure ASCII");
-            require(text.find("6H??? Bo") != std::string::npos && text.find("4HCaf?") != std::string::npos,
+            require(text.find("6H??? Wu") != std::string::npos && text.find("4HCaf?") != std::string::npos,
                     "IGES Hollerith strings must hold the ASCII replacement");
-            options.author = "Bo";
+            options.author = "Wu";
             options.organization = "ACME";
             options.description = "plain";
             require(stl2stp_export_iges(f.handle.get(), path.u8string().c_str(), &options, nullptr, nullptr) == STL2STP_OK,

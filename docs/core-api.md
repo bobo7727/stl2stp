@@ -465,7 +465,7 @@ ctest --test-dir build/core-linux --output-on-failure
 否则查找明确目录内的 toolkit libraries。仅使用标准 `Threads` 与平台 `CMAKE_DL_LIBS`
 辅助 OCCT 运行时。不调用/显式链接 `TKV3d`, `TKOpenGl`, `TKService`；配置时检查
 直接选择的 libraries，禁止显式添加这些 visualization toolkits。
-按统筹澄清，允许 OCCT DataExchange 自身的 transitive dependencies：实际 OCCT 8.0.1
+按约定，允许 OCCT DataExchange 自身的 transitive dependencies：实际 OCCT 8.0.1
 即使关闭 Visualization / ApplicationFramework modules，仍依赖 `TKXCAF` / `TKCAF`
 及 `TKV3d` / `TKService` 等。本库不使用这些 toolkit 的可视化 API；不得删除 OCCT
 所需的 imported-target 依赖。实测链接闭包不含 `TKOpenGl` / OpenGL / FreeType。

@@ -3,7 +3,7 @@
 ## 环境与权限
 
 - CMake 3.26.4、Ninja、`gcc-10` / `g++-10` 10.5.0；core 最低要求 CMake 3.16、C++17。
-- 统筹已完成 OCCT shared build；本次核心库工作只读取 `$HOME/occt-install`
+- OCCT shared build 已预先完成（步骤见下文）；核心库构建只读取 `$HOME/occt-install`
   和必要时的 `$HOME/stl2stp-work/occt-src`，不向这两个目录写入。
 - 源码、core build、CTest fixture、临时文件均放仓库内。不安装系统包，不运行
   `sudo` / `apt` / `pip` / `ldconfig`，不修改 shell profile 或系统配置。
@@ -20,15 +20,15 @@ SHA256: 6297cc55a1720523a437c54d07dc16b9da8c5f5ab5800da3c6ebded568d53c18
 
 本次已只读校验 `$HOME/stl2stp-work/occt-src/V8.0.1.tar.gz`，摘要一致；
 安装的 `Standard_Version.hxx` 与 `OpenCASCADEConfig.cmake` 均为 8.0.1。
-统筹报告 gcc 9.4 在 `Bnd_Box.hxx` 的 constexpr defaulted noexcept constructor
+实测 gcc 9.4 在 `Bnd_Box.hxx` 的 constexpr defaulted noexcept constructor
 处编译失败，因此改用已安装的 `g++-10` 10.5.0。本次不重新安装或重现 gcc 9.4 问题。
-统筹报告 OCCT `ninja -j12` 在 12 cores 上耗时 **1196 s**，install size **123 MB**；
+OCCT `ninja -j12` 在 12 cores 上耗时 **1196 s**，install size **123 MB**；
 这两个值是此次 OCCT 构建记录，不是 core 测试耗时，也不是通用性能承诺。
 
-## 统筹使用的 OCCT recipe
+## OCCT 构建步骤
 
-以下是已完成的构建过程的复现说明，**本次 bot 没有执行这些会写 home 的命令**。
-前提是 archive 已校验并解压为 `OCCT-8.0.1`，且编译器/CMake/Ninja 已由统筹准备。
+以下是已完成的构建过程的复现说明（编写本文档时没有重新执行这些会写 home 的命令）。
+前提是 archive 已校验并解压为 `OCCT-8.0.1`，且编译器/CMake/Ninja 已准备好。
 
 ```sh
 cmake -S "$HOME/stl2stp-work/occt-src/OCCT-8.0.1" \

@@ -128,7 +128,7 @@ Total Test time (real) =  10.35 sec
 本次保持 `core/extract` / HEAD `9ec394a`；没有 commit、remote、push、checkout、
 reset 或 stash。所有新代码、文档、fixture、构建/测试日志写在仓库内，
 OCCT install/source 仅只读，未触碰其它 home 项目。以下历史 25 项/性能数据对应
-**前版默认 SEWING**，不能用来代表本次 ORIGINAL；新增性能数据由统筹补充。
+**前版默认 SEWING**，不能用来代表本次 ORIGINAL；新增性能数据见下文“独立复测”。
 
 ### 模式测试范围
 
@@ -246,10 +246,10 @@ Total Test time (real) =   2.29 sec
 ## 历史基线：25 项完整 OCCT 回归（前版默认 SEWING）
 
 分支仍为 `core/extract`。未 commit、未添加 remote、未 push，未修改 reference。
-已有 `.gitattributes` / `.gitignore` / `AGENTS.md` / `README.md` 工作区改动保留原样。
+已有 `.gitattributes` / `.gitignore` / 协作约定文件 / `README.md` 工作区改动保留原样。
 现有 `.gitignore` 已排除整个 `build/`，无需再修改。
 
-统筹已明确允许只读 `$HOME/occt-install` 与 `$HOME/stl2stp-work/occt-src`，
+构建时约定只读 `$HOME/occt-install` 与 `$HOME/stl2stp-work/occt-src`，
 前次路径限制导致的阻塞已经解除。未向这两个目录写入，也未访问其它 home 项目。
 使用真实 OCCT 8.0.1 shared libraries 编译、链接 `exchange.cpp`，
 **完整 Release 构建零编译错误，25/25 CTest PASS**；未使用 disabled stub。
@@ -331,7 +331,7 @@ exchange 在 progress 0 / 0.45 / 0.8 / 1 请求取消，检查既有目标文件
 - Linux 链接器默认 `DT_RUNPATH` 不覆盖 OCCT 的间接 `.so` 依赖，曾导致
   `libTKDE.so.8.0` 找不到；改为 Linux-only `--disable-new-dtags` + `DT_RPATH`。
   实际 CLI ELF 的 RPATH 指向所选 `OCCT_LIBRARY_DIR`，没有设置 `LD_LIBRARY_PATH`。
-- 按统筹澄清保留 DataExchange imported targets 的 transitive dependencies，
+- 按约定保留 DataExchange imported targets 的 transitive dependencies，
   不因 `TKV3d` / `TKService` 间接依赖拒绝配置；core 仍不使用 visualization API，
   不直接选择这些 libraries。
 
@@ -353,9 +353,9 @@ TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel`，本次还�
 - MFC UI、渲染、注册表、undo 与原始硬编码作者/header 文案不迁移。
 
 接口、取消边界、线程模型和 iOS 接入见 `docs/core-api.md`；
-official archive 校验、统筹使用的 OCCT recipe 与 core 构建命令见 `docs/build-linux.md`。
+official archive 校验、OCCT 构建步骤 与 core 构建命令见 `docs/build-linux.md`。
 
-## 统筹独立复测（2026-10-20，WSL Ubuntu 20.04，12 核，Release，g++-10，OCCT 8.0.1）
+## 独立复测（2026-10-20，WSL Ubuntu 20.04，12 核，Release，g++-10，OCCT 8.0.1）
 
 从零重新配置构建 `build/core-linux-verify`：构建 47 s，0 个 warning；`ctest` 25/25 通过。
 夹具由 `stl2stp-fixture-generator` 生成；时间是 CLI 自报的 `export_ms`（包含缝合、可选的共面合并和 STEP 写出）。
@@ -378,7 +378,7 @@ official archive 校验、统筹使用的 OCCT recipe 与 core 构建命令见 `
 - 2 万面的 STEP 回读需要 10–12 s。在 `/mnt/d` 上单次测到过 32 s，属于 I/O 波动。
 - OCCT 的 STEP writer 会在 stdout 打印带颜色的 Transfer 统计；iOS 集成前应通过 `Message` 静默掉。
 
-## 统筹独立复测：ORIGINAL 与 SEWING 对比（2026-10-20，WSL Ubuntu 20.04，12 核，Release，g++-10，OCCT 8.0.1）
+## 独立复测：ORIGINAL 与 SEWING 对比（2026-10-20，WSL Ubuntu 20.04，12 核，Release，g++-10，OCCT 8.0.1）
 
 在 `build/v2-release` 和 `build/v2-debug-ubsan` 从零构建：Release 0 warning，46/46 通过；Debug `-Werror` + UBSan（`-fno-sanitize-recover`）46/46 通过，0 条 `runtime error`。
 

@@ -51,7 +51,7 @@ iOS App 第一阶段的目标，是做出一个**不依赖 MFC / Windows 的跨�
 ### 1.3 仓库结构（`D:\stl2stp-ios`，在 WSL 中是 `/mnt/d/stl2stp-ios`）
 
 ```text
-.gitattributes / .gitignore / README.md / AGENTS.md
+.gitattributes / .gitignore / README.md / 协作约定文件
 core/
   CMakeLists.txt                 # 库 + CLI + 测试；OCCT_ROOT 指定 OCCT 前缀
   include/stl2stp/stl2stp.h      # 唯一公共头文件（纯 C，C99 可编译）
@@ -83,7 +83,7 @@ build/                           # 所有构建输出与日志，被 .gitignore 
 
 | 提交 | 时间 | 内容 |
 | --- | --- | --- |
-| `d1a8084` | 16:51 | init：项目骨架与协作约定（README、AGENTS、.gitignore、.gitattributes、空目录 `.gitkeep`）。`main` 停在这里 |
+| `d1a8084` | 16:51 | init：项目骨架与协作约定（README、协作约定（现 CONTRIBUTING.md）、.gitignore、.gitattributes、空目录 `.gitkeep`）。`main` 停在这里 |
 | `224958d` | 17:57 | chore：去掉 4 个文本文件的 UTF-8 BOM，统一 LF；`.gitattributes` 增加 `*.png`/`*.jpg binary` |
 | `9ec394a` | 17:57 | core：抽取跨平台 stl2stp-core（C API、STL 读写、QEM、STEP/IGES 导出、共面合并、STEP 回读）+ CLI + 25 项 CTest；新增 `docs/core-api.md`、`build-linux.md`、`core-validation.md`。当时唯一的导出算法是缝合（即后来的 SEWING） |
 | `7d961fe` | 18:36 | core：新增转换模式开关。`ORIGINAL`（默认，复刻桌面版“共享边 + 单 shell + 单 solid”）/ `SEWING`；CLI `--mode`；新增 `docs/original-conversion.md`；测试 25 → 46 |
@@ -105,7 +105,7 @@ build/                           # 所有构建输出与日志，被 .gitignore 
 
 ## 2. 环境
 
-实测于 Bo 的 Windows 机器上的 WSL `Ubuntu-20.04`（Ubuntu 20.04.6 LTS），用户 `grab`，12 核。
+实测于开发机（Windows）上的 WSL `Ubuntu-20.04`（Ubuntu 20.04.6 LTS），12 核。
 
 | 工具 | 实测版本（`--version`） | 来源 |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ cmake -G Ninja "$SRC" \
 `CMAKE_C_COMPILER=/usr/bin/gcc-10`、`CMAKE_CXX_COMPILER=/usr/bin/g++-10`、`BUILD_CPP_STANDARD=C++17`、
 `BUILD_LIBRARY_TYPE=Shared`、`BUILD_MODULE_{FoundationClasses,ModelingData,ModelingAlgorithms,DataExchange}=ON`、
 `BUILD_MODULE_{ApplicationFramework,Visualization,Draw,DETools}=OFF`、`USE_{FREETYPE,TCL,XLIB,FREEIMAGE,RAPIDJSON,DRACO,TBB}=OFF`、
-`BUILD_RELEASE_DISABLE_EXCEPTIONS=ON`（OCCT 默认值）、`INSTALL_DIR=/home/grab/occt-install`、`INSTALL_DIR_LAYOUT=Unix`、
+`BUILD_RELEASE_DISABLE_EXCEPTIONS=ON`（OCCT 默认值）、`INSTALL_DIR=~/occt-install`、`INSTALL_DIR_LAYOUT=Unix`、
 `BUILD_OCCT_VERSION_EXT=8.0.1`。
 
 ### 3.3 编译与安装（取自 `build/occt_build.sh`）
@@ -581,7 +581,7 @@ $C readback build/core-linux/cube.step
 
 ### 4.16 编码规范化提交与 `.gitattributes` / `.gitignore`
 
-`224958d` 去掉了 `.gitattributes`、`.gitignore`、`AGENTS.md`、`README.md` 开头的 UTF-8 BOM（由 Windows 端创建时带入）。
+`224958d` 去掉了 `.gitattributes`、`.gitignore`、协作约定文件、`README.md` 开头的 UTF-8 BOM（由 Windows 端创建时带入）。
 现在的内容：
 
 ```gitattributes
@@ -729,7 +729,7 @@ SEWING + merge 的 cube 为 **15,937 字节**。
 8. 与原版**不保证**逐字节一致：OCCT 7.0 → 8.0.1 的内部处理、动态公差、实体排序不同；QEM 有改进；时间戳和 metadata 是有意改变的。
 9. 没有隐含的 100000 面上限，也不会自动简化，相当于原版确认框里选“是”。UI 层需要自己提示或限流。
 10. 无进度挂钩的 OCCT 阶段（`ComputeModel`、`UnifySameDomain`、`ReadFile`、IGES `Write`）不能立即取消；`core/fixes` 起 STEP 写盘每 1 MB 检查一次取消。
-11. `core/extract` 还**没有合并到 `main`**（等待 Bo 决定）。
+11. `core/extract` 还**没有合并到 `main`**（待决定）。
 12. `core/fixes` 的其余未决问题见 9.6。
 
 ---
@@ -741,7 +741,7 @@ SEWING + merge 的 cube 为 **15,937 字节**。
 3. 下载 OCCT `V8.0.1.tar.gz`，核对 SHA256 `6297cc55…3c18`，解压到 `~/stl2stp-work/occt-src/OCCT-8.0.1`（3.1）。
 4. 按 3.2 的完整参数配置 OCCT；按 3.3 执行 `ninja -j12 && ninja install`（12 核约 20 分钟）。
 5. 核对 `~/occt-install/include/opencascade/Standard_Version.hxx` 为 8.0.1，`lib/` 下有 48 个 `libTK*.so`，以及 `lib/cmake/opencascade/OpenCASCADEConfig.cmake`（3.4）。
-6. 获取本仓库：从 Bo 处拷贝 `D:\stl2stp-ios` 整个目录，或用 `git bundle` 传 `core/extract` 分支（不要添加 remote，也不要 push）。
+6. 获取本仓库：从原维护者处拷贝 `D:\stl2stp-ios` 整个目录，或用 `git bundle` 传 `core/extract` 分支（不要添加 remote，也不要 push）。
    原版源码另外放到 `reference/stl2stp-master/`，只读，仅用于对照，构建不需要。
 7. `git checkout core/extract`，确认 `git log --oneline` 包含 `65e30ad … d1a8084` 和本文提交。
 8. 按 5.1 构建 Release，运行 `ctest`，应为 **104/104 通过**、0 warning（`core/fixes`：**118/118**）。
@@ -755,7 +755,7 @@ SEWING + merge 的 cube 为 **15,937 字节**。
 
 ## 9. core/fixes：代码审查后的修复（分支 `core/fixes`，基于 `core/extract` `4c71bcb`）
 
-2026-10-20 的代码审查（box 上的 `stl2stp-review-and-research.md`）列出的问题，先写成会失败的 C++ 测试，
+2026-10-20 的代码审查（审查报告未入库）列出的问题，先写成会失败的 C++ 测试，
 再逐项修复。新测试可执行文件 `stl2stp-review-tests`，CTest 标签 `review`。读回 STEP 时**关闭 OCCT reader 端的
 shape healing**（`SetShapeProcessFlags(空)`），因为别的 CAD 拿到的是文件原样；不关的话 OCCT 读入时会自动修好，
 掩盖问题（一开始就是这样漏掉的）。
@@ -821,7 +821,7 @@ STEP 与 IGES **逐字节相同**。不同的只有有意改变的无效/开放�
 `zero-area-duplicate`）和本来就失败的输入（`empty-binary`、`huge-ascii`、`invalid`、`nonfinite`，两边都返回错误）。
 
 性能（sphere-ascii.stl 3.6 MB → 48 MB STEP，同一台机器，单次）：普通 STEP 导出 18.4 s → 14.3 s（去掉整文件逐字符重写）；
-`--merge-coplanar` 22.6 s → 16.5 s；`simplify --faces 2000` 0.19 s → 0.21 s。box 上的纯网格 harness：sphere 19800→2000 最大径向偏差
+`--merge-coplanar` 22.6 s → 16.5 s；`simplify --faces 2000` 0.19 s → 0.21 s。另一台 Linux 机器上的纯网格 harness：sphere 19800→2000 最大径向偏差
 0.00227 → 0.00199，最小三角形质量 0.421 → 0.244（更紧的翻转/质量检查的代价是更保守，第二阶段放宽）。
 
 
@@ -840,7 +840,7 @@ STEP 与 IGES **逐字节相同**。不同的只有有意改变的无效/开放�
 2. LeakSanitizer：OCCT 8.0.1 每次 transfer 在进程退出时留下约 7.6 MB（`Standard::Allocate`，栈无本项目帧），基线 `core/extract` 也有。默认关闭 LSan。
 3. gcc-10 ASan 在 WSL2 内核 6.18（高 `mmap_rnd_bits`）上偶发无限 `AddressSanitizer:DEADLYSIGNAL`，曾把日志写到 31 GB。
    规避：`setarch -R` + 输出上限（脚本已内置）。根治需 `vm.mmap_rnd_bits=28`（需 root）或更新的 gcc/clang。
-4. `simplify` 在大目标比例下略慢（box 测 31→39 ms、41→60 ms），最小三角形质量下降，见 9.4。
+4. `simplify` 在大目标比例下略慢（另一台机器上测得 31→39 ms、41→60 ms），最小三角形质量下降，见 9.4。
 5. 共面合并输出与旧版不同（有意，容差更合理），未在真实 CAD 中验证。
 
 ---
