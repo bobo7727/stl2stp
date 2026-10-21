@@ -1,0 +1,145 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../core/engine.dart';
+import '../core/models.dart';
+import 'history.dart';
+
+/// App-wide state: preferences, history, the conversion engine and output dir.
+class AppState extends ChangeNotifier {
+  AppState({required this.engine, required this.prefs, required this.outputDir}) {
+    _history = HistoryStore(File(p.join(outputDir.path, 'history.json')));
+    history = _history.load();
+  }
+
+  final ConversionEngine engine;
+  final SharedPreferences prefs;
+  final Directory outputDir;
+  late final HistoryStore _history;
+  late List<HistoryEntry> history;
+
+  /// Faces above which we suggest simplifying / refuse (placeholders, ui-spec §2.2).
+  static const largeFaces = 200000;
+  static const limitFaces = 2000000;
+
+  // ---- preferences ----
+  ThemeMode get themeMode => ThemeMode.values.byName(prefs.getString('themeMode') ?? 'system');
+  set themeMode(ThemeMode m) {
+    prefs.setString('themeMode', m.name);
+    notifyListeners();
+  }
+
+  /// 'zh' (default), 'en' or 'system'.
+  String get language => prefs.getString('language') ?? 'zh';
+  set language(String v) {
+    prefs.setString('language', v);
+    notifyListeners();
+  }
+
+  Locale? get locale => language == 'system' ? null : Locale(language);
+
+  bool get onboardingSeen => prefs.getBool('onboardingSeen') ?? false;
+  set onboardingSeen(bool v) {
+    prefs.setBool('onboardingSeen', v);
+    notifyListeners();
+  }
+
+  ExportFormat get defaultFormat => ExportFormat.values.byName(prefs.getString('defaultFormat') ?? 'step');
+  set defaultFormat(ExportFormat f) {
+    prefs.setString('defaultFormat', f.name);
+    notifyListeners();
+  }
+
+  /// A preset name or 'last'.
+  String get defaultPreset => prefs.getString('defaultPreset') ?? 'last';
+  set defaultPreset(String v) {
+    prefs.setString('defaultPreset', v);
+    notifyListeners();
+  }
+
+  /// Default metadata (empty unless set in Settings).
+  ConvertSettings get defaultMeta {
+    final raw = prefs.getString('defaultMeta');
+    if (raw == null) return const ConvertSettings();
+    return ConvertSettings.fromJson((jsonDecode(raw) as Map).cast<String, Object?>());
+  }
+
+  set defaultMeta(ConvertSettings s) {
+    prefs.setString('defaultMeta', jsonEncode(s.toJson()));
+    notifyListeners();
+  }
+
+  /// Initial settings for a new file (ui-spec §4.6 "设置是否记住").
+  ConvertSettings initialSettings() {
+    final meta = defaultMeta;
+    ConvertSettings base;
+    if (defaultPreset == 'last' && prefs.getString('lastSettings') != null) {
+      base = ConvertSettings.fromJson((jsonDecode(prefs.getString('lastSettings')!) as Map).cast<String, Object?>());
+    } else {
+      final preset = Preset.values.where((p) => p.name == defaultPreset).firstOrNull ?? Preset.recommended;
+      base = ConvertSettings.forPreset(preset, format: defaultFormat);
+    }
+    return base.copyWith(
+        author: meta.author, organization: meta.organization, product: meta.product, description: meta.description);
+  }
+
+  void rememberSettings(ConvertSettings s) {
+    // Metadata is only prefilled from Settings, so do not remember it here.
+    prefs.setString(
+        'lastSettings', jsonEncode(s.copyWith(author: '', organization: '', product: '', description: '').toJson()));
+  }
+
+  // ---- outputs & history ----
+  String outputPathFor(String sourcePath, ExportFormat f) {
+    final dir = Directory(p.join(outputDir.path, 'Outputs'))..createSync(recursive: true);
+    final stem = p.basenameWithoutExtension(sourcePath);
+    var candidate = p.join(dir.path, '$stem.${f.extension}');
+    var i = 2;
+    while (File(candidate).existsSync()) {
+      candidate = p.join(dir.path, '$stem ($i).${f.extension}');
+      i++;
+    }
+    return candidate;
+  }
+
+  void addHistory(HistoryEntry e) {
+    history = [e, ...history].take(HistoryStore.maxEntries).toList();
+    _history.save(history);
+    notifyListeners();
+  }
+
+  void deleteHistory(HistoryEntry e, {bool deleteFile = true}) {
+    history = history.where((h) => h.outputPath != e.outputPath).toList();
+    if (deleteFile) {
+      try {
+        File(e.outputPath).deleteSync();
+      } catch (_) {}
+    }
+    _history.save(history);
+    notifyListeners();
+  }
+
+  void clearHistory() {
+    for (final e in history) {
+      try {
+        File(e.outputPath).deleteSync();
+      } catch (_) {}
+    }
+    history = [];
+    _history.save(history);
+    notifyListeners();
+  }
+}
+
+/// Provides [AppState] to the widget tree.
+class AppScope extends InheritedNotifier<AppState> {
+  const AppScope({super.key, required AppState state, required super.child}) : super(notifier: state);
+
+  static AppState of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<AppScope>()!.notifier!;
+  static AppState read(BuildContext context) =>
+      (context.getElementForInheritedWidgetOfExactType<AppScope>()!.widget as AppScope).notifier!;
+}
