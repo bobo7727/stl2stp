@@ -253,12 +253,84 @@ flutter run -d "iPhone 16"            # 名称以 flutter devices 显示为准
 - iPad 上分享面板以弹出框形式出现，代码已经给了锚点位置；在 iPad 模拟器上点一次“分享…”确认不会崩溃。
 - `Info.plist` 已声明 STL 文档类型（UTI `com.stl2stp.stl`）。App 能不能出现在微信、“文件”等 App 的“用其他应用打开”列表里，要在真机上验证。
 
+### 9.3 后台转换与内存警告（原生代码，Dart 端已就绪）
+
+Dart 端用两个 MethodChannel，iOS 上还没有原生实现时会自动降级（不报错）：后台任务不申请，内存预算用默认 1.5 GB。在 Mac 上把下面的代码合进 `app/ios/Runner/AppDelegate.swift`：
+
+```swift
+import Flutter
+import UIKit
+import os
+
+@main
+@objc class AppDelegate: FlutterAppDelegate {
+  private var tasks: [Int: UIBackgroundTaskIdentifier] = [:]
+  private var nextId = 1
+  private var backgroundChannel: FlutterMethodChannel?
+
+  override func application(
+    _ application: UIApplication,
+    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+  ) -> Bool {
+    GeneratedPluginRegistrant.register(with: self)
+    let messenger = (window?.rootViewController as! FlutterViewController).binaryMessenger
+
+    // 后台任务：begin → id；end(id)；到期时回调 Dart 的 expired(id)。
+    let bg = FlutterMethodChannel(name: "stl2stp/background", binaryMessenger: messenger)
+    backgroundChannel = bg
+    bg.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else { return }
+      switch call.method {
+      case "begin":
+        let name = (call.arguments as? [String: Any])?["name"] as? String ?? "stl2stp-convert"
+        let id = self.nextId
+        self.nextId += 1
+        let task = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+          // 系统要收回后台时间：通知 Dart 取消转换，然后结束任务。
+          self?.backgroundChannel?.invokeMethod("expired", arguments: id)
+          self?.endTask(id)
+        }
+        if task == .invalid { result(nil) } else { self.tasks[id] = task; result(id) }
+      case "end":
+        if let id = (call.arguments as? [String: Any])?["id"] as? Int { self.endTask(id) }
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
+    // 本进程还能用多少内存（字节）。iOS 13+。
+    let mem = FlutterMethodChannel(name: "stl2stp/memory", binaryMessenger: messenger)
+    mem.setMethodCallHandler { call, result in
+      if call.method == "available" { result(Int(os_proc_available_memory())) }
+      else { result(FlutterMethodNotImplemented) }
+    }
+
+    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  private func endTask(_ id: Int) {
+    if let task = tasks.removeValue(forKey: id) { UIApplication.shared.endBackgroundTask(task) }
+  }
+}
+```
+
+说明：
+- 如果模板里的 `AppDelegate` 是新版“隐式引擎”写法（没有 `window.rootViewController`），就在 `didInitializeImplicitFlutterEngine(_:)` 里用 `engineBridge.applicationRegistrar.messenger()` 拿 messenger，其余不变。
+- 内存警告不需要额外原生代码：Flutter 引擎收到 `UIApplication.didReceiveMemoryWarningNotification` 后会调用 Dart 的 `didHaveMemoryPressure`，App 会安全取消正在进行的转换。
+- 验证：
+  1. 真机上转换一个几万面的模型，转换中按 Home 回桌面，等 10–20 秒再回来：应该已完成或仍在进行；
+  2. 回桌面等超过约 30 秒：应自动取消，错误页说明“App 在后台停留太久”；
+  3. 模拟器菜单 Debug → Simulate Memory Warning：正在转换时应取消并提示“内存紧张”；
+  4. 预览页点转换时，用 Xcode 的 Memory 仪表对比 App 预估的“预计需要”，必要时调 `MemoryGuard` 的系数（docs/flutter-app.md §13）。
+
 ## 10. OCCT（LGPL 2.1 + 例外）静态链接合规——上架前必须确认
 
 - iOS 上我们把 OCCT **静态**链接进 App。LGPL 2.1 第 6 条要求用户能用修改过的库**重新链接**你的程序。常见做法二选一：
   1. 提供 App 的**目标文件**（`.o`/静态库，不含 OCCT）和链接说明，让用户可以自己重链；或
   2. 把 OCCT 做成**动态 framework**随 App 分发（iOS 允许自带动态 framework），用户理论上可以替换。
-- 无论哪种，都要在 App 内“开源许可”页附 LGPL 2.1 全文和 OCCT 例外条款（`OCCT_LGPL_EXCEPTION.txt`），并说明从哪里获取 OCCT 源码（界面里已有文案 `licenses.occt.*`，“查看许可证全文”目前显示 Flutter 的许可页，需补上 OCCT 文本）。
+- 无论哪种，都要在 App 内“开源许可”页附 LGPL 2.1 全文和 OCCT 例外条款，并说明从哪里获取 OCCT 源码。这部分已经做了：两个文本在 `app/assets/licenses/occt/`，设置 → 关于 → 开源许可里可以看全文，也出现在 Flutter 的许可页里（docs/flutter-app.md §12）。
+- 以上是对一个**尚未确认的法律问题**的技术整理，不是法律意见。
 - App Store 的使用条款与 (L)GPL 是否兼容存在争议，**以法务意见为准**。原 stl2stp 项目的许可证也需确认。
 
 ## 11. 把 Mac 上的改动带回 Windows

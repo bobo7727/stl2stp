@@ -10,6 +10,7 @@ app/
 ├── pubspec.yaml                 依赖：ffi、path、path_provider、shared_preferences、file_picker、share_plus、in_app_purchase、desktop_drop
 ├── assets/i18n/zh.json, en.json 设计文案（从 design/ui 复制，tool/sync_strings.sh 同步）
 ├── assets/i18n/app_zh.json, app_en.json  App 专用文案（帮助页、购买、估算等；tool/app_strings.py 生成）
+├── assets/licenses/occt/        OCCT 8.0.1 的 LICENSE_LGPL_21.txt 和 OCCT_LGPL_EXCEPTION.txt（原样取自 OCCT 安装目录 share/doc/opencascade/）
 ├── lib/
 │   ├── main.dart                启动：选引擎（FFI 优先，找不到核心库就进演示模式）、读设置、命令行参数打开 STL
 │   ├── app.dart                 MaterialApp、主题、语言、首次引导
@@ -22,19 +23,22 @@ app/
 │   │   ├── models.dart          设置、预设、阶段、结果、状态码（与 stl2stp_status 对应）
 │   │   ├── stl_reader.dart      Dart 端轻量 STL 解析：3D 预览、ASCII/二进制标签、共面分组计数（估算用）
 │   │   ├── estimate.dart        预计用时/大小（用核心库实测标定的系数，输出范围；见 §7）
-│   │   ├── sample_mesh.dart     示例模型（L 形支架、球）生成器
+│   │   ├── sample_mesh.dart     示例模型（L 形支架、球；可生成“极点不精确”的开放球）生成器
+│   │   ├── memory_guard.dart    转换前的峰值内存预估和本机内存预算（见 §13）
+│   │   ├── licenses.dart        OCCT 许可文本：注册进 LicenseRegistry、读取全文（见 §12）
 │   │   └── screenshot.dart      集成测试里截图用
 │   ├── l10n/strings.dart        S.of(context).t('key', {参数})
 │   ├── theme/tokens.dart        ui-spec §6 的颜色、字号、圆角
+│   ├── platform/                background_task.dart（iOS 后台任务桥）、haptics.dart（触感反馈）；其他平台为空操作
 │   ├── purchase/                购买框架：PurchaseService 接口、免费额度、模拟商店、StoreKit 实现（见 §8）
 │   ├── state/                   AppState（设置、历史、输出目录、购买/额度、估算器）、历史记录 JSON
 │   ├── screens/                 引导、首页、预览+设置、转换中、完成、错误、历史、设置、帮助、购买页、开源许可
-│   └── widgets/                 3D 预览（纯 Flutter 软件渲染）、桌面拖放、提醒条、统计格、进度环等
+│   └── widgets/                 history_list.dart（可左右滑的历史行）、3D 预览（纯 Flutter 软件渲染）、桌面拖放、提醒条、统计格、进度环等
 ├── test/                        单元测试 + 组件测试（用演示引擎，任何机器都能跑）
 ├── integration_test/app_test.dart  端到端：真机/桌面上用真实核心库走完整 UI 流程并截图
 ├── tool/sync_strings.sh         同步设计文案
 ├── tool/app_strings.py          App 专用文案的唯一来源（生成 assets/i18n/app_*.json）
-├── tool/calib/                  估算标定脚本和实测数据（calib*.py、calib*.csv）
+├── tool/calib/                  估算标定脚本和实测数据（calib*.py、calib*.csv；weldtime.*：焊接耗时；memtime.*：峰值内存）
 ├── tool/ios/build_ios_core.sh   在 Mac 上编 iOS 版 OCCT + 核心库（见 docs/mac-setup-guide.md）
 └── android/ ios/ linux/ macos/ windows/   各平台工程（flutter create 生成，少量改动）
 ```
@@ -111,9 +115,9 @@ Windows 上已有 Android SDK、NDK 28.2 和模拟器镜像，Flutter 也能编 
 ## 5. 和 ui-spec 的差异 / 待办
 
 - 3D 预览用纯 Flutter 软件渲染（CustomPainter + `drawVertices`，最多显示 4 万个三角形），所有平台都能用；大模型以后可换 `flutter_scene` 或原生 SceneKit。
-- 宽屏（≥900 宽）时预览页已改为左右两栏；完整的 iPad 分栏（§4.16）还没做。
-- 历史记录左滑只有“删除”；点一行即“再次分享”。
-- 还没做：后台任务、内存警告自动取消、触感反馈、iPad 拖放（需要原生 UIDropInteraction）。
+- iPad / 宽窗口分栏（§4.16）、历史滑动、后台任务、内存保护、触感反馈已做（§11、§13）；iOS 原生部分（后台任务、可用内存）只写了文档和 Dart 端，**需要在 Mac 上接上并验证**（docs/mac-setup-guide.md §9.3）。
+- 预览页本身在宽度 ≥ 760 时用左右两栏（分栏右侧窗格约 940 宽时也会用到）。
+- 还没做：iPad 拖放（需要原生 UIDropInteraction）。
 
 ## 6. 帮助页
 
@@ -199,3 +203,60 @@ Windows 上已有 Android SDK、NDK 28.2 和模拟器镜像，Flutter 也能编 
 - iOS、Android、macOS 用 `share_plus` 的系统分享面板。iPad 必须给弹出框一个锚点：完成页传按钮位置，其他地方默认用触发控件自己的位置。
 - Linux、Windows 没有分享面板，会把文件路径复制到剪贴板并提示。
 - “存到‘文件’”用 `file_picker` 的保存对话框；不可用时同样复制路径。
+
+## 10. 合并重合顶点（焊接）
+
+- 核心库（`core/src/weld.cpp`，见 `docs/core-api.md` “core/weld”）在 ORIGINAL 模式里把**开放边界上**、距离小于容差的顶点合并：
+  容差 = `max(1e-6 × 包围盒对角线, 2 × FLT_EPSILON × 最大坐标)`，网格哈希 O(n)；不会合并封闭区域的顶点（薄壁不受影响），也不会让三角形退化。
+  典型效果：很多导出器写出的球体极点差几个浮点单位，精确合并后留下微小缝隙，原先只能得到开放曲面；焊接后得到 1 个封闭实体（核心测试 `weld_open_pole`）。
+- App：预览页“高级设置”里的“合并重合顶点”开关（`weldSwitch`，默认开，属于预设的一部分：关掉后预设显示为“自定义”）；帮助页有 `weld` 段落（`help.weld.*`）。
+  - 开：导出选项 `weld_vertices=1`；减面时先调 `stl2stp_weld_vertices` 再 QEM（QEM 需要连通的网格才能保持封闭），有顶点被合并时完成页显示“已修复”。
+  - 关：`weld_vertices=0`，保持逐位精确合并的旧行为。
+- 实测耗时影响（Release，WSL，STEP ORIGINAL，单次，秒，开 / 关；`tool/calib/weldtime.csv`）：
+
+  | 模型 | 开 | 关 |
+  | --- | --- | --- |
+  | 球 5k | 3.32 | 3.44 |
+  | 球 20k | 14.02 | 13.82 |
+  | 方块 20k | 14.20 | 13.93 |
+  | 球 50k | 38.68 | 39.82 |
+  | 球 50k 减到 50% | 18.76（焊接本身 4.6 ms） | 19.36 |
+  | 开放极点球 50k | 36.92（合并 199 个顶点，1 个实体） | 36.68（0 个实体） |
+  | 球 100k | 86.96 | 82.02 |
+  | 方块 100k | 79.73 | 78.42 |
+
+  差别在单次运行的波动范围内，§7 的估算系数没有改。
+- 集成测试用真实核心库验证：开放极点球（3968 面）开焊接 → STEP 里 1 个 `MANIFOLD_SOLID_BREP`；关焊接 → 0 个，只有 `SHELL_BASED_SURFACE_MODEL`。
+
+## 11. iPad 分栏和历史滑动
+
+- `useSplitLayout(size)`：宽度 ≥ 900，或者最短边 ≥ 600 且宽度 ≥ 700（iPad 竖屏 820×1180 也算）时用分栏；iPad 侧拉（Slide Over，约 375 宽）和手机布局不变。
+- 分栏：左边固定 340 宽，是首页内容（导入卡片、示例、帮助/设置按钮）加完整历史；右边是一个嵌套 `Navigator`（`detailNavigatorKey`），预览 → 转换中 → 完成/错误都在右栏里走，右栏按自己的宽度布局（单独的 `MediaQuery`），并有自己的 `ScaffoldMessenger`（提示条不会在两栏重复出现）。没选模型时右栏显示占位提示（`x.split.placeholder`）。`openModel` 有右栏时在右栏里打开并替换掉之前的页面。
+- 历史行（`lib/widgets/history_list.dart`，首页“最近”和历史页共用）：
+  - 向右滑：再次分享（行不消失）；向左滑：删除记录和文件；点一行也是再次分享。
+  - 输出文件已不存在：不分享，提示“……已不存在，无法分享”，带“删除记录”按钮（只删记录）。
+- 组件测试：`test/features_test.dart` 的 `split layout`（宽窗口两栏、预览在右栏；手机单栏、预览是新页面）和 `history swipe`。
+
+## 12. 开源许可
+
+- 设置 → 关于 → 开源许可：OCCT（LGPL 2.1 + OCCT 例外）、stl2stp-core 说明；“查看 OCCT 许可证全文”显示 App 内置的两个文本（`assets/licenses/occt/`，可选择复制）；“全部开源组件许可”打开 Flutter 的 `showLicensePage`，里面有 Flutter/Dart 各个包的许可（Flutter 自动收集），以及启动时用 `LicenseRegistry.addLicense` 注册的 OCCT 两段文本（包名 `Open CASCADE Technology (OCCT) 8.0.1`）。
+- **iOS 静态链接 LGPL 库的要求——这是一个待确认的法律问题，以下不是法律意见**：
+  - LGPL 2.1 第 6 条要求用户能用修改过的库重新链接得到可运行的程序。iOS 上 OCCT 是静态链接进 App 的，通常讨论的做法有：
+    1. 另外提供 App 的目标文件/静态库（不含 OCCT）和链接说明，让用户能自己重链；或
+    2. 把 OCCT 做成动态 framework 随 App 分发。
+  - OCCT 例外条款只允许“含有 OCCT 头文件内容（内联函数、模板等）的目标代码”按自选条款分发，条件是在配套文档里显著注明用了 OCCT；它**不**免除对 OCCT 库本身的重链要求。
+  - App Store 的分发条款（设备限制、DRM）与 LGPL 的兼容性一直有争议；原 stl2stp 项目本身的许可也要确认。
+  - 结论交给法务；技术上两种做法都可行，选 2 需要改 `tool/ios/build_ios_core.sh` 产出 dylib/framework。
+
+## 13. 后台转换、内存保护、触感反馈
+
+- **后台**（`lib/platform/background_task.dart`）：转换开始时 `begin`，结束/离开页面时 `end`；系统通知后台时间快用完（`expired`）时自动安全取消，错误页说明“App 在后台停留太久……转换已停止”。转换页提示“可以切到其他 App，转换会在后台继续一小段时间”。只在 iOS 启用；Linux/桌面/测试里是空操作（桌面进程本来就会继续跑）。iOS 原生代码见 docs/mac-setup-guide.md §9.3，**未在真机验证**。
+- **内存预检**（`lib/core/memory_guard.dart`、`lib/screens/memory_dialog.dart`）：
+  - 预估峰值 = 50 MB + 20.5 kB × 生成的 CAD 面数（缝合 × 1.06；合并共面 × 1.0；减面时取它和 1.2 kB × 原始三角形数中较大的一项）。
+  - 系数来自 `stl2stp-cli` 的 max RSS（`tool/calib/memtime.csv`，WSL，Release）：ORIGINAL STEP 5k 面 140 MB、20k 437 MB、50k 1016 MB、102k 2017 MB；缝合约多 5%；合并共面和 IGES 实测更少（保守地按 ×1.0）；减面 50% 基本按输出面数。模型在这些点上都不低于实测值（测试里有断言）。手机上的实际占用**还没测**（需要 Mac + 真机）。
+  - 本机预算：设置项 `memoryBudgetMB`（覆盖）→ iOS `stl2stp/memory` 通道 `available`（`os_proc_available_memory()`）× 0.8 → Linux `/proc/meminfo` MemAvailable × 0.8 → 默认 1.5 GB。
+  - 超过预算 70%：提示“可能占用很多内存”，可“仍然转换”或“减到 N% 再转换”（N 为能落到 70% 以下的最大 5% 档）；超过预算：提示“内存不够”，只能减面或取消。
+- **内存紧张**：系统内存警告（iOS `didReceiveMemoryWarning`，Flutter 转成 `WidgetsBindingObserver.didHaveMemoryPressure`）时，正在进行的转换安全取消，不留半个文件，错误页说明原因并建议减面。
+- **触感**（`lib/platform/haptics.dart`）：开始、成功用轻触，失败用中等力度；只在 iOS/Android 启用，桌面为空操作。
+- 测试：`test/features_test.dart` 的 `memory guard`（模型、预算解析、警告对话框选“减面”后按 75% 转换、拒绝）、`running conversion`（内存紧张自动取消、后台任务 begin/end/到期取消、触感调用、桌面空操作）。
+
