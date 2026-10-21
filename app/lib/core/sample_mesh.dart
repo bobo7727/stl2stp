@@ -56,12 +56,15 @@ Future<String> writeSampleStl(String path) async {
 }
 
 /// Closed UV sphere (radius [r]) as binary STL; 2*seg*(rings-1) triangles.
-Uint8List buildSphereStl({int seg = 64, int rings = 32, double r = 25}) {
+/// With [exactPoles] false the poles come from the trigonometric formula like
+/// many exporters do (south pole off by ~1e-15 per segment): bit-exact joining
+/// leaves it open, the core's tolerance weld closes it.
+Uint8List buildSphereStl({int seg = 64, int rings = 32, double r = 25, bool exactPoles = true}) {
   List<double> at(int i, int j) {
     // Poles must be single, exact vertices: sin(pi) is 1.2e-16, not 0, which would leave `seg` distinct
     // south-pole points and a microscopic hole that the (bit-exact welding) core rightly reports as open.
-    if (j == 0) return [0, 0, r];
-    if (j == rings) return [0, 0, -r];
+    if (exactPoles && j == 0) return [0, 0, r];
+    if (exactPoles && j == rings) return [0, 0, -r];
     final th = 3.141592653589793 * j / rings;
     final ph = 2 * 3.141592653589793 * (i % seg) / seg;
     return [r * _sin(th) * _cos(ph), r * _sin(th) * _sin(ph), r * _cos(th)];
