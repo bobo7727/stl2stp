@@ -858,6 +858,15 @@ STEP 与 IGES **逐字节相同**。不同的只有有意改变的无效/开放�
   `-00:00`、无偏移和带小数跨日的用例；`cli_timestamp` 与 `copy` 场景的 STEP 期望改为 UTC。
 - 同一分支另把中文示例作者 metadata 统一换成 `致知屋`（`\X2\81F477E55C4B\X0\`，IGES ASCII 替换为 `3H???`）。
 
+## 11. core/weld：近重合顶点容差焊接（分支 `core/weld`，基于 `main` `1385bb5`）
+
+- 起因：开放极点 UV 球（极点坐标相差几个 ULP）精确去重后留下缝隙，ORIGINAL 只能写出开放 shell，QEM 简化后也无法封闭。
+- 改动：新文件 `core/src/weld.cpp`（容差 = `max(1e-6 × 包围盒对角线, 2 × FLT_EPSILON × 最大坐标)`，网格哈希 O(n)，
+  只焊开放边界顶点，不让三角形退化）；`exchange.cpp` 在 ORIGINAL 的 `Poly_MergeNodesTool` 之前应用并返回 REPAIRED；
+  新 API `stl2stp_weld_vertices`；options 追加 `weld_vertices`（默认 1）/`weld_tolerance`；CLI `--no-weld`、`--weld-tol`。
+  `strict_original=1` 仍是逐字节旧行为。细节、容差理由与耗时见 `docs/core-api.md` “core/weld”。
+- 测试：`weld_open_pole`、`weld_guards`；`qem_near_coincident_pole` 显式关闭焊接以保留“精确合并时报告开放”的断言。CTest 120 → 122，全部通过。
+
 ## 附录 A：原版 → 新代码对照速查
 
 | 原版符号 | 新代码 |

@@ -12,9 +12,10 @@ Objective-C++ bridge 只需包含此头文件并持有 opaque `stl2stp_handle*`�
 | `stl2stp_create` | 创建空 handle；失败返回 `NULL` |
 | `stl2stp_destroy` | 销毁 handle；`NULL` 安全 |
 | `stl2stp_last_error` | 读取上次诊断，不清空；`NULL` 读取当前线程的创建/null-handle 诊断 |
-| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0`，四个文本 metadata 和 `timestamp` 指针均为 `NULL`，`merge_angular_tolerance=1e-4`，`strict_original=0` |
+| `stl2stp_default_export_options` | 返回 `mode=STL2STP_MODE_ORIGINAL`、`sewing_tolerance=1e-6`、`merge_coplanar=0`，四个文本 metadata 和 `timestamp` 指针均为 `NULL`，`merge_angular_tolerance=1e-4`，`strict_original=0`，`weld_vertices=1`，`weld_tolerance=0`（自动） |
 | `stl2stp_load_stl` | 自动识别 binary/ASCII STL，精确坐标去重，成功后替换网格 |
 | `stl2stp_get_mesh_stats` | 返回 unique vertices、无向 unique edges、triangular faces 和 AABB |
+| `stl2stp_weld_vertices` | 按容差焊接当前网格上近重合的开放边界顶点（就地修改，返回合并数）；在 `stl2stp_simplify` 之前调用 |
 | `stl2stp_simplify` | QEM edge collapse，按目标三角面数简化当前网格 |
 | `stl2stp_save_stl` | 写 little-endian binary STL；法向由顶点绕序重新计算 |
 | `stl2stp_export_step` | 按 ORIGINAL / SEWING 模式写 STEP，可返回导出前的 topology |
@@ -113,6 +114,44 @@ IGES 5.3 的字符串常量是 ASCII；按字符计数的读取器遇到 UTF-8 �
 author / organization / product / description / 文件名中每个非 ASCII 码点（以及非法 UTF-8 字节）
 替换为 `?`，返回 `STL2STP_WARNING_METADATA_CHANGED`。195 字节上限按替换后的 ASCII 计算。
 STEP 不受影响，仍用 `\X2\`/`\X4\` 无损编码。单引号在 STEP 中按规范写成两个单引号，不替换。
+
+## core/weld：近重合顶点容差焊接（2026-10-21）
+
+STL 读取按**精确坐标**去重。生成器/导出器常把同一个点写成相差几个 float ULP 的不同坐标（典型：UV 球极点
+`sin(π) ≠ 0`），精确合并后网格上留下微小缝隙，ORIGINAL 导出只能得到开放 shell（NOT_SOLID）。
+`core/src/weld.cpp` 在精确合并之后再做一次容差焊接。
+
+- **容差**：`tol = max(1e-6 × 包围盒对角线, 2 × FLT_EPSILON × 最大坐标绝对值)`。
+  - `1e-6 × 对角线`：1 m 的零件对应 1 µm，约为 float32 在该尺度的 16 个 ULP；与 `sewing_tolerance` 默认值 `1e-6`
+    和共面合并的线性容差同量级，远小于任何有意建模的特征。
+  - 后一项是 float32 精度下限：零件远离原点时，`1e-6 × 对角线` 可能小于坐标本身的量化步长。
+  - `weld_tolerance > 0` 时按调用方给的值（模型单位）使用，只做下限钳制 `≥ 1e-18 × max(对角线, 最大坐标)`；
+    `≤ 0` 表示自动；NaN/Inf → `STL2STP_ERROR_ARGUMENT`。
+- **算法**：边长 = `tol` 的均匀网格哈希，查 27 个邻格，贪心地把顶点并入最近的代表点（不传递），整体 O(n)。
+- **防护**：
+  1. 只有**开放边界顶点**（精确合并后位于只被一个三角形使用的边上）参与焊接、也只有它们能当代表点。
+     封闭的扇区永远不动，所以薄壁、薄片（两侧面相距只有容差的几倍）不会被压扁。
+  2. 一个顶点不会并入已经包含它自身某个三角形其它顶点的簇，因此焊接**不会让任何三角形退化**；
+     真实存在的、短于容差的极短边保持原样。
+  3. 索引上限 2^32。
+- **生效位置**：
+  - ORIGINAL 导出（`make_original_shape`）在 `Poly_MergeNodesTool` 之前应用；有顶点被焊接时追加说明
+    `N near-coincident vertex(es) welded (tolerance X)`，状态为 `STL2STP_WARNING_REPAIRED`。
+  - `stl2stp_weld_vertices(handle, tolerance, &merged)`：对已加载网格就地焊接（压缩顶点、重映射三角形、
+    丢弃退化三角形），供简化前调用——QEM 只在拓扑连通的网格上才能保持封闭。
+  - SEWING 本身按 `sewing_tolerance` 缝合，不额外焊接。
+- **开关**：`stl2stp_export_options` 末尾追加 `int weld_vertices`（默认 1）与 `double weld_tolerance`（`<=0` 自动）。
+  `weld_vertices=0` 或 `strict_original=1` 时保持精确坐标合并的旧行为。CLI：`--no-weld`、`--weld-tol UNITS`
+  （convert 与 simplify 均可；simplify 时 CLI 先调用 `stl2stp_weld_vertices` 并打印 `weld_ms`、`welded_vertices`）。
+  调用方须用新版头文件重新编译（options 结构体变大）。
+- **测试**：`weld_open_pole`（开放极点球：焊接开 → REPAIRED、63 个顶点被焊接、1 个有效 solid、3968 faces；
+  关 → NOT_SOLID；strict → OK；API 焊接后 1986 顶点；50%/25% 简化后 0 条边界边、1 solid）、
+  `weld_guards`（容差 2× 与 100× 的薄片不焊接、体积不变；细长三角形 p/q 保留而 r 被并入；`1e-20` 覆盖值不焊接；
+  NaN → ERROR_ARGUMENT）。全部 CTest 122/122 通过。
+- **耗时**（Release，WSL，STEP ORIGINAL，单次运行，秒，焊接开 / 关）：sphere5k 3.32/3.44，sphere20k 14.02/13.82，
+  box20k 14.20/13.93，sphere50k 38.68/39.82，sphere50k 简化 50% 18.76/19.36（`weld_ms` 4.6），
+  开放极点 sphere50k 36.92/36.68（焊接 199 个顶点，solids 1 / 0），sphere100k 86.96/82.02，box100k 79.73/78.42。
+  差异在单次运行噪声范围内。
 
 ## STL 与 QEM 语义
 

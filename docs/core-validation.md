@@ -1,6 +1,13 @@
 # 核心库验证交接（2026-10-20）
 
-## 当前：时间戳与 STEP Unicode（基于 `c0a553a`）
+## 当前：core/weld（基于 `1385bb5`，2026-10-21）
+
+WSL Ubuntu 20.04，Release，g++-10，OCCT 8.0.1，`ctest -j4`：**122/122 通过**（新增 `weld_open_pole`、`weld_guards`）。
+开放极点 sphere50k：焊接开 1 solid（焊接 199 个顶点），关 0 solids。耗时与峰值内存（max RSS）见
+`docs/core-api.md` “core/weld”；峰值内存：ORIGINAL 约 19–20 kB/三角形 + ~45 MB（5k 140 MB，20k 437 MB，
+50k 1016 MB，102k 2017 MB），SEWING 约 +5%，简化 50% 约按输出面数。
+
+## 历史：时间戳与 STEP Unicode（基于 `c0a553a`）
 
 branch `core/extract`，未 commit。`stl2stp_export_options` 最后追加 `timestamp`，
 NULL 每次取当前 UTC（STEP `YYYY-MM-DDTHH:MM:SSZ`），非 NULL 严格校验后在 STEP
