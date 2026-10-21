@@ -137,6 +137,29 @@ std::vector<Tri> plane(int n) {
     return result;
 }
 
+// UV sphere of radius r, `segments` x `rings`, built like typical exporters and the app's sample: vertex
+// (i, j) at polar angle pi*j/rings. With exact_poles=false the poles are computed with sin/cos like every
+// other ring, so the south pole becomes `segments` distinct points ~1e-15*r apart (sin(pi) != 0 in floating
+// point): a microscopic hole that bit-exact welding (desktop-compatible) must report as open.
+std::vector<Tri> uv_sphere(int segments, int rings, double r, bool exact_poles) {
+    const double pi = std::acos(-1.0);
+    auto at = [&](int i, int j) {
+        if (exact_poles && j == 0) { return Vec{0, 0, r}; }
+        if (exact_poles && j == rings) { return Vec{0, 0, -r}; }
+        const double theta = pi * j / rings, phi = 2 * pi * (i % segments) / segments;
+        return Vec{r * std::sin(theta) * std::cos(phi), r * std::sin(theta) * std::sin(phi), r * std::cos(theta)};
+    };
+    std::vector<Tri> result;
+    for (int j = 0; j < rings; ++j) {
+        for (int i = 0; i < segments; ++i) {
+            const Vec a = at(i, j), b = at(i + 1, j), c = at(i + 1, j + 1), d = at(i, j + 1);
+            if (j != 0) { result.push_back({a, d, b}); }
+            if (j != rings - 1) { result.push_back({b, d, c}); }
+        }
+    }
+    return result;
+}
+
 std::vector<Tri> rotated(std::vector<Tri> triangles) {
     // Arbitrary rotation (axis (1,2,3), 0.7 rad) and translation; written as float32 by write_stl.
     const Vec axis{1 / std::sqrt(14.0), 2 / std::sqrt(14.0), 3 / std::sqrt(14.0)};
@@ -396,6 +419,85 @@ int main(int argc, char** argv) {
             const auto twelve = f.simplify(12, status);
             std::cout << "cube 1200->12: status=" << status << " " << describe(twelve) << '\n';
             require(twelve.faces == 12 && std::abs(twelve.volume - 1.0) < 1e-5, "1200->12 must recover the exact cube");
+        } else if (which == "qem_closed_sphere") {
+            // A closed UV sphere must stay closed and watertight at 50 % and 25 %, reach the target, and export
+            // as exactly one valid solid (2026-10-21 investigation: the "simplified sphere is open" report came
+            // from a test mesh with an unwelded south pole, see qem_near_coincident_pole).
+            const auto mesh = uv_sphere(64, 32, 25.0, true);
+            const auto input = analyse(mesh);
+            std::cout << "input: " << describe(input) << '\n';
+            require(input.boundary_edges == 0 && input.non_manifold_edges == 0, "fixture must be closed");
+            {
+                require(f.load("sphere", mesh) == STL2STP_OK, "load sphere");
+                StepReport step;
+                const auto exported = f.export_step("sphere-100", stl2stp_default_export_options(), step);
+                std::cout << "100%: step status=" << exported << " " << describe(step) << '\n';
+                require(exported == STL2STP_OK && step.solids == 1 && step.free_shells == 0 && step.valid,
+                        "unsimplified closed sphere must be one valid solid");
+            }
+            for (const std::size_t percent : {50, 25}) {
+                require(f.load("sphere", mesh) == STL2STP_OK, "load sphere");
+                const std::size_t target = mesh.size() * percent / 100;
+                stl2stp_status status;
+                const auto report = f.simplify(target, status);
+                std::cout << percent << "% (" << mesh.size() << "->" << target << "): status=" << status << " "
+                          << describe(report) << '\n';
+                require(status == STL2STP_OK, "target not reached");
+                require(report.faces <= target && report.faces + 2 >= target, "face count far from target");
+                require(report.boundary_edges == 0, "closed sphere became open");
+                require(report.non_manifold_edges == 0 && report.duplicate_faces == 0, "simplified sphere not manifold");
+                require(long(report.vertices) - long(report.edges) + long(report.faces) == 2, "Euler characteristic must stay 2");
+                require(report.volume > 0.9 * input.volume && report.volume < 1.02 * input.volume, "volume drifted");
+                for (const int merge : {0, 1}) {
+                    auto options = stl2stp_default_export_options();
+                    options.merge_coplanar = merge;
+                    StepReport step;
+                    const auto exported = f.export_step("sphere-" + std::to_string(percent) + (merge ? "-merged" : ""), options, step);
+                    std::cout << "  step" << (merge ? " merged" : "") << ": status=" << exported << " " << describe(step) << '\n';
+                    require(exported == STL2STP_OK, "simplified closed sphere must export without warnings");
+                    require(step.solids == 1 && step.free_shells == 0, "simplified closed sphere must be exactly one solid");
+                    if (merge) {
+                        // Same known OCCT 8.0.1 limitation as merge_rotated: merged planar faces read back with ALL
+                        // reader healing disabled report BRepCheck_UnorientableShape; default readback is valid.
+                        require(step.healed_valid, "merged simplified sphere must read back valid");
+                    } else {
+                        require(step.invalid_solids == 0 && step.valid, "simplified closed sphere must pass BRepCheck");
+                    }
+                    require(std::abs(step.volume - report.volume) < 1e-3 * report.volume, "STEP volume differs from mesh");
+                }
+            }
+        } else if (which == "qem_near_coincident_pole") {
+            // Sphere whose south pole is 64 distinct points ~1e-15 apart: open (128 boundary edges) under bit-exact
+            // welding. The core must report it as open consistently, before and after simplification, and the
+            // simplifier must not open it further or create non-manifold edges.
+            const auto mesh = uv_sphere(64, 32, 25.0, false);
+            const auto input = analyse(mesh);
+            std::cout << "input: " << describe(input) << '\n';
+            require(input.boundary_edges == 128, "fixture must have the 128-edge pole hole");
+            require(f.load("pole", mesh) == STL2STP_OK, "load pole");
+            StepReport before;
+            require(f.export_step("pole", stl2stp_default_export_options(), before) == STL2STP_WARNING_NOT_SOLID,
+                    "unsimplified open sphere must warn NOT_SOLID");
+            require(before.solids == 0, "open input must not become a solid");
+            for (const std::size_t percent : {50, 25}) {
+                require(f.load("pole", mesh) == STL2STP_OK, "reload pole");
+                stl2stp_status status;
+                const auto report = f.simplify(mesh.size() * percent / 100, status);
+                std::cout << percent << "%: status=" << status << " " << describe(report) << '\n';
+                require(report.boundary_edges <= input.boundary_edges, "simplification opened the mesh further");
+                require(report.non_manifold_edges == 0 && report.duplicate_faces == 0, "simplified mesh not manifold");
+                StepReport after;
+                require(f.export_step("pole-" + std::to_string(percent), stl2stp_default_export_options(), after) ==
+                            STL2STP_WARNING_NOT_SOLID, "simplified open sphere must still warn NOT_SOLID");
+            }
+            // SEWING mode (tolerance 1e-6 relative) closes the microscopic hole: one solid.
+            require(f.load("pole", mesh) == STL2STP_OK, "reload pole for sewing");
+            auto sewing = stl2stp_default_export_options();
+            sewing.mode = STL2STP_MODE_SEWING;
+            StepReport sewn;
+            const auto sewn_status = f.export_step("pole-sewing", sewing, sewn);
+            std::cout << "sewing: status=" << sewn_status << " " << describe(sewn) << '\n';
+            require(sewn_status >= 0 && sewn.solids == 1 && sewn.invalid_solids == 0, "sewing must close the pole into one solid");
         } else if (which == "qem_scale_invariance") {
             // Same subdivided cube at 1e-3 and 1e3 scale must simplify to the same face count and relative volume.
             std::vector<double> volumes;
