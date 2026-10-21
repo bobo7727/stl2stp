@@ -121,6 +121,7 @@ class FfiEngine implements ConversionEngine {
       'mode': s.mode.value,
       'merge': s.mergeCoplanar,
       'verify': s.verifyEffective,
+      'weld': s.weld,
       'author': meta(s.author),
       'org': meta(s.organization),
       'product': meta(s.product),
@@ -294,9 +295,19 @@ void _convertWorker(Map<String, Object?> a) {
     var st = note(b.loadStl(h, str(a['in'] as String), cb));
     if (st < 0) return finish(st, failed: Stage.read.index, error: b.errorOf(h));
     _post(Stage.read.index, 1, force: true);
-    // 2. simplify
+    // 2. simplify (weld first so QEM sees closed seams; core/weld)
     if (a['simplify'] == true) {
       _post(Stage.simplify.index, 0, force: true);
+      if (a['weld'] == true) {
+        final merged = calloc<Uint64>();
+        try {
+          st = b.weldVertices(h, 0, merged);
+          if (st < 0) return finish(st, failed: Stage.simplify.index, error: b.errorOf(h));
+          if (merged.value > 0) note(CoreStatus.warningRepaired);
+        } finally {
+          calloc.free(merged);
+        }
+      }
       st = note(b.simplify(h, a['target'] as int, cb));
       if (st < 0) return finish(st, failed: Stage.simplify.index, error: b.errorOf(h));
       if (b.getMeshStats(h, stats) >= 0) facesAfter = stats.ref.faces;
@@ -314,7 +325,9 @@ void _convertWorker(Map<String, Object?> a) {
       ..description = str(a['description'] as String)
       ..timestamp = nullptr
       ..mergeAngularTolerance = d.mergeAngularTolerance
-      ..strictOriginal = d.strictOriginal;
+      ..strictOriginal = d.strictOriginal
+      ..weldVertices = a['weld'] == true ? 1 : 0
+      ..weldTolerance = d.weldTolerance;
     _post(Stage.build.index, 0, force: true);
     _wExportSplit = true;
     final out = str(a['out'] as String);

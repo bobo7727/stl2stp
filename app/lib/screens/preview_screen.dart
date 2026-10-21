@@ -8,6 +8,7 @@ import '../theme/tokens.dart';
 import '../widgets/common.dart';
 import '../widgets/mesh_viewer.dart';
 import 'converting_screen.dart';
+import 'memory_dialog.dart';
 import 'paywall_screen.dart';
 import 'flow.dart';
 import 'help_screen.dart';
@@ -67,6 +68,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
   Future<void> _convert() async {
     _syncMeta();
     if (!await ensureAllowed(context, info.faces, _s) || !mounted) return;
+    final checked = await ensureMemory(context, info.faces, _s);
+    if (checked == null || !mounted) return;
+    if (checked != _s) _set(checked);
     final state = AppScope.read(context);
     state.rememberSettings(_s);
     final req = ConvertRequest(
@@ -92,7 +96,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final t = Tokens.of(context);
-    final wide = MediaQuery.sizeOf(context).width >= 900;
+    final wide = MediaQuery.sizeOf(context).width >= 760; // also the right pane of the iPad split layout
     final est = _estimate(_s);
     final viewer = _viewerCard(s, t, wide ? 420 : 250);
     final stats = _statsSection(s, t);
@@ -413,6 +417,13 @@ class _PreviewScreenState extends State<PreviewScreen> {
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
         child: Text(s.t('advanced.mode.${_s.mode.name}.desc'), style: small),
+      ),
+      SwitchListTile(
+        key: const Key('weldSwitch'),
+        title: Text(s.t('x.weld')),
+        subtitle: Text(s.t('x.weld.desc'), style: small),
+        value: _s.weld,
+        onChanged: (v) => _set(_s.copyWith(weld: v)),
       ),
       SwitchListTile(
         title: Text(s.t('advanced.merge')),

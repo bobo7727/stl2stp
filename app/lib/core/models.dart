@@ -50,6 +50,7 @@ class ConvertSettings {
     this.mode = ConvertMode.original,
     this.mergeCoplanar = false,
     this.verify = true,
+    this.weld = true,
     this.author = '',
     this.organization = '',
     this.product = '',
@@ -64,6 +65,10 @@ class ConvertSettings {
   final ConvertMode mode;
   final bool mergeCoplanar;
   final bool verify;
+
+  /// Join near-coincident vertices (core/weld, default on). Off = exact
+  /// coordinate joining like the desktop original.
+  final bool weld;
   final String author;
   final String organization;
   final String product;
@@ -89,7 +94,8 @@ class ConvertSettings {
           (!simplify || ref.keepPercent == keepPercent) &&
           ref.mode == mode &&
           ref.mergeCoplanar == mergeCoplanar &&
-          ref.verify == verify) {
+          ref.verify == verify &&
+          ref.weld == weld) {
         return p;
       }
     }
@@ -117,6 +123,7 @@ class ConvertSettings {
     ConvertMode? mode,
     bool? mergeCoplanar,
     bool? verify,
+    bool? weld,
     String? author,
     String? organization,
     String? product,
@@ -129,6 +136,7 @@ class ConvertSettings {
       mode: mode ?? this.mode,
       mergeCoplanar: mergeCoplanar ?? this.mergeCoplanar,
       verify: verify ?? this.verify,
+      weld: weld ?? this.weld,
       author: author ?? this.author,
       organization: organization ?? this.organization,
       product: product ?? this.product,
@@ -143,6 +151,7 @@ class ConvertSettings {
         'mode': mode.name,
         'mergeCoplanar': mergeCoplanar,
         'verify': verify,
+        'weld': weld,
         'author': author,
         'organization': organization,
         'product': product,
@@ -156,6 +165,7 @@ class ConvertSettings {
         mode: ConvertMode.values.firstWhere((m) => m.name == j['mode'], orElse: () => ConvertMode.original),
         mergeCoplanar: j['mergeCoplanar'] == true,
         verify: j['verify'] != false,
+        weld: j['weld'] != false,
         author: (j['author'] as String?) ?? '',
         organization: (j['organization'] as String?) ?? '',
         product: (j['product'] as String?) ?? '',

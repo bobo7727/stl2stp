@@ -60,6 +60,11 @@ final class Stl2StpExportOptions extends Struct {
   external double mergeAngularTolerance;
   @Int()
   external int strictOriginal;
+  // Appended in core/weld.
+  @Int()
+  external int weldVertices;
+  @Double()
+  external double weldTolerance;
 }
 
 /// Function lookups on an opened stl2stp-core library.
@@ -75,6 +80,8 @@ class Stl2StpBindings {
             int Function(Pointer<Void>, Pointer<Utf8>, Pointer<Stl2StpCallbacks>)>('stl2stp_load_stl'),
         getMeshStats = lib.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Stl2StpMeshStats>),
             int Function(Pointer<Void>, Pointer<Stl2StpMeshStats>)>('stl2stp_get_mesh_stats'),
+        weldVertices = lib.lookupFunction<Int32 Function(Pointer<Void>, Double, Pointer<Uint64>),
+            int Function(Pointer<Void>, double, Pointer<Uint64>)>('stl2stp_weld_vertices'),
         simplify = lib.lookupFunction<Int32 Function(Pointer<Void>, Uint64, Pointer<Stl2StpCallbacks>),
             int Function(Pointer<Void>, int, Pointer<Stl2StpCallbacks>)>('stl2stp_simplify'),
         saveStl = lib.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Utf8>, Pointer<Stl2StpCallbacks>),
@@ -100,6 +107,7 @@ class Stl2StpBindings {
   final Stl2StpExportOptions Function() defaultExportOptions;
   final int Function(Pointer<Void>, Pointer<Utf8>, Pointer<Stl2StpCallbacks>) loadStl;
   final int Function(Pointer<Void>, Pointer<Stl2StpMeshStats>) getMeshStats;
+  final int Function(Pointer<Void>, double, Pointer<Uint64>) weldVertices;
   final int Function(Pointer<Void>, int, Pointer<Stl2StpCallbacks>) simplify;
   final int Function(Pointer<Void>, Pointer<Utf8>, Pointer<Stl2StpCallbacks>) saveStl;
   final int Function(Pointer<Void>, Pointer<Utf8>, Pointer<Stl2StpExportOptions>, Pointer<Stl2StpCallbacks>,

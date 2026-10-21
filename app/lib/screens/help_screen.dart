@@ -6,7 +6,7 @@ import '../widgets/common.dart';
 
 /// Help topics in display order. Each has `help.<id>.title` / `help.<id>.body`
 /// in assets/i18n/app_*.json (tool/app_strings.py).
-const helpTopics = ['formats', 'step_iges', 'presets', 'mode', 'merge', 'simplify', 'units', 'estimate', 'meta'];
+const helpTopics = ['formats', 'step_iges', 'presets', 'mode', 'weld', 'merge', 'simplify', 'units', 'estimate', 'meta'];
 const helpFaqCount = 6;
 
 /// Opens the help page, optionally scrolled to [topic] (one of [helpTopics],
