@@ -1,0 +1,11 @@
+reference/
+build/
+out/
+*.step
+*.stp
+*.igs
+*.iges
+core/tests/data/*.stl
+!core/tests/data/small_*.stl
+.vs/
+*.user

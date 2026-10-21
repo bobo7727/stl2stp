@@ -1,0 +1,7 @@
+mesh,tris,pct,merge,rc,seconds,bytes,export_solids,export_faces,note
+sphere50k,50000,50,0,0,18.357,60969351,1,25000,
+sphere50k,50000,50,1,0,25.135,48143913,1,17671,
+sphere50k,50000,25,0,0,8.635,30378141,1,12500,
+sphere50k,50000,25,1,0,13.001,27491022,1,10836,
+box20k,20172,50,0,0,8.708,22178786,1,10086,3943 triangle(s) re-oriented (inconsistent or inverted normals)
+box20k,20172,50,1,0,4.487,16189,1,6,3943 triangle(s) re-oriented (inconsistent or inverted normals)
