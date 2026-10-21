@@ -89,6 +89,7 @@ S = {
  'x.licenses.occt_text': ('查看 OCCT 许可全文', 'Read the OCCT licence'),
  'x.licenses.occt_source': ('许可全文随 App 附带：GNU LGPL 2.1 和 Open CASCADE 例外条款（1.0 版），取自 OCCT 8.0.1。', 'Full text included with the app: GNU LGPL 2.1 and the Open CASCADE exception (version 1.0), taken from OCCT 8.0.1.'),
  'x.licenses.all': ('全部开源组件许可', 'All open-source licences'),
+ 'x.licenses.others': ('Flutter 框架和 App 用到的 Dart 包（file_picker、share_plus、shared_preferences 等）各自的许可证，以及上面的 OCCT 文本，都在这里。', 'Licences of the Flutter framework and the Dart packages the app uses (file_picker, share_plus, shared_preferences and others), plus the OCCT texts above.'),
  # ---- history / split ----
  'x.history.share': ('分享', 'Share'),
  'x.history.remove': ('删除记录', 'Remove'),

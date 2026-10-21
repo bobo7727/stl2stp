@@ -64,6 +64,7 @@
  "x.licenses.occt_text": "Read the OCCT licence",
  "x.licenses.occt_source": "Full text included with the app: GNU LGPL 2.1 and the Open CASCADE exception (version 1.0), taken from OCCT 8.0.1.",
  "x.licenses.all": "All open-source licences",
+ "x.licenses.others": "Licences of the Flutter framework and the Dart packages the app uses (file_picker, share_plus, shared_preferences and others), plus the OCCT texts above.",
  "x.history.share": "Share",
  "x.history.remove": "Remove",
  "x.history.missing_file": "“{name}” no longer exists and cannot be shared. You can remove this record.",

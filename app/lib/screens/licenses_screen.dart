@@ -44,7 +44,7 @@ class LicensesScreen extends StatelessWidget {
         const SizedBox(height: 12),
         Surface(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s.t('licenses.others'), style: b),
+            Text(s.t('x.licenses.others'), style: b),
             TextButton(
               key: const Key('allLicenses'),
               onPressed: () {
