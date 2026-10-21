@@ -9,7 +9,9 @@ import '../state/app_state.dart';
 import '../state/history.dart';
 import '../theme/tokens.dart';
 import '../widgets/common.dart';
+import '../widgets/stl_drop.dart';
 import 'flow.dart';
+import 'help_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
 
@@ -26,13 +28,21 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(actions: [
         IconButton(
+          key: const Key('helpButton'),
+          tooltip: s.t('help.open'),
+          icon: Icon(Icons.help_outline, color: t.accent),
+          onPressed: () => openHelp(context),
+        ),
+        IconButton(
           key: const Key('settingsButton'),
           tooltip: s.t('home.settings'),
           icon: Icon(Icons.settings_outlined, color: t.accent),
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
         ),
       ]),
-      body: ListView(
+      body: StlDropTarget(
+        onFile: (path) => openModel(context, path),
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
           Text(s.t('home.title'), style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: t.label)),
@@ -96,6 +106,7 @@ class HomeScreen extends StatelessWidget {
               ]),
             ),
         ],
+      ),
       ),
     );
   }

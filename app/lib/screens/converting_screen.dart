@@ -64,6 +64,7 @@ class _ConvertingScreenState extends State<ConvertingScreen> {
     final nav = Navigator.of(context);
     if (r.ok) {
       final bytes = File(r.outputPath).existsSync() ? File(r.outputPath).lengthSync() : 0;
+      state.recordConversion();
       state.addHistory(HistoryEntry(
         outputPath: r.outputPath,
         format: widget.request.settings.format,

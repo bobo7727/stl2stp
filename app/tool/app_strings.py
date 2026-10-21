@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""App-only strings (not in design/ui string table). Single source of truth for
+assets/i18n/app_zh.json and app_en.json. Run: python3 tool/app_strings.py
+Style follows ui-spec §10: short, plain words, no exclamation marks, “” quotes in Chinese."""
+import json, os
+
+S = {
+ # ---- misc app strings ----
+ 'x.demo_banner': ('演示模式：未找到 stl2stp-core 转换引擎，转换结果只是占位文件。', 'Demo mode: stl2stp-core was not found, outputs are placeholders.'),
+ 'x.engine': ('转换引擎', 'Engine'),
+ 'x.open_path.title': ('输入 STL 文件路径', 'Enter STL file path'),
+ 'x.open_path.hint': ('/path/to/model.stl', '/path/to/model.stl'),
+ 'x.open_path.picker_failed': ('系统文件选择器不可用，请直接输入路径。', 'The system file picker is unavailable. Type a path instead.'),
+ 'x.output_path': ('输出位置', 'Saved at'),
+ 'x.copied': ('已复制', 'Copied'),
+ 'x.copy_path': ('复制路径', 'Copy path'),
+ 'x.saved_to': ('已保存到 {path}', 'Saved to {path}'),
+ 'x.share_unavailable': ('此平台不支持系统分享，文件路径已复制到剪贴板。', 'Sharing is not supported here. The file path was copied.'),
+ 'x.language.zh': ('中文', '中文'),
+ 'x.language.en': ('English', 'English'),
+ 'x.verify_failed': ('校验未通过，建议换“更严格”方式再转一次', 'Verification failed. Try the Strict preset.'),
+ 'x.not_solid': ('模型不封闭，已按曲面导出（没有实体）', 'The model is open, exported as surfaces (no solid)'),
+ 'x.repaired': ('输入模型有瑕疵，已自动修复', 'The input had defects and was repaired'),
+ 'x.clear_confirm': ('确定清空所有转换记录吗？', 'Clear all conversion history?'),
+ 'x.sample': ('用示例模型试试', 'Try a sample model'),
+ 'x.drop_here': ('松开即可导入', 'Release to import'),
+ 'x.drop_not_stl': ('只支持 .stl 文件', 'Only .stl files are supported'),
+ 'x.reset_purchase': ('重置购买状态（开发用）', 'Reset purchase (dev only)'),
+ # ---- estimate ----
+ 'est.range_seconds': ('约 {lo}–{hi} 秒', '{lo}–{hi} s'),
+ 'est.range_minutes': ('约 {lo}–{hi} 分钟', '{lo}–{hi} min'),
+ 'est.range_seconds_minutes': ('约 {lo} 秒–{hi} 分钟', '{lo} s–{hi} min'),
+ # ---- help ----
+ 'help.title': ('使用帮助', 'Help'),
+ 'help.open': ('帮助', 'Help'),
+ 'help.formats.title': ('支持哪些文件', 'Supported files'),
+ 'help.formats.body': ('导入：STL 网格模型，ASCII 和二进制两种都支持（3D 打印、扫描、建模软件常用的导出格式）。\n导出：STEP（.step）或 IGES（.igs），两者都能被 SolidWorks、Creo、NX、Fusion 360、FreeCAD 等 CAD 软件打开。',
+                       'Import: STL mesh files, both ASCII and binary (the usual export of 3D-printing, scanning and modelling tools).\nExport: STEP (.step) or IGES (.igs). Both open in SolidWorks, Creo, NX, Fusion 360, FreeCAD and other CAD software.'),
+ 'help.units.title': ('尺寸和单位', 'Size and units'),
+ 'help.units.body': ('STL 文件不记录单位，App 按文件里的数值原样转换，不做缩放。大多数软件导出 STL 时用毫米，所以 CAD 里打开后通常也是毫米。如果打开后大了或小了 25.4 倍，说明原文件是英寸，在 CAD 里导入时选对单位即可。',
+                     'STL files carry no units. The app converts the numbers as they are, without scaling. Most tools export STL in millimetres, so the CAD file is usually in millimetres too. If the part is 25.4 times too big or small, the STL was in inches: pick the right unit when importing into CAD.'),
+ 'help.step_iges.title': ('STEP 和 IGES 有什么区别', 'STEP or IGES?'),
+ 'help.step_iges.body': ('STEP 是现在通用的 CAD 交换格式，转出来是一个“实体”，可以直接测量、开孔、倒角，推荐优先用它。\nIGES 是较老的格式，转出来是一组“曲面”，打开后需要在 CAD 里“缝合 / 加厚”才能变成实体；只有对方软件只认 IGES 时再选它。IGES 文件信息只支持英文字符。',
+                         'STEP is the modern exchange format. The result is a solid you can measure, cut and fillet right away, so it is recommended.\nIGES is older. The result is a set of surfaces that must be knitted/sewn into a solid in CAD. Choose it only if the other side needs IGES. IGES file info supports English characters only.'),
+ 'help.presets.title': ('三种转换方式', 'The three presets'),
+ 'help.presets.body': ('推荐：与电脑版相同的算法（原版模式），速度快，适合大多数零件。\n文件更小：先把面数减到 50%，再把同一平面上的三角形合并成一个面，文件明显变小、CAD 里更流畅，细节略有损失。\n更严格：用“缝合”模式把相邻面缝成实体，更严谨，通常会慢一些；一个文件里有多个零件、或“推荐”方式转出来不是实体时选它。\n手动改了高级设置后显示为“自定义”。',
+                       'Recommended: the same algorithm as the desktop version (original mode). Fast, fine for most parts.\nSmaller file: reduce faces to 50 %, then merge triangles lying on the same plane into one face. Much smaller files that are smoother in CAD, with slightly less detail.\nStrict: “sewing” mode stitches neighbouring faces into a solid. More rigorous, usually somewhat slower. Use it for files with several parts, or when the recommended result is not a solid.\nAny manual change in Advanced settings shows as “Custom”.'),
+ 'help.mode.title': ('原版模式和缝合模式', 'Original vs sewing mode'),
+ 'help.mode.body': ('原版模式：按三角形共享的边直接拼成一个壳和一个实体，和电脑版结果一致，速度快。\n缝合模式：先把每个三角形变成面，再按容差缝合，能处理稍有缝隙的模型，也能把多个零件分别变成实体，但更慢、更耗内存。',
+                    'Original: builds one shell and one solid directly from shared triangle edges. Same result as the desktop version, fast.\nSewing: turns every triangle into a face and stitches them within a tolerance. Handles small gaps and gives each part its own solid, but is slower and uses more memory.'),
+ 'help.merge.title': ('合并共面', 'Merge coplanar faces'),
+ 'help.merge.body': ('STL 里一个平面往往由很多三角形组成。打开“合并共面”后，同一平面上的三角形会合成一个 CAD 面：平面多的零件（机加工件、钣金、外壳）文件能小一半以上，在 CAD 里选面、测量也更方便；曲面多的模型（雕塑、扫描件）几乎没有变化，只会多花一点时间。',
+                     'In STL one flat face is usually many triangles. With merging on, triangles on the same plane become one CAD face. Parts with many flat faces (machined parts, sheet metal, housings) often shrink by half or more and are easier to select and measure in CAD. Curvy models (sculptures, scans) barely change and just take a little longer.'),
+ 'help.simplify.title': ('为什么要减少面数', 'Why reduce faces?'),
+ 'help.simplify.body': ('每个三角形都会变成一个 CAD 面，面数越多，文件越大、转换越慢，CAD 打开也越卡。减面会在尽量保持形状的前提下合并相邻三角形，比例越低文件越小，但圆角、文字等细节会变粗糙。建议先用 50% 试试；模型超过 20 万面时 App 会主动提醒。',
+                        'Every triangle becomes a CAD face. More faces mean bigger files, slower conversion and a sluggish CAD session. Simplifying merges neighbouring triangles while keeping the shape. A lower ratio gives a smaller file but coarser fillets and lettering. Try 50 % first. The app suggests it for models above 200,000 faces.'),
+ 'help.meta.title': ('文件信息', 'File info'),
+ 'help.meta.body': ('作者、单位、产品名称、描述会写进文件头，在 CAD 的文件属性里能看到，默认都留空。时间戳自动写当前的 UTC 时间。',
+                    'Author, organization, product and description are written into the file header and show up in CAD file properties. All empty by default. The timestamp is the current UTC time.'),
+ 'help.privacy.title': ('隐私', 'Privacy'),
+ 'help.privacy.body': ('所有转换都在本机完成，文件不会上传到任何服务器，App 也不收集使用数据。转换结果只保存在本机，删除 App 时一起删除。',
+                       'All conversion happens on this device. Files are never uploaded and the app collects no usage data. Results are stored only on this device and are removed with the app.'),
+ 'help.faq.title': ('常见问题', 'FAQ'),
+ 'help.faq.q1': ('为什么 CAD 里打开是一堆曲面，不是实体？', 'Why does it open as surfaces, not a solid?'),
+ 'help.faq.a1': ('如果导出的是 IGES，这是正常的，IGES 本来就是曲面格式，需要在 CAD 里缝合；要实体请选 STEP。如果是 STEP，说明 STL 本身不封闭（有破洞），完成页会提示“模型不封闭”，可以先在建模软件里修补，或试试“更严格”。',
+                 'For IGES this is normal: IGES is a surface format, sew it in CAD or export STEP instead. For STEP it means the STL is not closed (it has holes). The done screen says so. Repair the mesh first, or try Strict.'),
+ 'help.faq.q2': ('一个文件里有好几个零件怎么办？', 'The file contains several parts'),
+ 'help.faq.a2': ('原版模式会把所有零件放进同一个实体里。选“更严格”（缝合模式），每个零件会成为独立的实体。', 'Original mode puts all parts into one solid. Choose Strict (sewing) to get one solid per part.'),
+ 'help.faq.q3': ('文件为什么这么大？', 'Why is the file so big?'),
+ 'help.faq.a3': ('STEP 是文本格式，每个三角形面要写好几十行。打开“合并共面”或减少面数能明显变小。', 'STEP is text and each triangle face takes dozens of lines. Merge coplanar faces or reduce faces.'),
+ 'help.faq.q4': ('转换很慢或中途退出？', 'Conversion is slow or the app quits'),
+ 'help.faq.a4': ('面数很多时手机内存可能不够。先减少面数再转换，转换时请保持 App 在前台。', 'Very large meshes can run out of memory on a phone. Reduce faces first and keep the app in the foreground.'),
+ 'help.faq.q5': ('IGES 里写的中文作者名不见了？', 'Chinese text disappeared from IGES file info'),
+ 'help.faq.a5': ('IGES 只支持英文字符，中文等字符会被去掉；需要中文请导出 STEP。', 'IGES supports English characters only. Other characters are removed. Use STEP to keep them.'),
+ 'help.faq.q6': ('怎么把文件传到电脑？', 'How do I get the file onto my computer?'),
+ 'help.faq.a6': ('完成页点“分享…”，发到微信“文件传输助手”、QQ 我的电脑，或用隔空投送、邮件；也可以“存到‘文件’”后用 iCloud 云盘同步。', 'On the done screen tap Share… and send it via WeChat/QQ, AirDrop or mail, or save it to Files and sync with iCloud Drive.'),
+ 'help.estimate.title': ('预计用时和大小', 'Time and size estimates'),
+ 'help.estimate.body': ('按面数和所选设置估算，给出一个范围。实际用时取决于设备性能和模型形状；“合并共面”能让平面多的零件变得更小，所以范围会更宽。',
+                        'Estimated from the face count and settings, shown as a range. Actual time depends on the device and the shape. Merging coplanar faces shrinks flat-faced parts a lot, so the range is wider.'),
+ # ---- purchase ----
+ 'purchase.pro': ('完整版', 'Pro'),
+ 'purchase.free': ('免费版', 'Free'),
+ 'purchase.status.pro': ('完整版（已解锁）', 'Pro (unlocked)'),
+ 'purchase.buy_price': ('购买 {price}', 'Buy for {price}'),
+ 'purchase.price_tbd': ('价格待定', 'Price TBD'),
+ 'purchase.buying': ('正在购买…', 'Purchasing…'),
+ 'purchase.restoring': ('正在恢复…', 'Restoring…'),
+ 'purchase.success': ('已解锁完整版，感谢支持', 'Pro unlocked. Thank you.'),
+ 'purchase.restored': ('已恢复购买', 'Purchase restored'),
+ 'purchase.nothing_to_restore': ('没有找到可恢复的购买', 'No purchases to restore'),
+ 'purchase.cancelled': ('已取消购买', 'Purchase cancelled'),
+ 'purchase.failed': ('购买失败：{msg}', 'Purchase failed: {msg}'),
+ 'purchase.unavailable': ('当前设备无法连接 App Store，稍后再试', 'The store is not available right now'),
+ 'purchase.mock_note': ('开发用模拟商店：不会扣费', 'Development mock store: no charge'),
+ 'purchase.limit.triangles': ('免费版最多转换 {limit} 个面的模型，这个模型有 {faces} 个面。可以先减少面数，或解锁完整版。', 'The free version converts up to {limit} faces. This model has {faces}. Reduce faces or unlock Pro.'),
+ 'purchase.limit.daily': ('免费版每天可转换 {limit} 次，今天已用完。', 'The free version allows {limit} conversions a day. Today’s are used up.'),
+ 'purchase.limit.iges': ('IGES 导出属于完整版功能。', 'IGES export is a Pro feature.'),
+ 'purchase.limit.meta': ('自定义文件信息属于完整版功能。', 'Custom file info is a Pro feature.'),
+ 'purchase.limit.title': ('需要完整版', 'Pro required'),
+ 'purchase.unlock': ('解锁完整版', 'Unlock Pro'),
+}
+
+def main():
+    here = os.path.dirname(os.path.abspath(__file__))
+    out = os.path.join(here, '..', 'assets', 'i18n')
+    for i, code in enumerate(['zh', 'en']):
+        with open(os.path.join(out, f'app_{code}.json'), 'w', encoding='utf-8') as f:
+            json.dump({k: v[i] for k, v in S.items()}, f, ensure_ascii=False, indent=1)
+            f.write('\n')
+    print(f'{len(S)} app strings written')
+
+if __name__ == '__main__':
+    main()

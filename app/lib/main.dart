@@ -9,6 +9,7 @@ import 'core/demo_engine.dart';
 import 'core/engine.dart';
 import 'core/ffi_engine.dart';
 import 'l10n/strings.dart';
+import 'purchase/purchase.dart';
 import 'state/app_state.dart';
 
 /// Picks the real FFI engine when stl2stp-core can be loaded, else demo mode.
@@ -21,7 +22,10 @@ ConversionEngine createEngine() {
 Future<AppState> createAppState({ConversionEngine? engine}) async {
   final prefs = await SharedPreferences.getInstance();
   final dir = await getApplicationSupportDirectory();
-  return AppState(engine: engine ?? createEngine(), prefs: prefs, outputDir: dir);
+  final purchase = createPurchaseService(prefs);
+  // Store errors must never block the app; the paywall retries init().
+  purchase.init().catchError((Object _) {});
+  return AppState(engine: engine ?? createEngine(), prefs: prefs, outputDir: dir, purchase: purchase);
 }
 
 Future<void> main(List<String> args) async {

@@ -21,6 +21,15 @@ import 'package:stl2stp_app/state/app_state.dart';
 
 const shotDir = String.fromEnvironment('SHOT_DIR', defaultValue: '/tmp/stl2stp-shots');
 
+/// Result lines (STEP_OK, ESTIMATE_CHECK…): printed to the test log and appended to SHOT_DIR/results.txt.
+void log(String line) {
+  // ignore: avoid_print
+  print(line);
+  File(p.join(shotDir, 'results.txt'))
+    ..createSync(recursive: true)
+    ..writeAsStringSync('$line\n', mode: FileMode.append);
+}
+
 Future<void> pumpUntil(WidgetTester tester, Finder f, {Duration timeout = const Duration(seconds: 120)}) async {
   final end = DateTime.now().add(timeout);
   while (f.evaluate().isEmpty) {
@@ -76,13 +85,13 @@ void main() {
     expect(stepText.startsWith('ISO-10303-21;'), isTrue);
     expect(stepText.contains('DEMO'), isFalse);
     expect(stepText.contains('MANIFOLD_SOLID_BREP'), isTrue);
-    stdout.writeln('STEP_OK $step ${File(step).lengthSync()} bytes');
+    log('STEP_OK $step ${File(step).lengthSync()} bytes');
 
     await tester.tap(find.byKey(const Key('doneButton')));
     await tester.pumpAndSettle();
     await shot(tester, '05_home_recent');
 
-    // 2) Sphere (≈4k faces), strict preset, IGES: catch the progress screen.
+    // 2) Sphere (3968 faces), strict preset, IGES: catch the progress screen.
     final sphere = p.join(work.path, 'sphere.stl');
     File(sphere).writeAsBytesSync(buildSphereStl(seg: 64, rings: 32));
     final ctx = tester.element(find.byKey(const Key('importCard')));
@@ -93,16 +102,20 @@ void main() {
     await tester.tap(find.text('IGES').first);
     await tester.pumpAndSettle();
     await shot(tester, '06_preview_sphere_iges');
+    final estText = tester.widget<Text>(find.byKey(const Key('estimateLine'))).data!;
+    final sw = Stopwatch()..start();
     await tester.tap(find.byKey(const Key('convertButton')));
     await pumpUntil(tester, find.byKey(const Key('cancelButton')), timeout: const Duration(seconds: 10));
     await tester.pump(const Duration(milliseconds: 400));
     await shot(tester, '07_converting');
     await pumpUntil(tester, find.byKey(const Key('doneTitle')), timeout: const Duration(minutes: 5));
+    sw.stop();
+    log('ESTIMATE_CHECK sphere 3968 tris strict IGES: shown "$estText", actual ${sw.elapsedMilliseconds} ms');
     await shot(tester, '08_done_iges');
     final iges = state.history.first.outputPath;
     expect(iges.endsWith('.igs'), isTrue);
     expect(File(iges).lengthSync(), greaterThan(10000));
-    stdout.writeln('IGES_OK $iges ${File(iges).lengthSync()} bytes');
+    log('IGES_OK $iges ${File(iges).lengthSync()} bytes');
 
     // 3) English UI.
     state.language = 'en';
@@ -129,8 +142,59 @@ void main() {
     // Either cancelled in time or (tiny model) finished first.
     if (find.text('Cancelled').evaluate().isNotEmpty) {
       await shot(tester, '10_cancelled_en');
-      stdout.writeln('CANCEL_OK');
+      log('CANCEL_OK');
     }
     state.language = 'zh';
+  });
+
+  testWidgets('help, smaller-preset estimate range, settings, paywall (mock store)', (tester) async {
+    await tester.pumpWidget(Stl2StpApp(state: state));
+    await tester.pumpAndSettle();
+
+    // Range estimate with merge coplanar (smaller preset) on the sample bracket.
+    await tester.tap(find.byKey(const Key('sampleButton')));
+    await pumpUntil(tester, find.byKey(const Key('convertButton')));
+    await tester.tap(find.byKey(const Key('preset_smaller')));
+    await tester.pumpAndSettle();
+    log('ESTIMATE_SMALLER ${tester.widget<Text>(find.byKey(const Key('estimateLine'))).data}');
+    await shot(tester, '11_preview_smaller_estimate');
+
+    // Help from the preview “?”.
+    await tester.tap(find.byKey(const Key('previewHelp')));
+    await tester.pumpAndSettle();
+    await shot(tester, '12_help_zh');
+    await tester.scrollUntilVisible(find.byKey(const Key('faq1')), 400);
+    await tester.pumpAndSettle();
+    await shot(tester, '13_help_faq_zh');
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+
+    // Settings → paywall → buy with the mock store → Pro.
+    await tester.tap(find.byKey(const Key('settingsButton')));
+    await tester.pumpAndSettle();
+    await shot(tester, '14_settings_free');
+    await tester.tap(find.byKey(const Key('purchaseStatus')));
+    await tester.pumpAndSettle();
+    await shot(tester, '15_paywall_zh');
+    await tester.tap(find.byKey(const Key('buyButton')));
+    await pumpUntil(tester, find.byKey(const Key('purchaseStatus')));
+    await tester.pumpAndSettle();
+    expect(state.isPro, isTrue);
+    await shot(tester, '16_settings_pro');
+    // Dev reset so the next run starts free again.
+    await tester.tap(find.text('重置购买状态（开发用）'));
+    await tester.pumpAndSettle();
+    expect(state.isPro, isFalse);
+
+    // English help.
+    state.language = 'en';
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settingsHelp')));
+    await tester.pumpAndSettle();
+    await shot(tester, '17_help_en');
+    state.language = 'zh';
+    await tester.pumpAndSettle();
   });
 }

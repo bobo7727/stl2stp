@@ -9,7 +9,7 @@ import 'dart:typed_data';
 /// ASCII/binary label (the C API does not expose the format yet, core TODO 2).
 /// The conversion itself always goes through stl2stp-core.
 class StlMesh {
-  StlMesh(this.positions, this.isAscii, this.totalTriangles);
+  StlMesh(this.positions, this.isAscii, this.totalTriangles, {this.planeGroups});
 
   /// x0,y0,z0,x1,y1,z1,x2,y2,z2 per triangle (possibly decimated for display).
   final Float32List positions;
@@ -17,6 +17,10 @@ class StlMesh {
 
   /// Triangle count in the file (before display decimation).
   final int totalTriangles;
+
+  /// Approximate number of CAD faces after “merge coplanar” = distinct planes
+  /// over all triangles (see [PlaneCounter]); null if not computed.
+  final int? planeGroups;
 
   int get triangleCount => positions.length ~/ 9;
 
@@ -73,13 +77,22 @@ StlMesh parseStlBytes(Uint8List bytes, {int maxDisplayTriangles = 60000}) {
   final stride = math.max(1, (count / maxDisplayTriangles).ceil());
   final out = Float32List(((count + stride - 1) ~/ stride) * 9);
   var o = 0;
-  for (var t = 0; t < count; t += stride) {
+  final planes = PlaneCounter();
+  final tri = Float64List(9);
+  for (var t = 0; t < count; t++) {
     final base = 84 + t * 50 + 12;
     for (var k = 0; k < 9; k++) {
-      out[o++] = bd.getFloat32(base + k * 4, Endian.little);
+      tri[k] = bd.getFloat32(base + k * 4, Endian.little);
+    }
+    planes.add(tri);
+    if (t % stride == 0) {
+      for (var k = 0; k < 9; k++) {
+        out[o++] = tri[k];
+      }
     }
   }
-  return StlMesh(o == out.length ? out : Float32List.sublistView(out, 0, o), false, count);
+  return StlMesh(o == out.length ? out : Float32List.sublistView(out, 0, o), false, count,
+      planeGroups: planes.count);
 }
 
 StlMesh _parseAscii(Uint8List bytes, int maxDisplay) {
@@ -95,12 +108,51 @@ StlMesh _parseAscii(Uint8List bytes, int maxDisplay) {
   if (count == 0) throw StlFormatException('no facets');
   final stride = math.max(1, (count / maxDisplay).ceil());
   final out = <double>[];
-  for (var t = 0; t < count; t += stride) {
-    out.addAll(verts.getRange(t * 9, t * 9 + 9));
+  final planes = PlaneCounter();
+  final tri = Float64List(9);
+  for (var t = 0; t < count; t++) {
+    for (var k = 0; k < 9; k++) {
+      tri[k] = verts[t * 9 + k];
+    }
+    planes.add(tri);
+    if (t % stride == 0) out.addAll(tri);
   }
-  return StlMesh(Float32List.fromList(out), true, count);
+  return StlMesh(Float32List.fromList(out), true, count, planeGroups: planes.count);
 }
 
 /// Reads and parses a file (call inside an isolate for large files).
 StlMesh readStlFile(String path, {int maxDisplayTriangles = 60000}) =>
     parseStlBytes(File(path).readAsBytesSync(), maxDisplayTriangles: maxDisplayTriangles);
+
+/// Counts distinct planes among triangles: the normal is quantized to ~0.06°
+/// and the plane offset to ~1 µm-scale buckets. Coplanar triangles end up in
+/// one bucket, so for a connected part the count approximates the faces left
+/// after the core's “merge coplanar” (separate coplanar islands are counted
+/// once, so this slightly underestimates). Degenerate triangles are skipped
+/// and counted as their own face.
+class PlaneCounter {
+  PlaneCounter({this.normalStep = 1e-3, this.offsetStep = 1e-3});
+  final double normalStep;
+  final double offsetStep;
+  final _keys = <int>{};
+  int _degenerate = 0;
+
+  int get count => _keys.length + _degenerate;
+
+  void add(List<double> t) {
+    final ux = t[3] - t[0], uy = t[4] - t[1], uz = t[5] - t[2];
+    final vx = t[6] - t[0], vy = t[7] - t[1], vz = t[8] - t[2];
+    var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    final len = math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (len < 1e-12) {
+      _degenerate++;
+      return;
+    }
+    nx /= len;
+    ny /= len;
+    nz /= len;
+    final d = nx * t[0] + ny * t[1] + nz * t[2];
+    _keys.add(Object.hash((nx / normalStep).round(), (ny / normalStep).round(), (nz / normalStep).round(),
+        (d / offsetStep).round()));
+  }
+}

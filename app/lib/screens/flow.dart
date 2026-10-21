@@ -161,9 +161,17 @@ OverlayEntry _showLoading(BuildContext context, String text) {
 }
 
 /// Share via the system share sheet; desktop fallback copies the path.
+///
+/// iOS/Android/macOS: system share sheet via share_plus. iPad requires an
+/// anchor rect for the popover; when [origin] is null the calling widget's
+/// bounds are used. Linux/Windows: no share sheet, the path is copied.
 Future<void> shareFile(BuildContext context, String path, {Rect? origin}) async {
   final s = S.of(context);
   final messenger = ScaffoldMessenger.of(context);
+  if (origin == null) {
+    final box = context.findRenderObject();
+    if (box is RenderBox && box.hasSize) origin = box.localToGlobal(Offset.zero) & box.size;
+  }
   try {
     if (!(Platform.isIOS || Platform.isAndroid || Platform.isMacOS)) throw UnsupportedError('desktop');
     await SharePlus.instance.share(ShareParams(files: [XFile(path)], sharePositionOrigin: origin));

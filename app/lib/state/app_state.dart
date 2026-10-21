@@ -6,14 +6,26 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/engine.dart';
+import '../core/estimate.dart';
 import '../core/models.dart';
+import '../purchase/free_tier.dart';
+import '../purchase/mock_purchase_service.dart';
+import '../purchase/purchase_service.dart';
 import 'history.dart';
 
 /// App-wide state: preferences, history, the conversion engine and output dir.
 class AppState extends ChangeNotifier {
-  AppState({required this.engine, required this.prefs, required this.outputDir}) {
+  AppState({
+    required this.engine,
+    required this.prefs,
+    required this.outputDir,
+    PurchaseService? purchase,
+    this.limits = FreeTierLimits.none,
+    this.estimator = const Estimator(),
+  }) : purchase = purchase ?? MockPurchaseService(prefs) {
     _history = HistoryStore(File(p.join(outputDir.path, 'history.json')));
     history = _history.load();
+    this.purchase.addListener(notifyListeners);
   }
 
   final ConversionEngine engine;
@@ -21,6 +33,15 @@ class AppState extends ChangeNotifier {
   final Directory outputDir;
   late final HistoryStore _history;
   late List<HistoryEntry> history;
+
+  /// Store backend (mock on Linux/desktop, in_app_purchase on iOS).
+  final PurchaseService purchase;
+
+  /// Free-tier limits; [FreeTierLimits.none] (default) = no restrictions.
+  final FreeTierLimits limits;
+
+  /// Time/size estimate model (coefficients + device factor, see estimate.dart).
+  final Estimator estimator;
 
   /// Faces above which we suggest simplifying / refuse (placeholders, ui-spec §2.2).
   static const largeFaces = 200000;
@@ -93,6 +114,27 @@ class AppState extends ChangeNotifier {
         'lastSettings', jsonEncode(s.copyWith(author: '', organization: '', product: '', description: '').toJson()));
   }
 
+  // ---- purchase / free tier ----
+  bool get isPro => purchase.isPro;
+
+  String _today() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month}-${n.day}';
+  }
+
+  int get conversionsToday => prefs.getString('convDay') == _today() ? (prefs.getInt('convCount') ?? 0) : 0;
+
+  /// Called after each successful conversion (for daily limits).
+  void recordConversion() {
+    final c = conversionsToday + 1;
+    prefs.setString('convDay', _today());
+    prefs.setInt('convCount', c);
+  }
+
+  /// The free-tier limit this conversion would hit, or null if allowed.
+  LimitHit? limitFor(int triangles, ConvertSettings s) =>
+      isPro ? null : limits.check(triangles: triangles, settings: s, conversionsToday: conversionsToday);
+
   // ---- outputs & history ----
   String outputPathFor(String sourcePath, ExportFormat f) {
     final dir = Directory(p.join(outputDir.path, 'Outputs'))..createSync(recursive: true);
@@ -132,6 +174,12 @@ class AppState extends ChangeNotifier {
     history = [];
     _history.save(history);
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    purchase.removeListener(notifyListeners);
+    super.dispose();
   }
 }
 

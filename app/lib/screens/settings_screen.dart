@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../core/models.dart';
 import '../l10n/strings.dart';
+import '../purchase/purchase.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import '../widgets/common.dart';
 import 'history_screen.dart';
+import 'help_screen.dart';
 import 'licenses_screen.dart';
+import 'paywall_screen.dart';
 
 const appVersion = '0.1.0';
 
@@ -37,11 +40,28 @@ class SettingsScreen extends StatelessWidget {
               border: Border.all(color: t.warning, style: BorderStyle.solid), borderRadius: BorderRadius.circular(12)),
           child: group([
             ListTile(
+              key: const Key('purchaseStatus'),
               title: Text(s.t('settings.purchase.status')),
-              trailing: Text(s.t('settings.purchase.free'), style: TextStyle(color: t.label2)),
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(st.isPro ? s.t('purchase.status.pro') : s.t('settings.purchase.free'),
+                    style: TextStyle(color: st.isPro ? t.success : t.label2)),
+                Icon(Icons.chevron_right, color: t.label3),
+              ]),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen())),
             ),
-            ListTile(title: Text(s.t('settings.purchase.restore'), style: TextStyle(color: t.accent)), onTap: () {}),
+            ListTile(
+              key: const Key('settingsRestore'),
+              title: Text(s.t('settings.purchase.restore'), style: TextStyle(color: t.accent)),
+              onTap: () async {
+                final r = await st.purchase.restore();
+                if (context.mounted) showPurchaseResult(context, r);
+              },
+            ),
+            if (st.purchase is MockPurchaseService)
+              ListTile(
+                title: Text(s.t('x.reset_purchase'), style: TextStyle(color: t.label2)),
+                onTap: () => (st.purchase as MockPurchaseService).reset(forgetOwned: true),
+              ),
           ]),
         ),
         SectionHeader(s.t('settings.defaults')),
@@ -110,6 +130,12 @@ class SettingsScreen extends StatelessWidget {
         ]),
         SectionHeader(s.t('settings.about')),
         group([
+          ListTile(
+            key: const Key('settingsHelp'),
+            title: Text(s.t('help.title')),
+            trailing: Icon(Icons.chevron_right, color: t.label3),
+            onTap: () => openHelp(context),
+          ),
           ListTile(title: Text(s.t('settings.about.version')), trailing: Text(appVersion, style: TextStyle(color: t.label2))),
           ListTile(
               title: Text(s.t('settings.about.privacy')),

@@ -11,8 +11,10 @@ import 'package:stl2stp_app/core/sample_mesh.dart';
 import 'package:stl2stp_app/core/stl_reader.dart';
 import 'package:stl2stp_app/l10n/strings.dart';
 import 'package:stl2stp_app/screens/flow.dart';
+import 'package:stl2stp_app/screens/help_screen.dart';
 import 'package:stl2stp_app/screens/preview_screen.dart';
 import 'package:stl2stp_app/state/app_state.dart';
+import 'package:stl2stp_app/widgets/stl_drop.dart';
 
 Future<AppState> makeState({ConversionEngine? engine, Map<String, Object> prefs = const {}}) async {
   SharedPreferences.setMockInitialValues({'onboardingSeen': true, ...prefs});
@@ -156,5 +158,44 @@ void main() {
     await tester.pumpWidget(Stl2StpApp(state: state));
     await tester.pumpAndSettle();
     expect(find.text('Import STL File'), findsOneWidget);
+  });
+
+  testWidgets('help page from home, zh and en, all topics present', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1400));
+    final state = await makeState();
+    await tester.pumpWidget(Stl2StpApp(state: state));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('helpButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('使用帮助'), findsOneWidget);
+    final s = await S.load('zh');
+    for (final id in helpTopics) {
+      await tester.scrollUntilVisible(find.text(s.t('help.$id.title')), 300);
+      expect(find.text(s.t('help.$id.title')), findsOneWidget);
+    }
+    await tester.scrollUntilVisible(find.text(s.t('help.faq.q1')), 300);
+    expect(find.textContaining('IGES 本来就是曲面格式'), findsOneWidget); // FAQ 1 expanded: "imports as surfaces"
+    state.language = 'en';
+    await tester.pumpAndSettle();
+    expect(find.text('Help'), findsWidgets);
+    expect(find.textContaining('IGES is a surface format'), findsOneWidget);
+  });
+
+  testWidgets('help opens at a topic from the preview "?" button; estimate shows a range', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1400));
+    final state = await makeState();
+    await tester.pumpWidget(Stl2StpApp(state: state, homeOverride: PreviewScreen(model: sampleModel('/tmp/x.stl'))));
+    await tester.pumpAndSettle();
+    final line = tester.widget<Text>(find.byKey(const Key('estimateLine'))).data!;
+    expect(line, contains('预计用时'));
+    expect(line, matches(RegExp(r'\d–\d|不到 1 秒')));
+    await tester.tap(find.byTooltip('帮助').last);
+    await tester.pumpAndSettle();
+    expect(find.text('使用帮助'), findsOneWidget);
+  });
+
+  test('drop target picks the first .stl', () {
+    expect(StlDropTarget.pickStl(['/a/readme.txt', '/a/Part.STL', '/b/x.stl']), '/a/Part.STL');
+    expect(StlDropTarget.pickStl(['/a/x.step']), isNull);
   });
 }

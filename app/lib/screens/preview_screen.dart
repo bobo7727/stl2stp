@@ -8,7 +8,9 @@ import '../theme/tokens.dart';
 import '../widgets/common.dart';
 import '../widgets/mesh_viewer.dart';
 import 'converting_screen.dart';
+import 'paywall_screen.dart';
 import 'flow.dart';
+import 'help_screen.dart';
 
 /// Preview + conversion settings (ui-spec §4.5/§4.6).
 class PreviewScreen extends StatefulWidget {
@@ -64,6 +66,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Future<void> _convert() async {
     _syncMeta();
+    if (!await ensureAllowed(context, info.faces, _s) || !mounted) return;
     final state = AppScope.read(context);
     state.rememberSettings(_s);
     final req = ConvertRequest(
@@ -76,18 +79,21 @@ class _PreviewScreenState extends State<PreviewScreen> {
         context, MaterialPageRoute(builder: (_) => ConvertingScreen(request: req, model: widget.model)));
   }
 
-  String _time(S s, double secs) {
-    if (secs < 1) return s.t('estimate.under_1s');
-    if (secs < 90) return s.t('estimate.seconds', {'n': secs.round()});
-    return s.t('estimate.minutes', {'n': (secs / 60).round()});
+  String _time(S s, Range r) {
+    final (key, params) = timeRangeKey(r);
+    return s.t(key, params);
   }
+
+  Estimate _estimate(ConvertSettings settings) => AppScope.read(context)
+      .estimator
+      .estimate(MeshStats(info.faces, planeGroups: widget.model.preview?.planeGroups), settings);
 
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
     final t = Tokens.of(context);
     final wide = MediaQuery.sizeOf(context).width >= 900;
-    final est = estimate(info.faces, _s);
+    final est = _estimate(_s);
     final viewer = _viewerCard(s, t, wide ? 420 : 250);
     final stats = _statsSection(s, t);
     final options = _optionsSection(s, t);
@@ -95,6 +101,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
       appBar: AppBar(
         title: Text(info.fileName, overflow: TextOverflow.ellipsis),
         actions: [
+          IconButton(
+            key: const Key('previewHelp'),
+            tooltip: s.t('help.open'),
+            icon: Icon(Icons.help_outline, color: t.accent),
+            onPressed: () => openHelp(context),
+          ),
           IconButton(
             tooltip: s.t('preview.replace'),
             icon: Icon(Icons.description_outlined, color: t.accent),
@@ -124,7 +136,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
             Row(children: [
               Expanded(
                 child: Text(
-                  s.t('estimate.line', {'time': _time(s, est.seconds), 'size': formatBytes(est.bytes)}),
+                  s.t('estimate.line', {'time': _time(s, est.seconds), 'size': formatBytesRange(est.bytes)}),
+                  key: const Key('estimateLine'),
                   style: TextStyle(fontSize: 12, color: t.label2, fontFeatures: tabular),
                 ),
               ),
@@ -223,8 +236,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
           kind: BannerKind.warn,
           text: s.t('warn.large.body', {
             'faces': formatCount(info.faces),
-            'size': formatBytes(estimate(info.faces, const ConvertSettings()).bytes),
-            'time': _time(s, estimate(info.faces, const ConvertSettings()).seconds),
+            'size': formatBytesRange(_estimate(const ConvertSettings()).bytes),
+            'time': _time(s, _estimate(const ConvertSettings()).seconds),
           }),
           action: s.t('warn.large.action'),
           onAction: () => setState(() {
@@ -240,7 +253,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final preset = _s.preset;
     final iges = _s.format == ExportFormat.iges;
     return [
-      SectionHeader(s.t('export.format')),
+      SectionHeader(s.t('export.format'), trailing: const HelpButton(topic: 'step_iges')),
       SizedBox(
         width: double.infinity,
         child: SegmentedButton<ExportFormat>(
@@ -265,13 +278,15 @@ class _PreviewScreenState extends State<PreviewScreen> {
       ],
       SectionHeader(
         s.t('preset.title'),
-        trailing: preset == null
-            ? Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: t.fill, borderRadius: BorderRadius.circular(8)),
-                child: Text(s.t('preset.custom'), style: TextStyle(fontSize: 12, color: t.label2)),
-              )
-            : null,
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (preset == null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(color: t.fill, borderRadius: BorderRadius.circular(8)),
+              child: Text(s.t('preset.custom'), style: TextStyle(fontSize: 12, color: t.label2)),
+            ),
+          const HelpButton(topic: 'presets'),
+        ]),
       ),
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         for (final (i, p) in Preset.values.indexed) ...[

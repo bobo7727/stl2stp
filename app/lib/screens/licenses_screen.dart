@@ -43,34 +43,3 @@ class LicensesScreen extends StatelessWidget {
     );
   }
 }
-
-/// Paywall placeholder (ui-spec §4.14) — no prices or quotas decided.
-class PaywallScreen extends StatelessWidget {
-  const PaywallScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final s = S.of(context);
-    final t = Tokens.of(context);
-    return Scaffold(
-      appBar: AppBar(),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
-        InfoBanner(kind: BannerKind.warn, text: s.t('paywall.placeholder_banner')),
-        const SizedBox(height: 24),
-        Center(child: Text(s.t('paywall.title'), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: t.label))),
-        const SizedBox(height: 16),
-        for (final k in ['unlimited', 'large', 'iges', 'meta'])
-          ListTile(
-            leading: Icon(Icons.check_circle, color: t.success),
-            title: Text(s.t('paywall.feature.$k')),
-            trailing: Text(s.t('common.placeholder_tag'), style: TextStyle(color: t.warning)),
-          ),
-        const SizedBox(height: 8),
-        Center(child: Text(s.t('paywall.free_limit'), style: TextStyle(color: t.label2))),
-        const SizedBox(height: 16),
-        FilledButton(onPressed: null, child: Text(s.t('paywall.buy'))),
-        TextButton(onPressed: null, child: Text(s.t('paywall.restore'))),
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.t('paywall.later'))),
-      ]),
-    );
-  }
-}
