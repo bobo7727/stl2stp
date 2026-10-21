@@ -1,0 +1,7 @@
+mesh,tris,pct,merge,rc,seconds,bytes,export_solids,export_faces,note
+sphere50k,50000,50,0,0,19.689,61082693,0,25000,mesh is not closed (open shell)
+sphere50k,50000,50,1,0,25.461,48118832,0,17592,mesh is not closed (open shell)
+sphere50k,50000,25,0,0,9.418,30475779,0,12500,mesh is not closed (open shell)
+sphere50k,50000,25,1,0,15.101,28052932,0,11104,mesh is not closed (open shell)
+box20k,20172,50,0,0,9.89,22178786,1,10086,
+box20k,20172,50,1,0,5.168,16189,1,6,
