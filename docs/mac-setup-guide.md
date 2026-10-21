@@ -158,7 +158,7 @@ cat app/ios/Flutter/Stl2StpCore.xcconfig
 ```bash
 cd ~/work/stl2stp-ios/app
 flutter pub get
-cd ios && pod install && cd ..        # 首次需要；插件 path_provider/shared_preferences/file_picker/share_plus
+cd ios && pod install && cd ..        # 首次需要；插件 path_provider/shared_preferences/file_picker/share_plus/in_app_purchase_storekit（desktop_drop 没有 iOS 实现，会被忽略）
 open -a Simulator                     # 或 xcrun simctl boot "iPhone 16"
 flutter devices
 flutter run -d "iPhone 16"            # 名称以 flutter devices 显示为准
@@ -208,7 +208,50 @@ flutter run -d "iPhone 16"            # 名称以 flutter devices 显示为准
 4. **TestFlight**：上传处理完成后，在 App Store Connect → TestFlight 加内部测试员（最多 100 人，无需审核）；外部测试需要 Beta 审核。
 5. **上架**：填写描述、截图（6.7"/6.9" iPhone 必需，iPad 若支持也要）、隐私（本 App 不收集数据，“数据不会被收集”）、出口合规（未用自定义加密，选“否”）。
 6. **中国大陆区**：自 2023 年起，在中国大陆上架的新 App 需要先完成 **ICP 备案（App 备案）**，并在 App Store Connect 填备案号；否则只能先上其他地区。请提前办理。
-7. 内购（以后的“解锁完整版”）：App Store Connect 里建 Non-Consumable 商品，Flutter 用 `in_app_purchase`，同时要签“付费 App 协议”、填银行和税务信息。
+7. 内购（以后的“解锁完整版”）：见下面 9.1。
+
+### 9.1 内购：StoreKit + `in_app_purchase`
+
+代码里已经有完整的框架，见 `docs/flutter-app.md` §8。
+- iOS 上自动使用 `StorePurchaseService`（`in_app_purchase` 3.3，底层是 StoreKit）。
+- 免费额度默认不限制，所以不配置内购也能正常使用 App。
+- 下面的步骤都没在 Mac 上验证过，按顺序做：
+
+1. **协议和商品**：
+   - App Store Connect → 协议、税务和银行业务：签“付费 App 协议”，填银行和税务信息。不签的话商品查不到。
+   - 你的 App → 营利 → App 内购买项目 → “+” → **非消耗型项目**：
+     - 产品 ID 填 `com.stl2stp.app.pro`。如果要用别的 ID，改 `lib/purchase/purchase_service.dart` 里的 `PurchaseConfig.proProductId`。
+     - 填参考名称、价格档位、中英文显示名称和描述，以及审核截图（可以用购买页截图）。
+   - 价格只在这里设，App 显示的是商店返回的本地化价格。
+2. **Xcode 能力**：Runner target → Signing & Capabilities → “+ Capability” → **In-App Purchase**。这一步需要付费开发者账号，免费个人团队测不了内购。
+3. **模拟器本地测试**（不需要联网和账号）：
+   - Xcode → File → New → File… → **StoreKit Configuration File**，命名 `Products.storekit`，勾选 “Sync with App Store Connect” 或手动添加。
+   - 手动添加时：“+” → Add Non-Consumable，Product ID `com.stl2stp.app.pro`，价格随便填（只在本地用）。
+   - Product → Scheme → Edit Scheme… → Run → Options → **StoreKit Configuration** 选 `Products.storekit`。
+   - 从 Xcode 运行（`open ios/Runner.xcworkspace`，再按 ⌘R）。`flutter run` 不会带上 StoreKit 配置。
+   - 测试：
+     - 设置 → 购买 → 购买，按钮上显示的是配置文件里的价格。
+     - 买完设置页显示“完整版（已解锁）”。
+     - 删掉 App 重新装，点“恢复购买”能恢复。
+     - Xcode → Debug → StoreKit → Manage Transactions 里可以退款或删除交易，用来测各种情况。
+4. **真机沙盒测试**：
+   - App Store Connect → 用户和访问 → 沙盒测试员，新建一个测试 Apple ID。
+   - iPhone：设置 → App Store → 沙盒账户，登录这个 ID。
+   - `flutter run --release` 后购买，会弹出“沙盒环境”提示，不扣费。
+5. **TestFlight**：内购同样走沙盒，不扣费。
+6. **上架前要补的**：
+   - 交易校验：现在只把“已解锁”存在本机。可以换 StoreKit 2 的签名交易（`in_app_purchase_storekit` 的 SK2 接口）在设备上校验，或接服务器校验。
+   - 退款处理。
+   - 定好免费额度：在 `main.dart` 里给 `AppState` 传 `FreeTierLimits(...)`。
+   - 去掉购买页的黄色占位横幅：设计文案 `paywall.placeholder_banner` 和权益后面的“待定”。
+   - 审核要求界面上有“恢复购买”按钮，这个已经有了。
+7. 不想连商店时（例如没配 StoreKit 文件就跑模拟器），启动参数加环境变量 `STL2STP_MOCK_STORE=1`，会改用模拟商店（Xcode → Scheme → Run → Arguments → Environment Variables）。
+
+### 9.2 分享（share_plus）
+
+- iOS 上“分享…”打开系统分享面板（微信、QQ、隔空投送、存到“文件”等），不需要额外配置。
+- iPad 上分享面板以弹出框形式出现，代码已经给了锚点位置；在 iPad 模拟器上点一次“分享…”确认不会崩溃。
+- `Info.plist` 已声明 STL 文档类型（UTI `com.stl2stp.stl`）。App 能不能出现在微信、“文件”等 App 的“用其他应用打开”列表里，要在真机上验证。
 
 ## 10. OCCT（LGPL 2.1 + 例外）静态链接合规——上架前必须确认
 
@@ -264,4 +307,4 @@ git checkout app/flutter && git merge app/flutter-mac   # 或在 worktree D:/stl
 | 免费 Apple ID 个人团队 | 免费 | **必须有 Mac + Xcode** | 只能装到自己的设备，7 天过期，不能 TestFlight/上架 |
 | TestFlight / App Store | 必须 99 美元/年开发者账号 | Mac 或上面的云方案 | 是 |
 
-结论：要做 iOS，最终都绕不开 **Mac + Xcode**（本地或云端）和（上架时）**99 美元/年**的开发者账号。Bo 准备好 Mac 后按本文第 2～7 步走，全程本地，不需要任何云服务。
+结论：要做 iOS，最终都绕不开 **Mac + Xcode**（本地或云端）和（上架时）**99 美元/年**的开发者账号。准备好 Mac 后按本文第 2～7 步走，全程本地，不需要任何云服务。
