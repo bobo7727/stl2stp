@@ -3,6 +3,7 @@
 > 写给接手维护的同事。目标：**只看这一套文档，就能在一台空白机器上 1:1 复现当前的构建、测试和 App**，并知道下一步该做什么。
 > 写作日期 2026-10-21。文中命令都在开发机（Windows + WSL2 Ubuntu 20.04）上实际运行过；没跑过、只能间接核对的内容会明确标出【未验证】或【间接核对】。
 > 本文是索引和概要，细节分在 `docs/handoff/` 下的子文档里；已有的专题文档（`docs/*.md`）直接链接，不重复抄写。
+> 本交接文档在 `app/flutter` 和 `main` 两个分支上内容相同。`main` 只含核心库，所以在 `main` 上阅读时，指向 `app/`、`design/`、`docs/flutter-app.md`、`docs/mac-setup-guide.md` 的链接会打不开，请到 `app/flutter` 的 worktree（例如 `D:\stl2stp-flutter`）里看。
 
 ## 目录
 
