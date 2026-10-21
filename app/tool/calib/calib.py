@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Calibrate time/size estimates: generate meshes, run stl2stp-cli, write CSV."""
-import math, os, struct, subprocess, sys, time, csv
+import math, os, re, struct, subprocess, sys, time, csv
 
 CLI = sys.argv[1]
 OUT = sys.argv[2]
@@ -18,6 +18,9 @@ def write_stl(path, tris):
 
 def sphere(seg, rings, r=25.0):
     def at(i, j):
+        # exact single poles: sin(pi) != 0 would leave seg distinct south-pole points (an open mesh)
+        if j == 0: return (0.0, 0.0, r)
+        if j == rings: return (0.0, 0.0, -r)
         th = math.pi * j / rings; ph = 2 * math.pi * (i % seg) / seg
         return (r*math.sin(th)*math.cos(ph), r*math.sin(th)*math.sin(ph), r*math.cos(th))
     tris = []
@@ -54,8 +57,10 @@ meshes = [
 configs = [
     ('step', 'original', False), ('step', 'original', True), ('step', 'sewing', False), ('iges', 'original', False),
 ]
+ONLY = sys.argv[3].split(',') if len(sys.argv) > 3 else None  # optional mesh-name filter
 rows = []
 for name, tris in meshes:
+    if ONLY and name not in ONLY: continue
     stl = os.path.join(OUT, name + '.stl'); write_stl(stl, tris)
     for fmt, mode, merge in configs:
         if len(tris) >= 100000 and mode == 'sewing': continue
@@ -67,7 +72,8 @@ for name, tris in meshes:
         if fmt == 'step' and mode == 'original' and not merge and p.returncode == 0:
             t1 = time.perf_counter(); subprocess.run([CLI, 'readback', out], capture_output=True); rb = round(time.perf_counter() - t1, 3)
         rows.append(dict(mesh=name, tris=len(tris), fmt=fmt, mode=mode, merge=int(merge), rc=p.returncode,
-                         seconds=round(dt, 3), bytes=size, readback=rb))
+                         seconds=round(dt, 3), bytes=size, readback=rb,
+                         solids=(re.findall(r'export solids=(\d+)', p.stdout + p.stderr) or [''])[0]))
         print(rows[-1], flush=True)
         if os.path.exists(out): os.remove(out)
     os.remove(stl)

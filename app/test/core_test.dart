@@ -9,6 +9,20 @@ import 'package:stl2stp_app/core/sample_mesh.dart';
 import 'package:stl2stp_app/core/stl_reader.dart';
 import 'package:stl2stp_app/l10n/strings.dart';
 
+/// Undirected edges not used exactly twice, with bit-exact float welding (as stl2stp-core does).
+int boundaryEdges(StlMesh m) {
+  final edges = <String, int>{};
+  for (var t = 0; t < m.triangleCount; t++) {
+    final v = [for (var k = 0; k < 3; k++) m.positions.sublist(t * 9 + k * 3, t * 9 + k * 3 + 3).join(',')];
+    for (var e = 0; e < 3; e++) {
+      final a = v[e], c = v[(e + 1) % 3];
+      final key = a.compareTo(c) < 0 ? '$a|$c' : '$c|$a';
+      edges[key] = (edges[key] ?? 0) + 1;
+    }
+  }
+  return edges.values.where((n) => n != 2).length;
+}
+
 void main() {
   group('presets', () {
     test('defaults are the recommended preset (original mode, verify on)', () {
@@ -82,17 +96,13 @@ void main() {
       expect(b.max[0] - b.min[0], 60);
       expect(b.max[1] - b.min[1], 40);
       expect(b.max[2] - b.min[2], 50);
-      // Every undirected edge is used exactly twice (watertight, no T-junctions).
-      final edges = <String, int>{};
-      for (var t = 0; t < m.triangleCount; t++) {
-        final v = [for (var k = 0; k < 3; k++) m.positions.sublist(t * 9 + k * 3, t * 9 + k * 3 + 3).join(',')];
-        for (var e = 0; e < 3; e++) {
-          final a = v[e], c = v[(e + 1) % 3];
-          final key = a.compareTo(c) < 0 ? '$a|$c' : '$c|$a';
-          edges[key] = (edges[key] ?? 0) + 1;
-        }
-      }
-      expect(edges.values.every((n) => n == 2), isTrue);
+      expect(boundaryEdges(m), 0); // watertight, no T-junctions
+    });
+
+    test('sample sphere is watertight (poles are single vertices, not sin(pi) jitter)', () {
+      final m = parseStlBytes(buildSphereStl(seg: 64, rings: 32), maxDisplayTriangles: 1 << 20);
+      expect(m.totalTriangles, 3968);
+      expect(boundaryEdges(m), 0);
     });
 
     test('ascii parse and binary file starting with "solid"', () {
@@ -143,7 +153,42 @@ void main() {
     // Measured with stl2stp-cli on the reference PC (calib.csv, 2026-10-21):
     // (triangles, planeGroups, format, mode, merge, simplify%, seconds, bytes).
     // Spheres: planes = seg*(rings-2) + 2*seg; boxes: 6 planes.
+    // Second session 2026-10-21, idle machine, closed meshes (every STEP read back as 1 solid).
     const rows = [
+      (4992, 2560, ExportFormat.step, ConvertMode.original, false, 100, 3.322, 11913055),
+      (4992, 2560, ExportFormat.step, ConvertMode.original, true, 100, 4.087, 7693635),
+      (4992, 2560, ExportFormat.step, ConvertMode.sewing, false, 100, 3.898, 12478255),
+      (4992, 2560, ExportFormat.iges, ConvertMode.original, false, 100, 1.655, 10121598),
+      (20224, 10240, ExportFormat.step, ConvertMode.original, false, 100, 14.066, 49054889),
+      (20224, 10240, ExportFormat.step, ConvertMode.original, true, 100, 16.879, 31712999),
+      (20224, 10240, ExportFormat.step, ConvertMode.sewing, false, 100, 16.996, 51389837),
+      (20224, 10240, ExportFormat.iges, ConvertMode.original, false, 100, 6.516, 41073885),
+      (20172, 6, ExportFormat.step, ConvertMode.original, false, 100, 13.764, 44572644),
+      (20172, 6, ExportFormat.step, ConvertMode.original, true, 100, 5.422, 15962),
+      (20172, 6, ExportFormat.step, ConvertMode.sewing, false, 100, 16.996, 47356834),
+      (20172, 6, ExportFormat.iges, ConvertMode.original, false, 100, 6.129, 34498791),
+      (50000, 25200, ExportFormat.step, ConvertMode.original, false, 100, 37.061, 124095949),
+      (50000, 25200, ExportFormat.step, ConvertMode.original, true, 100, 44.32, 79353544),
+      (50000, 25200, ExportFormat.step, ConvertMode.sewing, false, 100, 46.27, 129756126),
+      (50000, 25200, ExportFormat.iges, ConvertMode.original, false, 100, 18.07, 101605995),
+      (50000, 25200, ExportFormat.step, ConvertMode.original, false, 50, 18.357, 60969351),
+      (50000, 25200, ExportFormat.step, ConvertMode.original, true, 50, 25.135, 48143913),
+      (50000, 25200, ExportFormat.step, ConvertMode.original, false, 25, 8.635, 30378141),
+      (50000, 25200, ExportFormat.step, ConvertMode.original, true, 25, 13.001, 27491022),
+      (20172, 6, ExportFormat.step, ConvertMode.original, false, 50, 8.708, 22178786),
+      (20172, 6, ExportFormat.step, ConvertMode.original, true, 50, 4.487, 16189),
+      (101760, 51200, ExportFormat.step, ConvertMode.original, false, 100, 82.011, 255264972),
+      (101760, 51200, ExportFormat.step, ConvertMode.original, true, 100, 95.376, 164016285),
+      (101760, 51200, ExportFormat.iges, ConvertMode.original, false, 100, 34.654, 206878212),
+      (99372, 6, ExportFormat.step, ConvertMode.original, false, 100, 79.055, 227487049),
+      (99372, 6, ExportFormat.step, ConvertMode.original, true, 100, 28.134, 15991),
+      (99372, 6, ExportFormat.step, ConvertMode.sewing, false, 100, 99.323, 241037513),
+      (99372, 6, ExportFormat.iges, ConvertMode.original, false, 100, 33.495, 169964811),
+    ];
+
+    // First session the same day while other builds were running (1.1–1.9× slower; spheres were
+    // still open meshes from the old generator). Must stay inside the range incl. device spread.
+    const busyRows = [
       (4992, 2560, ExportFormat.step, ConvertMode.original, false, 100, 6.013, 11944484),
       (4992, 2560, ExportFormat.step, ConvertMode.original, true, 100, 6.798, 7725064),
       (4992, 2560, ExportFormat.step, ConvertMode.sewing, false, 100, 6.992, 12480362),
@@ -160,10 +205,6 @@ void main() {
       (50000, 25200, ExportFormat.step, ConvertMode.original, true, 100, 63.62, 79456083),
       (50000, 25200, ExportFormat.step, ConvertMode.sewing, false, 100, 55.616, 129763545),
       (50000, 25200, ExportFormat.iges, ConvertMode.original, false, 100, 25.199, 101638314),
-      (50000, 25200, ExportFormat.step, ConvertMode.original, false, 50, 19.689, 61082693),
-      (50000, 25200, ExportFormat.step, ConvertMode.original, true, 50, 25.461, 48118832),
-      (50000, 25200, ExportFormat.step, ConvertMode.original, false, 25, 9.418, 30475779),
-      (50000, 25200, ExportFormat.step, ConvertMode.original, true, 25, 15.101, 28052932),
       (20172, 6, ExportFormat.step, ConvertMode.original, false, 50, 9.89, 22178786),
       (20172, 6, ExportFormat.step, ConvertMode.original, true, 50, 5.168, 16189),
       (101760, 51200, ExportFormat.step, ConvertMode.original, false, 100, 116.975, 255428633),
@@ -188,12 +229,20 @@ void main() {
       }
     });
 
+    test('busy-machine measurements lie inside the range including device spread', () {
+      const e = Estimator(deviceFactor: 1); // default deviceLo/deviceHi 0.75/1.5
+      for (final (n, planes, f, mode, merge, pct, secs, bytes) in busyRows) {
+        final est = e.estimate(MeshStats(n, planeGroups: planes), settingsFor(f, mode, merge, pct));
+        final tag = '$n $f $mode merge=$merge $pct%';
+        expect(secs, inInclusiveRange(est.seconds.lo, est.seconds.hi), reason: 'busy time $tag: ${est.seconds}');
+        expect(bytes.toDouble(), inInclusiveRange(est.bytes.lo, est.bytes.hi), reason: 'busy size $tag: ${est.bytes}');
+      }
+    });
+
     test('central values are within 35 % (time) / 20 % (size) for large meshes', () {
       const e = Estimator(deviceFactor: 1);
       for (final (n, planes, f, mode, merge, pct, secs, bytes) in rows) {
         if (bytes < 1e6) continue; // merged boxes: a few KB, relative error meaningless
-        // Simplified sphere: the core emitted an open shell (faster than a solid); covered by the range only.
-        if (n == 50000 && pct < 100) continue;
         final est = e.estimate(MeshStats(n, planeGroups: planes), settingsFor(f, mode, merge, pct));
         expect(est.seconds.mid / secs, inInclusiveRange(0.65, 1.35), reason: '$n $f $mode $merge $pct');
         expect(est.bytes.mid / bytes, inInclusiveRange(0.8, 1.2), reason: '$n $f $mode $merge $pct');

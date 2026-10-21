@@ -6,10 +6,13 @@ import 'models.dart';
 ///
 /// Calibration (docs/flutter-app.md §估算校准): `stl2stp-cli convert` on this
 /// project's dev PC (WSL2 Ubuntu 20.04, gcc-10 -O2, OCCT 8.0.1, output written
-/// to an NTFS drive through /mnt/d), 2026-10-21. Meshes: closed UV spheres
-/// (curved) and finely tessellated boxes (planar) with 5k–100k triangles;
-/// STEP/IGES, original/sewing, merge on/off, simplify 25/50 %. Residuals of the
-/// fits are within about −25 % … +30 %, which [Coefficients.modelLo]/[modelHi] cover.
+/// to an NTFS drive through /mnt/d), 2026-10-21, idle machine. Meshes: closed UV
+/// spheres (curved) and finely tessellated boxes (planar) with 5k–100k triangles,
+/// all read back as one solid; STEP/IGES, original/sewing, merge on/off,
+/// simplify 25/50 %. Residuals of the fit are within about −22 % … +35 %, which
+/// [Coefficients.modelLo]/[modelHi] cover. An earlier session on the same PC
+/// while other builds ran was 1.1–1.9× slower; that stays inside the range once
+/// the device spread ([Estimator.deviceHi]) is included.
 ///
 /// Model (seconds on the reference machine):
 ///   export  = base + exportPerFace · F_out  (+ mergePerTriangle · f if merging)
@@ -22,11 +25,11 @@ import 'models.dart';
 /// The phone is accounted for by [Estimator.deviceFactor] (configurable).
 class Coefficients {
   const Coefficients({
-    this.baseSeconds = 0.15,
-    this.exportPerFace = 0.53e-3,
-    this.mergePerTriangle = 0.37e-3,
+    this.baseSeconds = 0.07,
+    this.exportPerFace = 0.33e-3,
+    this.mergePerTriangle = 0.34e-3,
     this.sewingFactor = 1.25,
-    this.verifyPerMB = 0.25,
+    this.verifyPerMB = 0.18,
     this.simplifyPerTriangle = 6e-6,
     this.headerBytes = 8000,
     this.stepBytesPerFace = 2400,
@@ -34,9 +37,9 @@ class Coefficients {
     this.mergedFaceBytesFactor = 1.3,
     this.sewingBytesFactor = 1.05,
     this.planarFaceBytesFactor = 0.6,
-    this.simplifiedLo = 0.7,
+    this.simplifiedLo = 1.0,
     this.modelLo = 0.75,
-    this.modelHi = 1.3,
+    this.modelHi = 1.35,
     this.sizeLo = 0.9,
     this.sizeHi = 1.1,
   });
@@ -47,13 +50,13 @@ class Coefficients {
   /// Building + writing one CAD face (STEP and IGES measured within 5 %).
   final double exportPerFace;
 
-  /// Coplanar detection per triangle (box100k → 6 faces still took 31 s).
+  /// Coplanar detection per triangle (box100k → 6 faces still took 28 s).
   final double mergePerTriangle;
 
-  /// Sewing vs original export time; measured 0.9–1.6× (mean ≈ 1.25×).
+  /// Sewing vs original export time; measured 1.0–1.7× (mean ≈ 1.25×).
   final double sewingFactor;
 
-  /// Read-back verification per MB of STEP output (0.17–0.36 s/MB measured).
+  /// Read-back verification per MB of STEP output (≈ 0.17–0.2 s/MB measured).
   final double verifyPerMB;
   final double simplifyPerTriangle;
 
@@ -73,11 +76,11 @@ class Coefficients {
   /// faces collapse to clean polygons: box → 6 faces measured ≈ 16 KB total.
   final double planarFaceBytesFactor;
 
-  /// Extra lower spread after simplification. A simplified box (still a
-  /// closed solid) converts at the normal per-face rate, but the simplified
-  /// UV sphere came out as an open shell (“mesh is not closed”, ~200 boundary
-  /// edges) and converted ≈ 0.67× faster. The central value models the
-  /// closed case; the range covers both.
+  /// Extra lower spread after simplification (1 = none). Simplified closed
+  /// meshes convert at the normal per-face rate (sphere 50k → 25k: 18.4 s vs
+  /// 37.1 s unsimplified). The first calibration's “0.67× faster” simplified
+  /// sphere was an open test mesh (unwelded pole in the old generator), not a
+  /// simplifier effect.
   final double simplifiedLo;
 
   /// Spread of the time model on the reference machine.
