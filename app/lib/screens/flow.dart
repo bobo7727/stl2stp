@@ -16,6 +16,10 @@ import '../state/history.dart';
 import 'error_screen.dart';
 import 'preview_screen.dart';
 
+/// Navigator of the right-hand pane in the split (iPad) layout; its state is
+/// null on phones. [openModel] shows models there when it exists.
+final detailNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Loaded model handed to the preview screen.
 class LoadedModel {
   LoadedModel(this.info, this.preview);
@@ -75,7 +79,8 @@ Future<String?> askPath(BuildContext context, String note) {
 /// opens the preview or the matching error screen (ui-spec §2.1/§2.2).
 Future<void> openModel(BuildContext context, String path, {bool replace = false}) async {
   final state = AppScope.read(context);
-  final nav = Navigator.of(context);
+  final detail = detailNavigatorKey.currentState;
+  final nav = detail ?? Navigator.of(context);
   final s = S.of(context);
   final overlay = _showLoading(context, s.t('import.loading'));
   LoadedModel? model;
@@ -131,6 +136,9 @@ Future<void> openModel(BuildContext context, String path, {bool replace = false}
   }
   if (replace) {
     await nav.pushReplacement(route);
+  } else if (detail != null) {
+    // Split layout: a newly opened model replaces whatever the right pane shows.
+    await nav.pushAndRemoveUntil(route, (r) => r.isFirst);
   } else {
     await nav.push(route);
   }

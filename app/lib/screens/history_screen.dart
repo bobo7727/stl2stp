@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
-import 'home_screen.dart';
+import '../widgets/history_list.dart';
 
-/// Conversion history (ui-spec §4.12). Swipe left to delete; tap to share again.
+/// Conversion history (ui-spec §4.12). Swipe right to share again, left to delete; tap to share.
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
 
@@ -25,30 +25,10 @@ class HistoryScreen extends StatelessWidget {
       body: state.history.isEmpty
           ? Center(child: Text(s.t('history.empty'), style: TextStyle(color: t.label2)))
           : ListView(padding: const EdgeInsets.all(16), children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Column(children: [
-                  for (final e in state.history)
-                    Dismissible(
-                      key: ValueKey(e.outputPath),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        color: t.danger,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        child: Text(s.t('history.delete'), style: const TextStyle(color: Colors.white)),
-                      ),
-                      onDismissed: (_) => state.deleteHistory(e),
-                      child: Column(children: [
-                        HistoryTile(entry: e),
-                        const Divider(indent: 64),
-                      ]),
-                    ),
-                ]),
-              ),
+              HistoryList(entries: state.history),
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text(s.t('history.note'), textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: t.label2)),
+                child: Text('${s.t('x.history.swipe_hint')}\n${s.t('history.note')}', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: t.label2)),
               ),
             ]),
     );
