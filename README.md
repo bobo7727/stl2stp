@@ -10,6 +10,7 @@
 | `stl2stp-code/` | Visual Studio 2019 解决方案（`stl2stp-code.sln`）与 MFC 全部源码 |
 | `occt-build/` | OpenCASCADE Release 编译子集：`inc` 头文件 + `win64` 运行库（编译所需） |
 | `stl2stp-code-occt/` | 已编译成品：免安装，进入目录双击 `stl2stp-code-occt.exe` 即用 |
+| `mobile/` | 跨平台 C++ 转换核心及 Flutter 应用（面向 iOS），含测试、设计稿与移植文档；详见 [mobile/README.md](mobile/README.md) |
 
 **产品文档**
 

@@ -1,7 +1,7 @@
 # 在 Mac 上继续开发 iOS 版：详细操作流程
 
-> 适用：分支 `app/flutter`（Flutter 界面 + `core/` C++ 核心库）。本文在 Windows/WSL 上写成，**还没有在 Mac 上实际跑过**；命令按 Xcode 16/26、Flutter 3.38、CMake 3.26+ 编写，遇到出入请对照第 12 节排错。
-> 原则不变：只用本地 git，**不加远端、不推送**；代码不上传任何云服务。
+> 适用：`mobile/` 目录（原独立仓库的 `app/flutter` 分支；Flutter 界面 + `core/` C++ 核心库）。本文在 Windows/WSL 上写成，**还没有在 Mac 上实际跑过**；命令按 Xcode 16/26、Flutter 3.38、CMake 3.26+ 编写，遇到出入请对照第 12 节排错。
+> 本文写于代码迁入 Gitee 之前，因此下文的 `git bundle` 是离线传输方案。现在也可以克隆本仓库，在 `mobile/` 目录内执行核心库与 Flutter 命令。
 
 ## 0. 总览
 

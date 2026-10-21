@@ -25,3 +25,6 @@ ipch/
 *.VC.opendb
 *.opensdf
 *.sdf
+
+# 本地对照用的原版源码副本（mobile/ 文档引用，不提交）
+reference/

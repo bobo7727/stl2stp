@@ -1,7 +1,7 @@
 # 协作约定
 
-1. 只在本地 git 工作，禁止添加 remote、禁止 push。
-2. 每个任务在独立分支开发：core/*、app/*、ios/*、validate/* 等，完成后合并到 main（流程见 docs/HANDOFF.md §3）。
+1. 在独立分支开发并提交到本仓库；移动版的改动放在 `mobile/`，避免误改桌面版工程。
+2. 每个任务在独立分支开发：core/*、app/*、ios/*、validate/* 等，验证后合并到仓库默认分支（原本地流程见 docs/HANDOFF.md §3）。
 3. 所有源码统一 UTF-8（无 BOM），换行 LF。不要沿用原仓库的 GBK 编码。
 4. core 库不得依赖 MFC / Windows API，只依赖 C++17 标准库与 OpenCASCADE。
 5. 对外接口集中在 core/include/stl2stp/，以 C 风格接口暴露，方便 Flutter（dart:ffi）和 iOS 原生代码调用。
