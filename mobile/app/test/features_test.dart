@@ -212,14 +212,25 @@ void main() {
   });
 
   group('history swipe', () {
-    testWidgets('swipe right shares, missing file explains, swipe left deletes', (tester) async {
+    testWidgets('swipe right falls back when sharing is unavailable, missing file explains, swipe left deletes', (tester) async {
       setLogicalSize(tester, const Size(430, 932));
       String? clipboard;
+      const shareChannel = MethodChannel('dev.fluttercommunity.plus/share');
+      final nativeShareCalls = <MethodCall>[];
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
         if (call.method == 'Clipboard.setData') clipboard = (call.arguments as Map)['text'] as String;
         return null;
       });
-      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
+      // macOS/iOS/Android try the native sheet first. Make its failure explicit
+      // so this fallback test is independent of the machine running Flutter.
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(shareChannel, (call) async {
+        nativeShareCalls.add(call);
+        throw PlatformException(code: 'share_unavailable', message: 'Simulated unavailable share sheet');
+      });
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(shareChannel, null);
+      });
       final state = await makeState();
       final out = File('${state.outputDir.path}/keep.step')..writeAsStringSync('x');
       state.addHistory(entry('${state.outputDir.path}/gone.step'));
@@ -227,10 +238,17 @@ void main() {
       await tester.pumpWidget(Stl2StpApp(state: state));
       await tester.pumpAndSettle();
 
-      // Share again (desktop fallback: path copied + message); the row stays.
+      // Sharing is unsupported (Linux/Windows) or explicitly fails above
+      // (macOS/iOS/Android): the path is copied and the history row stays.
       await tester.drag(find.text('keep.step'), const Offset(300, 0));
       await tester.pumpAndSettle();
       expect(clipboard, out.path);
+      final usesNativeShare = Platform.isIOS || Platform.isAndroid || Platform.isMacOS;
+      expect(nativeShareCalls, hasLength(usesNativeShare ? 1 : 0));
+      if (usesNativeShare) {
+        expect(nativeShareCalls.single.method, 'share');
+        expect((nativeShareCalls.single.arguments as Map)['paths'], [out.path]);
+      }
       expect(find.textContaining('文件路径已复制'), findsOneWidget);
       expect(state.history, hasLength(2));
       ScaffoldMessenger.of(tester.element(find.text('keep.step'))).removeCurrentSnackBar();
@@ -243,6 +261,7 @@ void main() {
       expect(find.byKey(const Key('historyMissingSnack')), findsOneWidget);
       expect(find.textContaining('无法分享'), findsOneWidget);
       expect(clipboard, isNull);
+      expect(nativeShareCalls, hasLength(usesNativeShare ? 1 : 0)); // missing file is never shared
       await tester.tap(find.text('删除记录'));
       await tester.pumpAndSettle();
       expect(state.history.map((e) => e.fileName), ['keep.step']);
