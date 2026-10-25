@@ -1,0 +1,130 @@
+# Configure signing and the App Store Connect integration as documented in
+# mobile/docs/codemagic.md. Workflows are started manually in Codemagic.
+workflows:
+  ios-simulator:
+    name: iOS simulator - real conversion core
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    working_directory: mobile/app
+    environment:
+      flutter: 3.38.7
+      xcode: latest
+      cocoapods: default
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/stl2stp-ios-deps/V8.0.1.tar.gz
+    scripts:
+      - name: Record toolchain and validate C API
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          for tool in cmake ninja; do command -v "$tool" >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install "$tool"; done
+          flutter --version
+          xcodebuild -version
+          python3 tool/ios/core_symbols.py
+          python3 tool/ios/test_core_symbols.py
+          python3 tool/ios/test_build_ios_core.py
+          python3 tool/ios/test_check_ios_binary.py
+      - name: Flutter packages, analysis and tests
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build OCCT and the real iOS core
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SIM_ARCHS=arm64 JOBS=4 bash tool/ios/build_ios_core.sh
+      - name: Install CocoaPods dependencies
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd ios
+          pod install
+      - name: Build and check the simulator app
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          flutter build ios --simulator --debug
+          python3 tool/ios/check_ios_binary.py build/ios/iphonesimulator/Runner.app/Runner
+          mkdir -p "$CM_BUILD_DIR/mobile/build"
+          ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app \
+            "$CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip"
+    artifacts:
+      - $CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip
+      - /tmp/xcodebuild_logs/*.log
+
+  ios-testflight:
+    name: iOS signed release - TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    working_directory: mobile/app
+    integrations:
+      app_store_connect: stl2stp-app-store-connect
+    environment:
+      flutter: 3.38.7
+      xcode: latest
+      cocoapods: default
+      groups:
+        - ios_release
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.stl2stp.stl2stpApp
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/stl2stp-ios-deps/V8.0.1.tar.gz
+    scripts:
+      - name: Validate release inputs and toolchain
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          : "${APP_STORE_APPLE_ID:?Set the numeric Apple ID in the ios_release variable group}"
+          [[ "$APP_STORE_APPLE_ID" =~ ^[0-9]+$ ]] || { echo 'APP_STORE_APPLE_ID must be numeric' >&2; exit 1; }
+          for tool in cmake ninja; do command -v "$tool" >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install "$tool"; done
+          flutter --version
+          xcodebuild -version
+          python3 tool/ios/core_symbols.py
+          python3 tool/ios/test_core_symbols.py
+          python3 tool/ios/test_build_ios_core.py
+          python3 tool/ios/test_check_ios_binary.py
+      - name: Flutter packages, analysis and tests
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build OCCT and the real iOS core
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SIM_ARCHS=arm64 JOBS=4 bash tool/ios/build_ios_core.sh
+      - name: Install pods and apply signing profiles
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          (cd ios && pod install)
+          xcode-project use-profiles
+      - name: Archive signed IPA and validate exported C API
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID")
+          [[ "$LATEST" =~ ^[0-9]+$ ]] || { echo 'Cannot determine latest App Store Connect build number' >&2; exit 1; }
+          BUILD_NUMBER=$((LATEST + 1))
+          flutter build ipa --release --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+          python3 tool/ios/check_ios_binary.py build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Runner
+    artifacts:
+      - $CM_BUILD_DIR/mobile/app/build/ios/ipa/*.ipa
+      - $CM_BUILD_DIR/mobile/app/build/ios/archive/*.xcarchive/dSYMs/*.dSYM
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

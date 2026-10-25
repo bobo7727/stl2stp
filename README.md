@@ -40,3 +40,5 @@
 - 导出 STEP / IGES（>10 万面确认框，语义与原版 v1.0.2 一致）
 - STEP 纯预览（B-Rep 拓扑统计）
 - 深/浅双主题、标准视图自动居中、拖动旋转/平移
+
+GitHub 仓库的 Codemagic iOS 构建及 TestFlight 发布入口见 [mobile/docs/codemagic.md](mobile/docs/codemagic.md)。

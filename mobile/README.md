@@ -12,3 +12,5 @@
 - `reference/` 原桌面版源码（只读参考，不入库）
 
 协作约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。iOS 构建仍需 macOS、Xcode 及 OCCT iOS 库；步骤见 [docs/mac-setup-guide.md](docs/mac-setup-guide.md)。
+
+GitHub → Codemagic → TestFlight 的配置步骤见 [发布指南](docs/codemagic.md)，工作流位于仓库根 codemagic.yaml。

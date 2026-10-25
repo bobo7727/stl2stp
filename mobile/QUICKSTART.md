@@ -95,3 +95,5 @@ flutter run -d <实际模拟器或设备ID>
 从 master 建功能分支，提交源码、配置和文档；构建目录不入库。记录 Git 提交号、OS、编译器/CMake/Flutter/OCCT 版本、执行命令及测试报告。历史文档中的 122 项 CTest、55 项 Flutter 测试等数字是参考基线，以本次工具输出为准。
 
 复现以功能和测试结果为验收依据；不同工具链、安装路径和 RPATH 可能改变二进制摘要。固定 STL 与时间戳可用于进一步比对导出内容。
+
+云端 Mac 构建和 TestFlight 发布见 [Codemagic 指南](docs/codemagic.md)。
