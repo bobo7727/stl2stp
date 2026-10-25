@@ -28,4 +28,18 @@ def run(path):
             if dd < 0.999999 or off > 1e-4 or shift > 1e-4 or abs(m2 - m3) > 1e-9 * max(1, abs(m3)):
                 bad.append((i, pc, round(dd, 6), '%.2g' % off, '%.2g' % shift, m2, m3))
     print('%-36s pcurves=%d maxoff=%.2g min_dir_dot=%.8f bad=%d %s' % (path.split('/')[-1], n, maxoff, mindot, len(bad), bad[:4]))
-for f in sys.argv[1:]: run(f)
+    if n == 0:
+        print('    ERROR: no supported PCURVE entities found')
+    return not bad and n > 0
+
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        sys.exit('Usage: pcurve_check.py FILE.step [FILE.step ...]')
+    passed = True
+    for path in sys.argv[1:]:
+        try:
+            passed = run(path) and passed
+        except Exception as error:
+            print('%s ERROR: %s' % (path, error), file=sys.stderr)
+            passed = False
+    sys.exit(0 if passed else 1)

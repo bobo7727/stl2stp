@@ -2,7 +2,7 @@
 
 手机端 STL 转 STEP/IGES 工具，基于本仓库的 MFC 桌面版实现重新组织。此目录与桌面版并存，构建入口分别位于 `core/` 和 `app/`。
 
-**接手维护请先读 [docs/HANDOFF.md](docs/HANDOFF.md)**（交接总入口：架构、环境、构建、界面、算法、验证、路线图）。
+**首次构建请先读 [QUICKSTART.md](QUICKSTART.md)**（全新克隆、依赖准备、构建、测试和真实转换验收）。维护细节见 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
 - `core/`  跨平台 C++ 核心库 stl2stp-core（STL 读取、QEM 简化、STEP/IGES 导出），默认 ORIGINAL 复现桌面共享边/单壳单体算法，另可选 SEWING；CMake 构建，含 CLI 与测试
 - `app/`   Flutter App（iOS 为目标平台，Linux 桌面用于开发和测试），通过 dart:ffi 调用核心库

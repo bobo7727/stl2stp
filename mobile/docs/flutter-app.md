@@ -62,6 +62,8 @@ app/
 
 ## 3. 在本机（Windows + WSL）运行
 
+当前可移植入口见 [QUICKSTART.md](../QUICKSTART.md)。下述已安装工具路径是原开发机示例，不是克隆仓库的前提；将 Flutter SDK 加入自己的 PATH，并使用 tools/bootstrap-occt.sh 和 tools/verify.sh 准备核心库。
+
 当前 Windows 上没有 Visual Studio C++ 工具链，也没有 Windows 版 OCCT，所以 **Windows 桌面版暂时编不了**。预览用 **WSL Ubuntu 20.04 的 Linux 桌面版**（WSLg 显示窗口），它直接复用 WSL 里已编好的 OCCT（`~/occt-install`）和核心库，转换是真实的。
 
 已安装：
@@ -72,7 +74,8 @@ app/
 ### 3.1 编核心库（共享库版）
 
 ```bash
-cd /mnt/d/stl2stp-flutter           # app/flutter 分支的 worktree
+cd "$(git rev-parse --show-toplevel)/mobile"
+mkdir -p build/tmp
 TMPDIR=$PWD/build/tmp cmake -S core -B build/core-shared -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10 \
   -DOCCT_ROOT=$HOME/occt-install -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF
@@ -84,7 +87,7 @@ cmake --build build/core-shared --parallel 8
 
 ```bash
 export PATH=/mnt/d/dev/flutter-linux/bin:$PATH PUB_CACHE=/mnt/d/dev/pub-cache
-cd /mnt/d/stl2stp-flutter/app
+cd "$(git rev-parse --show-toplevel)/mobile/app"
 flutter pub get
 flutter analyze
 flutter test                                  # 单元 + 组件测试（演示引擎）
@@ -250,7 +253,7 @@ Windows 上已有 Android SDK、NDK 28.2 和模拟器镜像，Flutter 也能编 
 
 ## 13. 后台转换、内存保护、触感反馈
 
-- **后台**（`lib/platform/background_task.dart`）：转换开始时 `begin`，结束/离开页面时 `end`；系统通知后台时间快用完（`expired`）时自动安全取消，错误页说明“App 在后台停留太久……转换已停止”。转换页提示“可以切到其他 App，转换会在后台继续一小段时间”。只在 iOS 启用；Linux/桌面/测试里是空操作（桌面进程本来就会继续跑）。iOS 原生代码见 docs/mac-setup-guide.md §9.3，**未在真机验证**。
+- **后台**（`lib/platform/background_task.dart`）：转换开始时 `begin`，结束/离开页面时 `end`；系统通知后台时间快用完（`expired`）时自动安全取消，错误页说明“App 在后台停留太久……转换已停止”。转换页提示“可以切到其他 App，转换会在后台继续一小段时间”。只在 iOS 启用；Linux/桌面/测试里是空操作（桌面进程本来就会继续跑）。iOS 原生实现已集成在 app/ios/Runner/AppDelegate.swift；验收步骤见 docs/mac-setup-guide.md §9.3，**未在真机验证**。
 - **内存预检**（`lib/core/memory_guard.dart`、`lib/screens/memory_dialog.dart`）：
   - 预估峰值 = 50 MB + 20.5 kB × 生成的 CAD 面数（缝合 × 1.06；合并共面 × 1.0；减面时取它和 1.2 kB × 原始三角形数中较大的一项）。
   - 系数来自 `stl2stp-cli` 的 max RSS（`tool/calib/memtime.csv`，WSL，Release）：ORIGINAL STEP 5k 面 140 MB、20k 437 MB、50k 1016 MB、102k 2017 MB；缝合约多 5%；合并共面和 IGES 实测更少（保守地按 ×1.0）；减面 50% 基本按输出面数。模型在这些点上都不低于实测值（测试里有断言）。手机上的实际占用**还没测**（需要 Mac + 真机）。

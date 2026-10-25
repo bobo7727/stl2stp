@@ -2,7 +2,7 @@
 
 [← 返回总入口](../HANDOFF.md)
 
-> 每个手册列出要改的文件（按顺序）、命令、验收标准。路径相对仓库根；命令在 WSL 里执行，环境变量见 [build-test.md](build-test.md) 开头。
+> 每个手册列出要改的文件（按顺序）、命令、验收标准。源码路径相对 mobile/；Git 分支从当前 master 建立。命令在 WSL 里执行，环境变量见 [build-test.md](build-test.md) 开头。
 
 ## 目录
 
@@ -21,7 +21,7 @@
 
 以“新增 `int foo`”为例（参考 `weld_vertices` 是怎么加的：`git log --oneline -- core/src/weld.cpp`，以及 app/flutter 上的 `1eb0bf0`）。
 
-1. **分支**：`git -C D:\stl2stp-ios switch -c core/foo main`（或 `git -C ... worktree add D:\stl2stp-foo -b core/foo main`）。
+1. **分支**：在最新 master 的克隆中运行 `git switch -c core/foo`。不需要原 ZIP 中的 main/app/flutter 分支。
 2. **头文件** `core/include/stl2stp/stl2stp.h`：在 `stl2stp_export_options` **末尾**追加字段并写注释（默认值、范围、单位）。永远不要在中间插入或改已有字段的顺序。
 3. **默认值** `core/src/mesh.cpp` 的 `stl2stp_default_export_options()`：按字段顺序补上默认值（这是一个按位置初始化的列表，顺序必须一致）。
 4. **参数校验** `core/src/exchange.cpp` 导出入口附近（现有 `sewing_tolerance` / `merge_angular_tolerance` 校验处）：非法值返回 `STL2STP_ERROR_ARGUMENT`，并且在写任何文件之前。
@@ -31,7 +31,7 @@
 8. **测试**：`core/tests/test_review.cpp` 加用例并在 `core/tests/CMakeLists.txt` 的 review 列表登记；`test_c_api.c` 若默认值需要检查也加上；CLI 测试按需加。
 9. **构建验收**：`cmake --build build/rel && ctest --test-dir build/rel -j4` → 全部通过、总数 = 122 + 新增数。
 10. **文档**：`docs/core-api.md`（字段表、语义）、`docs/CHANGES-from-original.md`（新的一节）、`docs/core-validation.md`（测试数）。
-11. **合并**：`core/foo` → `main`（快进或合并提交）→ 在 app/flutter 上 `git merge main`。
+11. **合并**：先完成以下 Dart/UI 适配和验证，再将 core/foo 合并到 master；当前 master 已同时包含 core 与 app。
 12. **Dart 绑定** `app/lib/core/ffi/bindings.dart` 的 `Stl2StpExportOptions`：在**同样的位置**追加同类型字段（`int` → `@Int()`，`double` → `@Double()`，指针 → `Pointer<Utf8>`）。顺序或类型错了会静默写错内存。
 13. **设置模型** `app/lib/core/models.dart` 的 `ConvertSettings`：加字段、构造默认值、`copyWith`、`toJson`/`fromJson`（旧 JSON 里没有该键时要有默认值）；如果它应该参与预设匹配，加进 `preset` getter 的比较和 `forPreset`。
 14. **传参** `app/lib/core/ffi_engine.dart`：`convert()` 的 `args` Map 加一项；`_convertWorker` 里 `opt.ref..foo = ...`。`DemoEngine` 一般不用改。
@@ -151,6 +151,6 @@ return AppState(
 1. 确认所有测试通过：CTest 122+、`flutter analyze`、`flutter test`、集成测试。
 2. 版本号：改 `app/pubspec.yaml` 的 `version: X.Y.Z+N`（N 每次上传递增）；同时改 `settings_screen.dart` 的 `appVersion`（直到按 [operations.md §4](operations.md#4-版本号与发版流程) 改成自动读取）。
 3. 写 `CHANGELOG.md`（根目录，新建）：版本、日期、用户可见变化、核心库变化、已知问题。
-4. 提交：`git -C D:\stl2stp-flutter commit -am "release: X.Y.Z"`；打本地标签 `git -C D:\stl2stp-flutter tag vX.Y.Z`。
+4. 从仓库根检查 `git status --short`，按实际路径暂存源码/配置/文档，提交 `git commit -m "release: X.Y.Z"`，需要时打标签 `git tag vX.Y.Z`；生成文件和签名私密文件不入库。
 5. iOS（Mac 上）：`flutter build ipa --release` → Xcode Organizer 或 Transporter 上传 → TestFlight 内测 → 提交审核（截图、隐私问卷：不收集数据）。详见 [mac-setup-guide.md §9](../mac-setup-guide.md)。
-6. 发版后：备份（`git bundle create stl2stp-vX.Y.Z.bundle --all`），把 bundle 存到安全的地方（仓库没有远端）。
+6. 发版后：确认提交已同步到 GitHub；还可以建立离线备份（`git bundle create stl2stp-vX.Y.Z.bundle --all`），把 bundle 存到另一存储位置。

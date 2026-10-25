@@ -1,9 +1,9 @@
 # STL2STP 维护交接文档（总入口）
 
 > 写给接手维护的同事。目标：**只看这一套文档，就能在一台空白机器上 1:1 复现当前的构建、测试和 App**，并知道下一步该做什么。
-> 写作日期 2026-10-21。文中命令都在开发机（Windows + WSL2 Ubuntu 20.04）上实际运行过；没跑过、只能间接核对的内容会明确标出【未验证】或【间接核对】。
+> 原始记录日期 2026-10-21，来自 Windows + WSL2 Ubuntu 20.04 开发环境；当前复现入口已按组合仓库更新。历史测量不能代替新机器验证，Mac/iOS 的构建与真机验收仍需另行执行。
 > 本文是索引和概要，细节分在 `docs/handoff/` 下的子文档里；已有的专题文档（`docs/*.md`）直接链接，不重复抄写。
-> 本交接文档在 `app/flutter` 和 `main` 两个分支上内容相同。`main` 只含核心库，所以在 `main` 上阅读时，指向 `app/`、`design/`、`docs/flutter-app.md`、`docs/mac-setup-guide.md` 的链接会打不开，请到 `app/flutter` 的 worktree（例如 `D:\stl2stp-flutter`）里看。
+> 当前入口：GitHub 的 `master`，移动版位于 `mobile/`。先读 [QUICKSTART.md](../QUICKSTART.md)；以下未更新的性能和测试数量是 2026-10-21 原开发环境的历史记录，不等于新机器已通过验证。
 
 ## 目录
 
@@ -84,7 +84,7 @@ flowchart LR
 │   ├── cli/main.cpp      命令行工具 stl2stp-cli
 │   ├── tests/            CTest（122 个）：test_core.cpp test_review.cpp test_metadata.cpp test_c_api.c fixtures.cpp
 │   └── tools/run-sanitizer-ctest.sh   ASan/UBSan 跑测试（有输出上限）
-├── app/                  Flutter App（只在 app/flutter 分支）
+├── app/                  Flutter App（当前 master 的 mobile/app）
 │   ├── lib/              Dart 源码（core/ ffi/ screens/ widgets/ state/ purchase/ platform/ theme/ l10n/）
 │   ├── test/             单元 + 组件测试（55 个）
 │   ├── integration_test/ 真实核心库端到端测试（3 个），顺带截图
@@ -98,77 +98,44 @@ flowchart LR
 └── build/                所有构建产物（不入库）
 ```
 
-### 3.2 分支（写作时的 head）
+### 3.2 当前仓库和分支
 
-仓库**只在本地**，没有任何 remote，不要添加 remote、不要 push（交付方式见 [mac-setup-guide.md §3](mac-setup-guide.md#3-把仓库拷到-mac不用远端)：打包整个目录或 `git bundle`）。
+仓库为 `https://github.com/bobo7727/stl2stp.git`，默认分支 `master`。根目录保留 Windows/MFC 桌面工程，移动版的 core、app、design 和 docs 均在 `mobile/`。CAD 验证工具已合入 `mobile/core/tools/cadcheck/`。
 
-| 分支 | head | 用途 | 和 main 的关系 |
-|---|---|---|---|
-| `main` | `cfee62c`（+ 本交接文档的提交，见 §8） | 核心库的集成分支：所有已接受的 core 改动 | — |
-| `app/flutter` | `f998ebe`（+ 本交接文档的提交） | **日常开发分支**：main 的全部内容 + Flutter App + 设计稿 | 基于 main `cfee62c`，领先 19 个提交 |
-| `core/weld` | `cfee62c` | 容差焊接（已合并到 main，与 main 相同） | 0/0 |
-| `core/simplify-closed` | `1385bb5` | QEM 闭合网格回归测试（已合并） | main 领先 2 |
-| `core/utc-timestamp` | `97d6d87` | STEP 时间戳转 UTC（已合并） | main 领先 3 |
-| `core/fixes` | `e823516` | 代码审查后的修复：校验/修复、共面容差、IGES ASCII 等（已合并） | main 领先 4 |
-| `core/extract` | `4f49890` | 早期“把原版算法抽成库”的分支 | 基于旧 main `6004e50`，**有 1 个提交未进 main**（只改了测试/文档里的示例作者名），可以不合 |
-| `ios/ui-design` | `ccf5fe2` | UI 设计稿（design/ui） | 基于 `6004e50`，内容已经合进 app/flutter |
-| `validate/cad` | `b9f8620` | 外部 CAD 校验脚本 `core/tools/cadcheck/` | 基于 `97d6d87`，领先 2，**未合并**（只是工具） |
+原 ZIP 中的 main、app/flutter、core/*、ios/ui-design、validate/cad 是历史本地分支，未单独发布到远端。新克隆不需要这些分支或原开发机的 worktree。
 
-worktree（Windows 上的 git，路径以开发机为例，接手者可自定）：
+### 3.3 日常开发
 
-| 目录 | 分支 |
-|---|---|
-| `D:\stl2stp-ios` | main（主 checkout） |
-| `D:\stl2stp-flutter` | app/flutter |
-| `D:\stl2stp-weld` | core/weld |
-| `D:\stl2stp-simplify` | core/simplify-closed |
+从最新 master 新建功能分支，移动版改动放在 mobile/。使用 `tools/verify.sh` 跑核心测试；有 Flutter SDK 时再跑 App 测试。通过验证后提交并合并到 master。构建产物、下载缓存、生成的模型和私有签名配置不入库。
 
-> worktree 是用 **Windows 的 git** 建的（路径是 `D:/...`），在 WSL 里对这些目录跑 `git` 会报路径错误。请在 PowerShell 里用 `git -C D:\stl2stp-flutter ...`。构建和测试在 WSL 里通过 `/mnt/d/...` 进行，两者不冲突。
-
-### 3.3 在哪个分支上工作、怎么合并
-
-- **改 App**：直接在 `app/flutter` 上提交。
-- **改核心库**：从 `main` 拉 `core/<主题>` 分支 → 完成并通过 122 个 CTest → 合并（或快进）到 `main` → 再把 `main` 合并进 `app/flutter`（历史上就是这样做的，例如 `bc487de merge main (core/weld) into app/flutter`）。
-- **只改文档**：在 `app/flutter` 上提交；如果文档也适用于核心库，再把同样的改动 cherry-pick 到 `main`（本交接文档就是这样做的）。
-- 合并方向永远是 core 分支 → main → app/flutter，不要反向把 App 合进 main（main 应保持不含 Flutter）。
+Git 和构建都可以在新的 Linux/WSL 克隆中执行。不要把旧 Windows worktree 的 .git 路径记录复制到新机器当作源码依赖。
 
 ### 3.4 提交身份
 
-- 仓库用**仓库级**的 `user.name` / `user.email`（不改全局配置）。当前是：
-
-```powershell
-git -C D:\stl2stp-ios config user.name     # 致知屋
-git -C D:\stl2stp-ios config user.email    # zhizhiwu@local
-```
-
-- 接手者可以继续用 `致知屋 <zhizhiwu@local>`，也可以改成自己的：`git -C D:\stl2stp-ios config user.name "<你的名字>"`（worktree 共享同一个配置）。
-- 生成文件里的“作者”元数据默认留空；示例和测试里统一用 `致知屋` 作中文示例作者。
-- 历史已经整理过一次（早期提交的作者信息被统一改写），所以 [CHANGES-from-original.md §1.4](CHANGES-from-original.md) 里列出的旧 hash（如 `d1a8084`）已不存在，以 `git log` 为准。
+用自己的 Git 身份提交，按需设置仓库级 user.name/user.email，不必修改全局配置。生成文件的作者元数据默认留空，测试中的中文示例作者保持“致知屋”。
 
 ## 4. 十分钟上手（已有环境时）
 
-假设已按 [environment.md](handoff/environment.md) 装好 WSL、OCCT、Flutter。以下在 WSL 里执行（`D:` 盘对应 `/mnt/d`）：
+从克隆仓库根目录进入 mobile。需要 Bash、CMake、Ninja、C/C++ 编译器、Python 3；完整转换另需 OCCT 8.0.1。
 
 ```bash
-cd /mnt/d/stl2stp-flutter                      # app/flutter 的 worktree
-export CMAKE_BUILD_PARALLEL_LEVEL=4
-# 1) 核心库 + CLI + 122 个测试
-TMPDIR=$PWD/build/tmp cmake -S core -B build/rel -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10 -DOCCT_ROOT=$HOME/occt-install
-cmake --build build/rel
-ctest --test-dir build/rel -j4                 # 期望：100% tests passed, 0 tests failed out of 122
-# 2) App 用的共享库
-TMPDIR=$PWD/build/tmp cmake -S core -B build/core-shared -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10 -DOCCT_ROOT=$HOME/occt-install \
-  -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF
-cmake --build build/core-shared
-# 3) App
-export PATH=/mnt/d/dev/flutter-linux/bin:$PATH PUB_CACHE=/mnt/d/dev/pub-cache
-cd app && flutter pub get && flutter analyze && flutter test      # 期望：No issues found / All tests passed!（55）
-flutter build linux --release && build/linux/x64/release/bundle/stl2stp_app
+cd mobile
+# 首次需要下载并构建 OCCT；只写 mobile/build，耗时取决于机器。
+bash tools/bootstrap-occt.sh --jobs 4
+# 共享核心库、CLI、CTest，以及 CAD 导出与独立检查。
+bash tools/verify.sh --jobs 4 --cad
+# 没有 OCCT 时只能验证网格功能，不代表 STEP/IGES 可用：
+# bash tools/verify.sh --mesh-only
+
+# 已安装 Flutter 3.38.7 并加入 PATH 后：
+cd app
+flutter pub get
+flutter analyze
+flutter test
+flutter run -d linux
 ```
 
-所有命令、参数、期望输出和耗时见 [build-test.md](handoff/build-test.md)。
+完整前提、命令和验收标准见 [QUICKSTART.md](../QUICKSTART.md)。下面的环境表和性能数值保留历史基线，不能用产物大小或旧用户名替代本机测试结果。
 
 ## 5. 复现检查清单（空白机器 → 完全相同的构建）
 
@@ -237,14 +204,14 @@ flutter build linux --release && build/linux/x64/release/bundle/stl2stp_app
 | 购买 | 框架完成（模拟商店已测试）；StoreKit 实现未测试；价格、免费额度未定 |
 | 法务 | LGPL 静态链接合规方案、ICP 备案、Apple 开发者账号：**待决定**（见 [risks-faq-glossary.md §4](handoff/risks-faq-glossary.md#4-法律与合规)） |
 
-本交接文档的提交：见 `git log --oneline -- docs/HANDOFF.md docs/handoff`（app/flutter 和 main 各一份，内容相同）。
+文档更新记录：从仓库根运行 `git log --oneline -- mobile/docs/HANDOFF.md mobile/docs/handoff`。
 
 ## 9. 优先级最高的后续工作（摘要）
 
 完整的路线图（工作量、依赖、验收标准）见 [roadmap.md](handoff/roadmap.md)。
 
 1. **【需要决定】** 价格、免费额度、是否上架 App Store（决定开发者账号、ICP 备案、LGPL 合规方式）。
-2. **【需要 Mac】** 在 Mac 上跑通 iOS：`build_ios_core.sh` → 模拟器 → 真机；把 iOS 原生后台/内存代码加进 `AppDelegate.swift`。
+2. **【需要 Mac】** 在 Mac 上跑通 iOS：`build_ios_core.sh` → 模拟器 → 真机；验证已集成到 `AppDelegate.swift` 的后台/内存原生通道。
 3. **【需要 Mac】** 真机标定：估算的 `deviceFactor` 和内存模型。
 4. **【不需要 Mac】** 拿到 SolidWorks 对测试包的结果，若有问题修正核心库。
 5. **【不需要 Mac】** 让 OCCT 写 STEP 时不再往 stdout 打彩色统计（`Message` 静默）。

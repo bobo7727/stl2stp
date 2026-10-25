@@ -12,6 +12,8 @@
 | `stl2stp-code-occt/` | 已编译成品：免安装，进入目录双击 `stl2stp-code-occt.exe` 即用 |
 | `mobile/` | 跨平台 C++ 转换核心及 Flutter 应用（面向 iOS），含测试、设计稿与移植文档；详见 [mobile/README.md](mobile/README.md) |
 
+移动版从全新克隆开始的构建和验证步骤见 [mobile/QUICKSTART.md](mobile/QUICKSTART.md)。
+
 **产品文档**
 
 - `项目说明.txt` — 目录结构、编译与运行步骤、混合编码注意事项

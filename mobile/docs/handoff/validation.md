@@ -52,41 +52,27 @@
 
 ## 3. 怎样重做外部校验
 
-脚本在 `validate/cad` 分支的 `core/tools/cadcheck/`（只是工具，没有合进 main）。说明见该目录的 `README.md`。
+当前 master 已包含 core/tools/cadcheck。先在 mobile/ 准备 OCCT，再由统一入口生成模型、导出并执行纯 Python 检查：
 
 ```bash
-# 1) 取出脚本（在 PowerShell 里建一个临时 worktree，或直接 checkout 该分支的那个目录）
-#    git -C D:\stl2stp-ios worktree add D:\stl2stp-cadcheck validate/cad
-# 2) 准备 CLI 和夹具（WSL）
-R=/mnt/d/stl2stp-flutter                       # 用当前代码编出的 CLI
-CC=/mnt/d/stl2stp-cadcheck/core/tools/cadcheck
-OUT=$R/build/cadcheck; FX=$OUT/fx; O=$OUT/out
-mkdir -p $FX $O
-cp $R/build/rel/tests/data/{cube-binary,sphere,two-shells}.stl $FX/     # ctest 夹具生成的
-python3 $CC/gen.py $FX                          # 旋转立方体 n=4/10、开口立方体、两个旋转体
-# 3) 生成导出（run.sh 里写死了路径 /mnt/d/stl2stp-ios 和 build/cc2-release，按需改成上面的变量；命令清单就是 run.sh 的内容）
-CLI=$R/build/rel/stl2stp-cli; TS=2026-10-21T10:30:00+08:00
-$CLI convert $FX/cube-binary.stl $O/cube-original.step --mode original --timestamp $TS
-$CLI convert $FX/rot-cube-10.stl $O/rot10-original-merge.step --mode original --merge-coplanar --timestamp $TS
-$CLI convert $FX/cube-binary.stl $O/meta-cn.step --mode original --author "致知屋" --org "测试公司（深圳）" --product "零件 A-01" --description "中文描述 °±" --timestamp $TS
-# …其余见 run.sh
-# 4) 独立检查
-python3 $CC/step_check.py $O/*.step            # 写 step_check_report.json，逐文件 PASS/FAIL
-python3 $CC/pcurve_check.py $O/*.step
-python3 $CC/render.py $OUT/render.png $O/rot10-original-merge.step   # 需要 matplotlib
+cd "$(git rev-parse --show-toplevel)/mobile"
+bash tools/bootstrap-occt.sh --jobs 4
+bash tools/verify.sh --jobs 4 --cad
 ```
 
-FreeCAD（Windows）：
+已有完整 core build 时可以单独执行：
 
-```powershell
-& "C:\Program Files\FreeCAD 1.0\bin\FreeCADCmd.exe" D:\stl2stp-cadcheck\core\tools\cadcheck\fc_check.py -- D:\stl2stp-flutter\build\cadcheck\out D:\stl2stp-flutter\build\cadcheck\freecad.txt
+```bash
+bash core/tools/cadcheck/run.sh --build-dir "$PWD/build/core-shared" --check
 ```
 
-（FreeCAD 的安装路径以你的机器为准；`fc_check.py` 的参数格式见 README：`freecadcmd fc_check.py -- <dir> <report.txt>`。）
+入口会先运行已编译的 fixture-generator，再生成旋转/开口模型。每次在输出目录下创建新的 run 子目录，不清空旧文件；以脚本最后打印的结果路径为准。无须复制旧 build 中的 STL。可用 --output-dir 指定输出父目录。
+
+需要渲染图片时，在已安装 matplotlib 的环境对新输出运行 `python3 core/tools/cadcheck/render.py <图片路径> <STEP文件>`。FreeCAD 是另一个独立安装的外部验证工具，使用 `FreeCADCmd core/tools/cadcheck/fc_check.py -- <输出目录> <报告路径>`；Windows 上将程序与参数换成对应绝对路径。内置检查不替代 SolidWorks/Parasolid 的真实用户环境验证。
 
 ## 4. SolidWorks 测试包与待做的 Parasolid 检查
 
-- 测试包：`D:\stl2stp-ios\build\stl2stp-cad-test.zip`（78,968 字节，在 `build/` 下不入库），包含：
+- 原测试包是未入库的历史输出。现在从上述新 run 的输出目录选择以下文件重新打包，无需原开发机的 ZIP：
 
 | 文件 | 检查什么 |
 |---|---|

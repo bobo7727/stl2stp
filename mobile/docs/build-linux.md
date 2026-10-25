@@ -1,4 +1,6 @@
-# Linux 构建（WSL Ubuntu 20.04 / OCCT 8.0.1）
+# Linux 构建（OCCT 8.0.1）
+
+当前入口见 [QUICKSTART.md](../QUICKSTART.md)：从克隆仓库的 mobile/ 运行 `bash tools/bootstrap-occt.sh` 和 `bash tools/verify.sh --cad`。下文记录原 Ubuntu 20.04 工具链的手工构建细节；所有相对 core/、app/、build/ 路径都以 mobile/ 为根。
 
 ## 环境与权限
 
@@ -7,7 +9,7 @@
   和必要时的 `$HOME/stl2stp-work/occt-src`，不向这两个目录写入。
 - 源码、core build、CTest fixture、临时文件均放仓库内。不安装系统包，不运行
   `sudo` / `apt` / `pip` / `ldconfig`，不修改 shell profile 或系统配置。
-- 不访问其它 home 项目；`reference/` 只读，不入库；不 commit/remote/push。
+- 下载和构建默认写 mobile/build/，不修改系统安装或 shell 配置；reference/ 不参与构建。
 
 ## OCCT 来源与校验
 
@@ -77,7 +79,7 @@ cmake --install "$HOME/stl2stp-work/occt-src/build-linux-release"
 
 ## 构建与测试 core
 
-从仓库根目录执行，使用已经完成的 OCCT 安装；`STL2STP_WITH_OCCT=ON` 编译真实
+从克隆仓库的 mobile/ 执行，使用已经完成的 OCCT 安装；`STL2STP_WITH_OCCT=ON` 编译真实
 `exchange.cpp`，不是 disabled stub。临时目录环境只影响以下进程，不修改全局环境：
 
 ```sh

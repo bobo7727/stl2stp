@@ -90,7 +90,7 @@ F（写出的 CAD 面数）= f（减面后的三角形数）；合并共面时 �
 
 ## 3. iOS 原生部分（后台、内存）
 
-Dart 端已就绪，原生代码还没加（需要 Mac）。代码和说明在 [mac-setup-guide.md §9.3](../mac-setup-guide.md)。
+Dart 与 iOS 原生通道均已集成；原生实现在 app/ios/Runner/AppDelegate.swift，仍需在 Mac/iPhone 上验收。验证步骤见 [mac-setup-guide.md §9.3](../mac-setup-guide.md#93-后台转换与内存警告)。
 
 | 通道 | 方法 | 原生实现 | Dart 端 |
 |---|---|---|---|

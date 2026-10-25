@@ -2,7 +2,7 @@
 
 [← 返回总入口](../HANDOFF.md)
 
-按“现象 → 原因 → 解决”排列。路径以 `$R` 表示 app/flutter worktree 在 WSL 里的路径（例如 `/mnt/d/stl2stp-flutter`）。
+按“现象 → 原因 → 解决”排列。当前 `$R` 表示克隆仓库的 mobile/ 绝对路径；旧 Windows worktree 的报错作为历史排错记录保留，新克隆不需要那些目录。首次构建见 [QUICKSTART.md](../../QUICKSTART.md)。
 
 ## 目录
 

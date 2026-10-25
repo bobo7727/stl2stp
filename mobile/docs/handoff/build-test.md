@@ -2,13 +2,15 @@
 
 [← 返回总入口](../HANDOFF.md)
 
-> 以下命令都在 WSL（Ubuntu 20.04）里执行。仓库根目录用 `$R` 表示（开发机：`R=/mnt/d/stl2stp-flutter`，即 app/flutter 的 worktree）。
+> 以下命令从当前仓库的 mobile/ 执行，`$R` 表示 mobile 的绝对路径。优先使用 [QUICKSTART.md](../../QUICKSTART.md) 中的工具入口；测试数量和产物大小是原环境的历史基线。
 > 公共环境（只影响当前 shell，不改 `~/.bashrc`）：
 
 ```bash
-R=/mnt/d/stl2stp-flutter
+R="$(git rev-parse --show-toplevel)/mobile"
+cd "$R"
+export OCCT_ROOT="${OCCT_ROOT:-$R/build/occt/install}"
 export CMAKE_BUILD_PARALLEL_LEVEL=4
-export PATH=/mnt/d/dev/flutter-linux/bin:$PATH PUB_CACHE=/mnt/d/dev/pub-cache
+# 先把自己的 Flutter SDK 加入 PATH；PUB_CACHE 可按需设置。
 mkdir -p $R/build/tmp
 ```
 
@@ -48,7 +50,7 @@ mkdir -p $R/build/tmp
 ```bash
 cd $R
 TMPDIR=$R/build/tmp cmake -S core -B build/rel -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10 -DOCCT_ROOT=$HOME/occt-install
+  -DCMAKE_C_COMPILER="${CC:-cc}" -DCMAKE_CXX_COMPILER="${CXX:-c++}" -DOCCT_ROOT="$OCCT_ROOT"
 cmake --build build/rel
 TMPDIR=$R/build/tmp ctest --test-dir build/rel -j4 --output-on-failure
 ```
@@ -74,7 +76,7 @@ review      = ...
 ```bash
 cd $R
 TMPDIR=$R/build/tmp cmake -S core -B build/core-shared -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_COMPILER=gcc-10 -DCMAKE_CXX_COMPILER=g++-10 -DOCCT_ROOT=$HOME/occt-install \
+  -DCMAKE_C_COMPILER="${CC:-cc}" -DCMAKE_CXX_COMPILER="${CXX:-c++}" -DOCCT_ROOT="$OCCT_ROOT" \
   -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF
 cmake --build build/core-shared            # 新目录从零编译约 15 s（-j4，实测）
 ls -l build/core-shared/libstl2stp-core.so # 342584 字节
@@ -265,7 +267,7 @@ bash tool/sync_strings.sh      # 把 design/ui/strings_{zh,en}.json 拷到 asset
 flutter test test/core_test.dart --name strings   # 5 个文案一致性测试
 ```
 
-### 7.3 外部 CAD 校验（validate/cad 分支的 `core/tools/cadcheck/`）
+### 7.3 外部 CAD 校验（当前 master 的 `core/tools/cadcheck/`）
 
 见 [validation.md §3](validation.md#3-怎样重做外部校验)。
 

@@ -3,7 +3,7 @@
 [← 返回总入口](../HANDOFF.md)
 
 > 本页所有版本号都是 2026-10-21 在开发机上用 `--version`、`dpkg -l`、`CMakeCache.txt`、`OpenCASCADEConfig.cmake` 核对的实际值。
-> 路径约定：WSL 的家目录写作 `~/`；Windows 用户目录写作 `C:\Users\<你的用户名>`；仓库在 `D:\stl2stp-ios`（WSL 里是 `/mnt/d/stl2stp-ios`）。
+> 当前命令入口是克隆仓库的 `mobile/`，先读 [QUICKSTART.md](../../QUICKSTART.md)。本页版本表记录原开发环境；新 Ubuntu 可以使用系统的现代 C++17 编译器。需要匹配历史 Ubuntu 20.04 环境时再显式选择 gcc-10/g++-10。
 
 ## 目录
 
@@ -109,7 +109,7 @@ hash -r; cmake --version | head -1     # cmake version 3.26.4
 
 ## 4. OCCT 8.0.1（从源码编译）
 
-完整记录见 [CHANGES-from-original.md §3](../CHANGES-from-original.md) 和 [build-linux.md](../build-linux.md)。这里给出可以直接照抄的版本。
+当前自动化入口：在 mobile/ 运行 `bash tools/bootstrap-occt.sh --jobs 4`，会校验固定 8.0.1 源码摘要并在 build/occt 下构建。下文保留原开发环境的手动配方；记录见 [CHANGES-from-original.md §3](../CHANGES-from-original.md) 和 [build-linux.md](../build-linux.md)。
 
 ### 4.1 源码
 
@@ -192,7 +192,7 @@ Tools • Dart 3.10.7 • DevTools 2.51.1
 ### 5.2 依赖包
 
 ```bash
-cd /mnt/d/stl2stp-flutter/app && flutter pub get
+cd "$(git rev-parse --show-toplevel)/mobile/app" && flutter pub get
 ```
 
 `pubspec.lock` 已入库，锁定 98 个包。直接依赖（实际解析版本）：
@@ -219,7 +219,7 @@ cd /mnt/d/stl2stp-flutter/app && flutter pub get
 |---|---|---|
 | `app/tool/app_strings.py`、`app/tool/sync_strings.sh` | 标准库 | Python 3.8.10 |
 | `app/tool/calib/calib.py` `calib2.py` `memtime.py` `weldtime.py` | 标准库（调用 `stl2stp-cli`；memtime 用 `os.wait4` 读子进程的 `ru_maxrss`） | 同上 |
-| `core/tools/cadcheck/gen.py` `step_check.py` `pcurve_check.py`（validate/cad 分支） | 标准库 | 同上 |
+| `core/tools/cadcheck/gen.py` `step_check.py` `pcurve_check.py`（当前 master） | 标准库 | 同上 |
 | `core/tools/cadcheck/render.py` | `matplotlib`（及 `numpy`） | 已有 matplotlib 3.7.5、numpy 1.24.4 |
 | `core/tools/cadcheck/fc_check.py` | FreeCAD 自带的 Python（`FreeCAD`、`Part` 模块） | Windows 版 FreeCAD 1.0 |
 
@@ -233,20 +233,18 @@ cd /mnt/d/stl2stp-flutter/app && flutter pub get
 
 ## 8. 取得仓库
 
-仓库没有远端。接手时会拿到整个目录的拷贝或一个 `git bundle`：
+在 Linux、WSL 或 Mac 的目标工作目录运行：
 
-```powershell
-# 方式 A：直接拷贝整个 D:\stl2stp-ios 目录（含 .git）
-# 方式 B：git bundle
-git clone D:\path\to\stl2stp.bundle D:\stl2stp-ios
-git -C D:\stl2stp-ios branch -a
-# 建 App 的 worktree（在 Windows git 里做）
-git -C D:\stl2stp-ios worktree add D:\stl2stp-flutter app/flutter
-git -C D:\stl2stp-ios config user.name  "致知屋"         # 或你自己的名字
-git -C D:\stl2stp-ios config user.email "zhizhiwu@local"
+```bash
+git clone https://github.com/bobo7727/stl2stp.git
+cd stl2stp/mobile
+bash tools/bootstrap-occt.sh --jobs 4
+bash tools/verify.sh --jobs 4 --cad
 ```
 
-`reference/`（原版源码）不入库；需要对照原版时另行从 gitee `zigzagwag/stl2stp` 获取放到 `reference/`。
+远端 master 已包含 App、设计稿和 CAD 工具，不需要 checkout 原 ZIP 的 app/flutter 或 validate/cad 分支。构建不依赖 reference/；对照桌面版可直接查看本仓库根目录保留的 MFC 工程。
+
+下载/源码/编译/安装默认位于 mobile/build/occt，参数可覆盖。旧的 home 安装配方仍可用于已有环境，通过 `tools/verify.sh --occt-root /实际安装路径` 指定。
 
 ## 9. 磁盘与并行度约定
 
@@ -261,9 +259,9 @@ git -C D:\stl2stp-ios config user.email "zhizhiwu@local"
 详细步骤见 [mac-setup-guide.md](../mac-setup-guide.md)。概要：
 
 1. Mac（Apple 芯片推荐）+ Xcode + CLT + Homebrew（`cmake`、`ninja`、`cocoapods`）+ Flutter 3.38.7 macOS SDK（与 Linux 同版本）。
-2. 把仓库拷过去（没有远端：拷目录或 `git bundle`）。
+2. 克隆 GitHub master 并进入 mobile/，见上面的取得仓库步骤。
 3. （可选）在 macOS 上编一遍核心库跑 122 个测试。
 4. `bash app/tool/ios/build_ios_core.sh`：下载并校验同一个 OCCT 源码包，编 iOS 静态版 OCCT + 核心库（真机 arm64、模拟器 arm64[+x86_64]），生成 `app/ios/Stl2StpCore/*` 和 `app/ios/Flutter/Stl2StpCore.xcconfig`，不用手改 Xcode 工程。**这个脚本写于 Windows 上，还没在 Mac 上运行过。**
 5. `flutter run` 到模拟器 → 免费 Apple ID 装到自己的 iPhone → 付费开发者账号（¥688/年）上 TestFlight / App Store。
-6. 把 `mac-setup-guide.md §9.3` 里的原生代码（后台任务、内存通道）加到 `app/ios/Runner/AppDelegate.swift`。
+6. 按 `mac-setup-guide.md §9.3` 验证已集成的后台任务和内存通道。
 7. iOS bundle id 是 `com.stl2stp.stl2stpApp`（Linux 的 application id 是 `com.stl2stp.stl2stp_app`），内购商品 ID `com.stl2stp.app.pro`。

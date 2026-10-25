@@ -85,6 +85,8 @@ def check(path):
     R = {'file': path.split('/')[-1], 'errors': [], 'warnings': []}
     err = lambda s: R['errors'].append(s) if len(R['errors']) < 40 else None
     warn = lambda s: R['warnings'].append(s) if len(R['warnings']) < 20 else None
+    if not any(t == 'ADVANCED_FACE' for t, _ in E.values()):
+        err('no supported ADVANCED_FACE entities found')
     # header
     m = re.search(r"FILE_NAME\s*\((.*?)\)\s*;", hdr, re.S)
     if m:
@@ -225,6 +227,8 @@ def check(path):
     return R
 
 if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        sys.exit('Usage: step_check.py FILE.step [FILE.step ...]')
     allr = []
     for f in sys.argv[1:]:
         try:
@@ -240,4 +244,6 @@ if __name__ == '__main__':
         if r.get('header'): print('    header:', json.dumps(r['header'], ensure_ascii=False), 'products:', r.get('products'), 'schema:', r.get('schema'))
         for e in r['errors'][:8]: print('    ERROR:', e)
         for w in r.get('warnings', [])[:3]: print('    warn:', w)
-    json.dump(allr, open('step_check_report.json', 'w'), ensure_ascii=False, indent=1)
+    with open('step_check_report.json', 'w', encoding='utf-8') as report:
+        json.dump(allr, report, ensure_ascii=False, indent=1)
+    sys.exit(0 if all(r['result'] == 'PASS' for r in allr) else 1)

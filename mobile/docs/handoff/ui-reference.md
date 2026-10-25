@@ -290,7 +290,7 @@ OCCT：名称、LGPL-2.1 + OCCT 例外说明、源码获取方式（`x.licenses.
 完整列表（自动生成）：[screen-map.md](screen-map.md)。重新生成：
 
 ```bash
-cd /mnt/d/stl2stp-flutter && python3 app/tool/gen_ui_docs.py
+cd "$(git rev-parse --show-toplevel)/mobile" && python3 app/tool/gen_ui_docs.py
 # 输出：strings.md: 300 keys; screen-map.md: 17 files
 ```
 

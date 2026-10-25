@@ -23,7 +23,7 @@
 | D-1 | P0 | 是否上架 App Store（还是只自用/闲鱼代转） | 决定后面全部 iOS 工作和费用 | 上架：注册开发者账号（¥688/年）、ICP 备案 |
 | D-2 | P0 | 价格、免费额度（每日次数？面数上限？IGES/中文信息收费？） | 购买页现在是占位 | 改 `lib/purchase/free_tier.dart` 的 `FreeTierLimits` 和商品 ID（[operations.md §1](operations.md#1-内购模拟商店--storekit)） |
 | D-3 | P0 | LGPL 合规方式：提供目标文件 / 动态 framework / OCCT 商业许可 | 不解决不能合规上架 | 见 [risks-faq-glossary.md §4](risks-faq-glossary.md#4-法律与合规) |
-| D-4 | P1 | 是否合并 `validate/cad`（`core/tools/cadcheck`）到 main | 只影响工具 | `git merge validate/cad`，跑 ctest |
+| D-4 | 完成 | CAD 工具已纳入 master 的 mobile/core/tools/cadcheck | 继续保持可复现入口 | `bash tools/verify.sh --cad` |
 | D-5 | P2 | 是否做 Android | 需要 NDK 版 OCCT，工作量大 | 见 N-9 |
 
 ## 2. 需要 Mac
@@ -31,7 +31,7 @@
 | ID | 优先级 | 事项 | 工作量 | 依赖 | 验收标准 |
 |---|---|---|---|---|---|
 | M-1 | P0 | 在 Mac 上编 iOS 版 OCCT + 核心库（`app/tool/ios/build_ios_core.sh`），在模拟器上跑通 | 1–2 天 | Mac + Xcode | 模拟器里转换 `示例_支架.stl` 成功，STEP 回读 1 个实体；`flutter test` 在 Mac 上 55/55 |
-| M-2 | P0 | 把后台任务（`stl2stp/background`）和内存查询（`stl2stp/memory`）的原生代码加进 `ios/Runner/AppDelegate.swift` | 0.5 天 | M-1 | 转换中切到后台 20 秒再回来，转换继续完成；内存对话框显示真实可用内存（[operations.md §3](operations.md#3-ios-原生部分后台内存)） |
+| M-2 | P0 | 验证已集成的后台任务（`stl2stp/background`）和内存查询（`stl2stp/memory`）原生代码 | 0.5 天 | M-1 | 转换中切到后台 20 秒再回来，转换继续完成；内存对话框显示真实可用内存（[operations.md §3](operations.md#3-ios-原生部分后台内存)） |
 | M-3 | P0 | 真机安装（免费 Apple ID 可以先装 7 天） | 0.5 天 | M-1 | 真机上从“文件”导入、转换、分享到微信都成功 |
 | M-4 | P0 | 真机标定估算和内存模型 | 1 天 | M-3 | 在真机上跑 5k/20k/50k 球和方块；设置 `Estimator(deviceFactor: …)`；实测落在显示的范围内（参照 `test/core_test.dart` 的标准）；更新 [operations.md §2](operations.md#2-估算与内存模型的系数及重新标定) |
 | M-5 | P0 | StoreKit：在 App Store Connect 建商品，沙盒测试购买/恢复 | 1–2 天 | D-1、D-2、开发者账号 | 沙盒账号购买、恢复、退款后状态都正确；`STL2STP_MOCK_STORE` 不设时用真实商店 |

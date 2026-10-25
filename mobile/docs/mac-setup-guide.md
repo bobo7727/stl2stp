@@ -1,7 +1,7 @@
 # 在 Mac 上继续开发 iOS 版：详细操作流程
 
 > 适用：`mobile/` 目录（原独立仓库的 `app/flutter` 分支；Flutter 界面 + `core/` C++ 核心库）。本文在 Windows/WSL 上写成，**还没有在 Mac 上实际跑过**；命令按 Xcode 16/26、Flutter 3.38、CMake 3.26+ 编写，遇到出入请对照第 12 节排错。
-> 本文写于代码迁入 Gitee 之前，因此下文的 `git bundle` 是离线传输方案。现在也可以克隆本仓库，在 `mobile/` 目录内执行核心库与 Flutter 命令。
+> 当前从 GitHub master 克隆，在 mobile/ 内执行核心库与 Flutter 命令。最低 iOS 14；先读 [QUICKSTART.md](../QUICKSTART.md)。iOS 原生通道已纳入工程，仍需 Mac/真机验证。
 
 ## 0. 总览
 
@@ -9,7 +9,7 @@
 |---|---|---|
 | 1 | Mac 硬件和系统要求 | — |
 | 2 | 安装 Xcode、命令行工具、Homebrew、CMake/Ninja、CocoaPods、Flutter | 1～2 小时（Xcode 下载最慢） |
-| 3 | 把仓库从 Windows 拷到 Mac（git bundle，不用远端） | 10 分钟 |
+| 3 | 从 GitHub 克隆仓库并进入 mobile/ | 10 分钟 |
 | 4 | 先在 Mac 上验证核心库（可选，macOS 原生编译） | 30 分钟 |
 | 5 | 编译 iOS 版 OCCT + 核心库（一条脚本） | 40～90 分钟 |
 | 6 | 在 iOS 模拟器上运行 | 15 分钟 |
@@ -70,34 +70,22 @@ flutter doctor -v     # Xcode、CocoaPods 两项应为 ✓（Android、Chrome �
 ```
 > 国内可设镜像：`export PUB_HOSTED_URL=https://pub.flutter-io.cn FLUTTER_STORAGE_BASE_URL=https://storage.flutter-io.cn`。
 
-## 3. 把仓库拷到 Mac（不用远端）
+## 3. 在 Mac 上取得仓库
 
-在 **Windows** 上（PowerShell 或 WSL，二选一）：
-```bash
-cd /mnt/d/stl2stp-ios
-git bundle create /mnt/d/stl2stp-$(date +%Y%m%d).bundle --all
-git bundle verify /mnt/d/stl2stp-*.bundle
-```
-同时拷 OCCT 源码包（省得 Mac 再下载）：WSL 里的 `~/stl2stp-work/occt-src/V8.0.1.tar.gz`（SHA256 `6297cc55a1720523a437c54d07dc16b9da8c5f5ab5800da3c6ebded568d53c18`）。
-
-用 U 盘 / 隔空投送 / 内网共享把 `.bundle` 和 `V8.0.1.tar.gz` 拷到 Mac 的 `~/Downloads`。
-
-在 **Mac** 上：
 ```bash
 mkdir -p ~/work && cd ~/work
-git clone ~/Downloads/stl2stp-YYYYMMDD.bundle stl2stp-ios
-cd stl2stp-ios
-git remote remove origin          # clone 会把 bundle 记成 origin，删掉，保持“无远端”
-git checkout app/flutter
+git clone https://github.com/bobo7727/stl2stp.git
+cd stl2stp/mobile
 git log --oneline -5
-mkdir -p ~/stl2stp-ios-deps && cp ~/Downloads/V8.0.1.tar.gz ~/stl2stp-ios-deps/
 ```
-`reference/`（原版源码 zip）不在 git 里，需要的话单独拷。
+
+后续 core/、app/、build/ 相对路径均以 mobile/ 为根。不需要原 ZIP 的 app/flutter 分支或旧 worktree。iOS 脚本会下载并校验固定的 OCCT 8.0.1 源码；已有官方源码包时可用 OCCT_TGZ 指定其路径。
 
 ## 4.（可选）先在 macOS 上编一遍核心库，跑单元测试
 
 目的是确认 C++ 代码在 Apple Clang 下没问题，再上 iOS。
 ```bash
+# 可先运行 iOS 构建脚本下载源码，或下载官方 V8.0.1.tar.gz 并校验摘要。
 cd ~/stl2stp-ios-deps && tar xzf V8.0.1.tar.gz
 cmake -G Ninja -S OCCT-8.0.1 -B build-occt-macos \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$HOME/stl2stp-ios-deps/occt-macos \
@@ -110,7 +98,7 @@ cmake -G Ninja -S OCCT-8.0.1 -B build-occt-macos \
   -DUSE_FREEIMAGE=OFF -DUSE_RAPIDJSON=OFF -DUSE_DRACO=OFF -DUSE_TBB=OFF -DUSE_VTK=OFF
 cmake --build build-occt-macos --parallel && cmake --install build-occt-macos
 
-cd ~/work/stl2stp-ios
+cd ~/work/stl2stp/mobile
 cmake -G Ninja -S core -B build/core-macos -DCMAKE_BUILD_TYPE=Release \
   -DOCCT_ROOT=$HOME/stl2stp-ios-deps/occt-macos -DBUILD_SHARED_LIBS=ON
 cmake --build build/core-macos --parallel
@@ -133,30 +121,32 @@ STL2STP_CORE_LIB=$PWD/../build/core-macos/libstl2stp-core.dylib flutter run -d m
 2. 用 CMake（`CMAKE_SYSTEM_NAME=iOS`）编 **静态** OCCT 两份：真机 `iphoneos/arm64`、模拟器 `iphonesimulator/arm64;x86_64`；只开 FoundationClasses、ModelingData、ModelingAlgorithms、DataExchange 四个模块（其依赖的少量可视化/OCAF 工具包会自动带上，与 Linux 构建一致），`-Os`；
 3. 编 `core/` 为静态库，并用 `libtool -static` 把核心库和全部 `libTK*.a` 合并成一个 `libStl2StpCore.a`（每个平台一份）；
 4. 生成 `app/ios/Stl2StpCore/Stl2StpCore.xcframework`（备用，SwiftUI 也能直接用）；
-5. 生成 `app/ios/Flutter/Stl2StpCore.xcconfig`，内容是按 SDK 区分的库搜索路径、`-lStl2StpCore -lc++`、11 个 `-Wl,-u,_stl2stp_*`（强制把 C API 链进 Runner），以及 `STRIP_STYLE = non-global`（保留全局符号，Dart 用 `DynamicLibrary.process()` 才找得到）。`ios/Flutter/Debug.xcconfig`、`Release.xcconfig` 已经写好 `#include? "Stl2StpCore.xcconfig"`，**不需要在 Xcode 里拖文件、改工程**。
+5. 生成 `app/ios/Flutter/Stl2StpCore.xcconfig`，内容是按 SDK 区分的库搜索路径、`-lStl2StpCore -lc++`、完整 C API 的 `-Wl,-u,_stl2stp_*`（强制把 C API 链进 Runner），以及 `STRIP_STYLE = non-global`（保留全局符号，Dart 用 `DynamicLibrary.process()` 才找得到）。`ios/Flutter/Debug.xcconfig`、`Release.xcconfig` 已经写好 `#include? "Stl2StpCore.xcconfig"`，**不需要在 Xcode 里拖文件、改工程**。
 
 执行：
 ```bash
-cd ~/work/stl2stp-ios
+cd ~/work/stl2stp/mobile
 # Apple 芯片且不需要 Intel 模拟器时可只编 arm64，快一半：
-SIM_ARCHS=arm64 JOBS=8 bash app/tool/ios/build_ios_core.sh 2>&1 | tee build/ios-core.log
+mkdir -p build
+set -o pipefail
+SIM_ARCHS=arm64 JOBS=4 bash app/tool/ios/build_ios_core.sh 2>&1 | tee build/ios-core.log
 ls -lh app/ios/Stl2StpCore/*/libStl2StpCore.a
 cat app/ios/Flutter/Stl2StpCore.xcconfig
 ```
 脚本里的关键 CMake 参数（便于手工排错）：
 ```
 -G Ninja -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos|iphonesimulator
--DCMAKE_OSX_ARCHITECTURES=arm64 | "arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+-DCMAKE_OSX_ARCHITECTURES=arm64 | "arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
 -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_BUILD_TYPE=Release
 -DBUILD_LIBRARY_TYPE=Static -DBUILD_USE_PCH=OFF  (+ 与 Linux 相同的模块/USE_* 开关)
 核心库：-DOCCT_ROOT=<上一步安装目录> -DBUILD_SHARED_LIBS=OFF -DSTL2STP_BUILD_CLI=OFF -DBUILD_TESTING=OFF
 ```
-最低系统版本取 **iOS 13.0**（Flutter 3.38 的最低要求）；以后想用 iOS 16 的新 API，把 `MIN_IOS` 和 `ios/Podfile` 的 `platform :ios` 一起改。
+最低系统版本为 **iOS 14.0**，与锁定的 file_picker_darwin 插件要求一致。修改最低版本时应同步 Runner、Podfile、AppFrameworkInfo 和构建脚本默认值。
 
 ## 6. 在 iOS 模拟器上运行
 
 ```bash
-cd ~/work/stl2stp-ios/app
+cd ~/work/stl2stp/mobile/app
 flutter pub get
 cd ios && pod install && cd ..        # 首次需要；插件 path_provider/shared_preferences/file_picker/share_plus/in_app_purchase_storekit（desktop_drop 没有 iOS 实现，会被忽略）
 open -a Simulator                     # 或 xcrun simctl boot "iPhone 16"
@@ -253,76 +243,19 @@ flutter run -d "iPhone 16"            # 名称以 flutter devices 显示为准
 - iPad 上分享面板以弹出框形式出现，代码已经给了锚点位置；在 iPad 模拟器上点一次“分享…”确认不会崩溃。
 - `Info.plist` 已声明 STL 文档类型（UTI `com.stl2stp.stl`）。App 能不能出现在微信、“文件”等 App 的“用其他应用打开”列表里，要在真机上验证。
 
-### 9.3 后台转换与内存警告（原生代码，Dart 端已就绪）
+### 9.3 后台转换与内存警告
 
-Dart 端用两个 MethodChannel，iOS 上还没有原生实现时会自动降级（不报错）：后台任务不申请，内存预算用默认 1.5 GB。在 Mac 上把下面的代码合进 `app/ios/Runner/AppDelegate.swift`：
+后台任务和实时内存查询已经集成在 app/ios/Runner/AppDelegate.swift，通过 stl2stp/background 和 stl2stp/memory 两个通道与 Dart 通信。无需手动复制 Swift 片段。后台时间到期会通知 Dart 安全取消，并结束对应的系统任务；可用内存查询使用 os_proc_available_memory。
 
-```swift
-import Flutter
-import UIKit
-import os
+这些桥接逻辑仍需在 Mac/iPhone 上验证，不保证系统一定给予固定时长的后台运行时间。Flutter 的内存压力通知继续由引擎传到 Dart。
 
-@main
-@objc class AppDelegate: FlutterAppDelegate {
-  private var tasks: [Int: UIBackgroundTaskIdentifier] = [:]
-  private var nextId = 1
-  private var backgroundChannel: FlutterMethodChannel?
+验证清单：
 
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    GeneratedPluginRegistrant.register(with: self)
-    let messenger = (window?.rootViewController as! FlutterViewController).binaryMessenger
-
-    // 后台任务：begin → id；end(id)；到期时回调 Dart 的 expired(id)。
-    let bg = FlutterMethodChannel(name: "stl2stp/background", binaryMessenger: messenger)
-    backgroundChannel = bg
-    bg.setMethodCallHandler { [weak self] call, result in
-      guard let self = self else { return }
-      switch call.method {
-      case "begin":
-        let name = (call.arguments as? [String: Any])?["name"] as? String ?? "stl2stp-convert"
-        let id = self.nextId
-        self.nextId += 1
-        let task = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
-          // 系统要收回后台时间：通知 Dart 取消转换，然后结束任务。
-          self?.backgroundChannel?.invokeMethod("expired", arguments: id)
-          self?.endTask(id)
-        }
-        if task == .invalid { result(nil) } else { self.tasks[id] = task; result(id) }
-      case "end":
-        if let id = (call.arguments as? [String: Any])?["id"] as? Int { self.endTask(id) }
-        result(nil)
-      default:
-        result(FlutterMethodNotImplemented)
-      }
-    }
-
-    // 本进程还能用多少内存（字节）。iOS 13+。
-    let mem = FlutterMethodChannel(name: "stl2stp/memory", binaryMessenger: messenger)
-    mem.setMethodCallHandler { call, result in
-      if call.method == "available" { result(Int(os_proc_available_memory())) }
-      else { result(FlutterMethodNotImplemented) }
-    }
-
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-
-  private func endTask(_ id: Int) {
-    if let task = tasks.removeValue(forKey: id) { UIApplication.shared.endBackgroundTask(task) }
-  }
-}
-```
-
-说明：
-- 如果模板里的 `AppDelegate` 是新版“隐式引擎”写法（没有 `window.rootViewController`），就在 `didInitializeImplicitFlutterEngine(_:)` 里用 `engineBridge.applicationRegistrar.messenger()` 拿 messenger，其余不变。
-- 内存警告不需要额外原生代码：Flutter 引擎收到 `UIApplication.didReceiveMemoryWarningNotification` 后会调用 Dart 的 `didHaveMemoryPressure`，App 会安全取消正在进行的转换。
-- 验证：
-  1. 真机上转换一个几万面的模型，转换中按 Home 回桌面，等 10–20 秒再回来：应该已完成或仍在进行；
-  2. 回桌面等超过约 30 秒：应自动取消，错误页说明“App 在后台停留太久”；
-  3. 模拟器菜单 Debug → Simulate Memory Warning：正在转换时应取消并提示“内存紧张”；
-  4. 预览页点转换时，用 Xcode 的 Memory 仪表对比 App 预估的“预计需要”，必要时调 `MemoryGuard` 的系数（docs/flutter-app.md §13）。
+1. 模拟器启动后确认使用真实 FFI 核心，并完成示例 STL → STEP → 回读。
+2. 真机转换时切到后台再回来，验证任务结束或继续；系统触发任务过期时应安全取消。
+3. 模拟器触发 Memory Warning，转换应取消并显示内存提示。
+4. 用 Xcode 检查可用内存通道返回值和 App 预算，不能把固定降级预算当作原生查询成功。
+5. Mac 上构建 Release 后运行符号检查，并验证焊接开关与真实导出，不能只检查界面能否打开。
 
 ## 10. OCCT（LGPL 2.1 + 例外）静态链接合规——上架前必须确认
 
@@ -333,21 +266,18 @@ import os
 - 以上是对一个**尚未确认的法律问题**的技术整理，不是法律意见。
 - App Store 的使用条款与 (L)GPL 是否兼容存在争议，**以法务意见为准**。原 stl2stp 项目的许可证也需确认。
 
-## 11. 把 Mac 上的改动带回 Windows
+## 11. 提交 Mac 上的改动
 
-在 Mac：
+从最新 master 建立功能分支；构建和测试后只暂存源码、配置及文档。不要暂存 app/ios/Stl2StpCore、Pods、生成的 xcconfig、build 缓存或签名私密文件。
+
 ```bash
-cd ~/work/stl2stp-ios
-git add -A && git commit -m "ios: ..."         # 不要提交 app/ios/Stl2StpCore/、*.a、Pods/（.gitignore 已排除）
-git bundle create ~/Desktop/mac-changes.bundle app/flutter
+cd ~/work/stl2stp
+git switch -c ios/your-change
+git status --short
+# 按实际改动选择 git add 的路径，然后提交到功能分支并按仓库流程合并。
 ```
-拷回 Windows 后在 WSL：
-```bash
-cd /mnt/d/stl2stp-ios
-git fetch /mnt/d/mac-changes.bundle app/flutter:app/flutter-mac
-git log --oneline app/flutter..app/flutter-mac
-git checkout app/flutter && git merge app/flutter-mac   # 或在 worktree D:/stl2stp-flutter 里合并
-```
+
+原本地 bundle/worktree 的离线交接流程不再是获取当前源码的前提。
 
 ## 12. 常见问题
 

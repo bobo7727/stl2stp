@@ -1,5 +1,8 @@
 import math, struct, sys, os
+if len(sys.argv) != 2:
+    sys.exit('Usage: gen.py OUTPUT_DIRECTORY')
 out = sys.argv[1]
+os.makedirs(out, exist_ok=True)
 def cube(n, off=(0,0,0), skip_top=False):
     res=[]
     for axis in range(3):
