@@ -26,6 +26,7 @@ workflows:
           python3 tool/ios/test_core_symbols.py
           python3 tool/ios/test_build_ios_core.py
           python3 tool/ios/test_check_ios_binary.py
+          python3 ../tools/tests/test_occt_discovery.py
       - name: Flutter packages, analysis and tests
         script: |
           #!/usr/bin/env bash
@@ -91,6 +92,7 @@ workflows:
           python3 tool/ios/test_core_symbols.py
           python3 tool/ios/test_build_ios_core.py
           python3 tool/ios/test_check_ios_binary.py
+          python3 ../tools/tests/test_occt_discovery.py
       - name: Flutter packages, analysis and tests
         script: |
           #!/usr/bin/env bash

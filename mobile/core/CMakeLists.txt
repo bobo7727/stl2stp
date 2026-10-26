@@ -7,7 +7,7 @@ include(GNUInstallDirs)
 option(STL2STP_WITH_OCCT "Build STEP/IGES exchange (OFF is mesh-only, not full validation)" ON)
 option(STL2STP_BUILD_CLI "Build the command line executable" ON)
 set(OCCT_ROOT "" CACHE PATH "OCCT installation prefix")
-set(OCCT_INCLUDE_DIR "" CACHE PATH "Override OCCT headers (include/opencascade or inc)")
+set(OCCT_INCLUDE_DIR "" CACHE PATH "Override OCCT headers (include/opencascade, inc or include)")
 set(OCCT_LIBRARY_DIR "" CACHE PATH "Override OCCT toolkit directory")
 set(OCCT_EXTRA_LIBRARIES "" CACHE STRING "Additional dependencies of a custom static OCCT build")
 
@@ -20,16 +20,21 @@ target_include_directories(stl2stp-core PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(STL2STP_WITH_OCCT)
+    # OCCT_ROOT is a staged target-platform dependency, outside the Apple SDK.
+    # iOS defaults discovery to SDK roots ONLY; do not re-root this explicit
+    # prefix. Keep NO_DEFAULT_PATH so unrelated host installs are not selected.
     if(NOT OCCT_INCLUDE_DIR)
         find_path(_occt_headers Standard_Version.hxx
-            PATHS "${OCCT_ROOT}/include/opencascade" "${OCCT_ROOT}/inc" NO_DEFAULT_PATH)
+            PATHS "${OCCT_ROOT}/include/opencascade" "${OCCT_ROOT}/inc" "${OCCT_ROOT}/include"
+            NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
         if(NOT _occt_headers)
             message(FATAL_ERROR "OCCT headers not found. Set OCCT_ROOT or OCCT_INCLUDE_DIR.")
         endif()
         set(OCCT_INCLUDE_DIR "${_occt_headers}" CACHE PATH "OCCT headers" FORCE)
     endif()
     if(NOT OCCT_LIBRARY_DIR)
-        find_library(_occt_kernel NAMES TKernel PATHS "${OCCT_ROOT}/lib" "${OCCT_ROOT}/lib64" NO_DEFAULT_PATH)
+        find_library(_occt_kernel NAMES TKernel PATHS "${OCCT_ROOT}/lib" "${OCCT_ROOT}/lib64"
+            NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
         if(NOT _occt_kernel)
             message(FATAL_ERROR "OCCT libraries not found. Set OCCT_ROOT or OCCT_LIBRARY_DIR.")
         endif()
@@ -38,7 +43,7 @@ if(STL2STP_WITH_OCCT)
     endif()
     find_package(OpenCASCADE QUIET CONFIG
         PATHS "${OCCT_LIBRARY_DIR}/cmake/opencascade" "${OCCT_LIBRARY_DIR}/cmake/OpenCASCADE"
-        NO_DEFAULT_PATH)
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
     set(_occt_toolkits TKDESTEP TKDEIGES TKXSBase TKBool TKBO TKPrim TKShHealing
         TKTopAlgo TKGeomAlgo TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel)
     set(_occt_links "")
@@ -48,14 +53,14 @@ if(STL2STP_WITH_OCCT)
         elseif(TARGET ${_toolkit})
             list(APPEND _occt_links ${_toolkit})
         else()
-            find_library(_occt_${_toolkit} NAMES ${_toolkit} PATHS "${OCCT_LIBRARY_DIR}" NO_DEFAULT_PATH)
+            find_library(_occt_${_toolkit} NAMES ${_toolkit} PATHS "${OCCT_LIBRARY_DIR}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
             if(NOT _occt_${_toolkit})
                 message(FATAL_ERROR "Missing OCCT toolkit ${_toolkit} in ${OCCT_LIBRARY_DIR}")
             endif()
             list(APPEND _occt_links "${_occt_${_toolkit}}")
         endif()
     endforeach()
-    find_library(_occt_de NAMES TKDE PATHS "${OCCT_LIBRARY_DIR}" NO_DEFAULT_PATH)
+    find_library(_occt_de NAMES TKDE PATHS "${OCCT_LIBRARY_DIR}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
     if(_occt_de)
         list(APPEND _occt_links "${_occt_de}")
     endif()
