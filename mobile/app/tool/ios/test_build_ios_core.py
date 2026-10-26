@@ -87,6 +87,9 @@ class IosBuildScriptTest(unittest.TestCase):
                 env.update(SIM_ARCHS=archs, MIN_IOS=minimum)
                 run = subprocess.run(["bash", str(script)], env=env, text=True, capture_output=True)
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+                generated = (mobile / 'app/ios/Flutter/Stl2StpCore.xcconfig').read_text()
+                self.assertIn('ARCHS[sdk=iphonesimulator*] = ' + archs.replace(';', ' '),
+                              generated.splitlines())
 
             config = (mobile / 'app/ios/Flutter/Stl2StpCore.xcconfig').read_text()
             self.assertIn('ENABLE_DEBUG_DYLIB = NO', config)

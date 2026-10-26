@@ -55,6 +55,8 @@ Codemagic 成功上传后，还要在 App Store Connect 查看 Apple 的处理/�
 
 生成的配置直接按 SDK 指定 `libStl2StpCore.a`，并保留 Dart 动态查找所需的 `-u` 参数。设置 `ENABLE_DEBUG_DYLIB = NO`，使 Debug 与 Release 都把核心符号保留在 Runner 主程序中，与最终二进制检查一致。新版 Xcode 默认可能把 Debug 代码放入单独的 dylib，参见 [Apple 的构建产物布局说明](https://developer.apple.com/documentation/xcode/understanding-build-product-layout-changes)。若仍然链接失败，提供原生步骤中的两个库符号检查结果及 Xcode 完整链接日志，以区分库内容、架构与链接设置问题。
 
+如果完整日志包含 `found architecture 'arm64', required architecture 'x86_64'`，说明 Xcode 正在尝试链接静态库没有提供的切片；接口虽然存在，也会因整个库被忽略而报出整组未定义符号。Flutter 的 `flutter build ios --simulator` 使用通用模拟器目标，不能仅依赖 Debug 的 `ONLY_ACTIVE_ARCH = YES`；[Apple 说明该设置在通用目标下会被忽略](https://developer.apple.com/documentation/xcode/build-settings-reference)。生成脚本现在把 Runner 的 `ARCHS[sdk=iphonesimulator*]` 设置为实际 `SIM_ARCHS` 列表：CI 的 `arm64` 只构建 arm64 Runner，手动选择 `arm64;x86_64` 时则生成双架构配置。修改切片范围后必须重新运行原生构建脚本。
+
 本配置需在真实 Codemagic Mac 上运行后才能确认 iOS 构建通过。WSL 的脚本/单元验证不代替 Swift、CocoaPods、签名、设备和 TestFlight 验证。
 
 参考：[Flutter 工作流](https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/)、[YAML 工作目录与校验](https://docs.codemagic.io/yaml-basic-configuration/yaml-getting-started/)。
