@@ -97,6 +97,8 @@ workflows:
           set -euo pipefail
           : "${APP_STORE_APPLE_ID:?Set the numeric Apple ID in the ios_release variable group}"
           [[ "$APP_STORE_APPLE_ID" =~ ^[0-9]+$ ]] || { echo 'APP_STORE_APPLE_ID must be numeric' >&2; exit 1; }
+          : "${PROJECT_BUILD_NUMBER:?Codemagic must provide PROJECT_BUILD_NUMBER}"
+          [[ "$PROJECT_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'PROJECT_BUILD_NUMBER must be a positive integer' >&2; exit 1; }
           for tool in cmake ninja; do command -v "$tool" >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install "$tool"; done
           git log -1 --format="Build commit: %H %s"
           flutter --version
@@ -128,10 +130,9 @@ workflows:
         script: |
           #!/usr/bin/env bash
           set -euo pipefail
-          LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID")
-          [[ "$LATEST" =~ ^[0-9]+$ ]] || { echo 'Cannot determine latest App Store Connect build number' >&2; exit 1; }
-          BUILD_NUMBER=$((LATEST + 1))
-          flutter build ipa --release --build-number="$BUILD_NUMBER" \
+          # This counter also exists before the first App Store Connect upload.
+          echo "Building IPA with Codemagic project build number: $PROJECT_BUILD_NUMBER"
+          flutter build ipa --release --build-number="$PROJECT_BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist
           python3 tool/ios/check_ios_binary.py build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app/Runner
     artifacts:

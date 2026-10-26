@@ -41,7 +41,7 @@ stl2stp-app-store-connect
 
 ## 4. 执行 TestFlight 工作流
 
-选择 master 的最新提交，手动启动 ios-testflight。它会先运行符号回归与 Flutter 测试，然后构建真实核心、安装 Pods、应用签名配置，从 App Store Connect 查询递增的 build number，最后生成 IPA。
+选择 master 的最新提交，手动启动 ios-testflight。它会先运行符号回归与 Flutter 测试，然后构建真实核心、安装 Pods、应用签名配置，使用 Codemagic 跨工作流递增的 PROJECT_BUILD_NUMBER 作为 build number，首次上传也无需历史构建，最后生成 IPA。
 
 发布前会对归档中的 Runner 执行实际符号检查，确认包含全部 C API（包括 stl2stp_weld_vertices），避免 App 因缺少真实核心符号而退回演示模式。测试失败、依赖构建失败或符号缺失都会停止工作流。
 
