@@ -23,6 +23,13 @@ with open(os.environ['IOS_MOCK_LOG'], 'a') as log:
     log.write(json.dumps([name, args]) + '\n')
 if name == 'shasum':
     sys.stdin.read()
+if name == 'xcrun':
+    import re
+    header = pathlib.Path(os.environ['IOS_TEST_HEADER']).read_text()
+    symbols = sorted(set(re.findall(r'\b(stl2stp_\w+)\s*\(', header)))
+    if os.environ.get('IOS_TEST_MISSING_ARCH') == args[args.index('-arch') + 1]:
+        symbols.remove('stl2stp_create')
+    print('\n'.join('_' + symbol for symbol in symbols))
 if name == 'libtool':
     output_index = args.index('-o') + 1
     for archive in args[output_index + 1:]:
@@ -42,6 +49,7 @@ class IosBuildScriptTest(unittest.TestCase):
             for relative in (
                 "app/tool/ios/build_ios_core.sh",
                 "app/tool/ios/core_symbols.py",
+                "app/tool/ios/check_ios_binary.py",
                 "app/lib/core/ffi/bindings.dart",
                 "core/include/stl2stp/stl2stp.h",
             ):
@@ -66,18 +74,26 @@ class IosBuildScriptTest(unittest.TestCase):
 
             tools = root / "mock tools"
             tools.mkdir()
-            for name in ("cmake", "shasum", "libtool", "lipo", "xcodebuild", "rm"):
+            for name in ("cmake", "shasum", "libtool", "lipo", "xcodebuild", "rm", "xcrun"):
                 command = tools / name
                 command.write_text("#!" + sys.executable + "\n" + MOCK_TOOL, encoding="utf-8")
                 command.chmod(0o755)
             log = root / "calls.jsonl"
-            env = dict(os.environ, WORK=str(work), JOBS="1", IOS_MOCK_LOG=str(log))
+            env = dict(os.environ, WORK=str(work), JOBS="1", IOS_MOCK_LOG=str(log),
+                       IOS_TEST_HEADER=str(mobile / 'core/include/stl2stp/stl2stp.h'))
             env["PATH"] = str(tools) + os.pathsep + env["PATH"]
             script = mobile / "app/tool/ios/build_ios_core.sh"
             for archs, minimum in (("arm64", "14.0"), ("arm64;x86_64", "15.0")):
                 env.update(SIM_ARCHS=archs, MIN_IOS=minimum)
                 run = subprocess.run(["bash", str(script)], env=env, text=True, capture_output=True)
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+
+            config = (mobile / 'app/ios/Flutter/Stl2StpCore.xcconfig').read_text()
+            self.assertIn('ENABLE_DEBUG_DYLIB = NO', config)
+            self.assertIn('"$(STL2STP_CORE_LIBRARY)"', config)
+            self.assertNotIn('-lStl2StpCore', config)
+            for sdk in ('iphoneos', 'iphonesimulator'):
+                self.assertIn(f'$(PROJECT_DIR)/Stl2StpCore/{sdk}/libStl2StpCore.a', config)
 
             calls = [json.loads(line) for line in log.read_text().splitlines()]
             configurations = [args for name, args in calls if name == "cmake" and "-S" in args]
@@ -86,6 +102,18 @@ class IosBuildScriptTest(unittest.TestCase):
             self.assertEqual(sum(name == "cmake" and "--install" in args for name, args in calls), 4)
             self.assertIn("-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64", occt[-1])
             self.assertIn("-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0", occt[-1])
+            checks = [args for name, args in calls if name == 'xcrun']
+            self.assertEqual([args[args.index('-arch') + 1] for args in checks],
+                             ['arm64', 'arm64', 'arm64', 'arm64', 'x86_64'])
+            # A missing export in just one slice must stop before packaging.
+            log.write_text('')
+            env['IOS_TEST_MISSING_ARCH'] = 'x86_64'
+            run = subprocess.run(['bash', str(script)], env=env, text=True, capture_output=True)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn('stl2stp_create', run.stderr)
+            self.assertIn('x86_64', run.stderr)
+            failed_calls = [json.loads(line) for line in log.read_text().splitlines()]
+            self.assertFalse(any(name == 'xcodebuild' for name, _ in failed_calls))
             archives = [args for name, args in calls if name == "libtool"]
             self.assertEqual(len(archives), 4)
             for args in archives:

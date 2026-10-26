@@ -51,6 +51,10 @@ Codemagic 成功上传后，还要在 App Store Connect 查看 Apple 的处理/�
 
 从失败步骤查看日志；原生库生成在 mobile/app/ios/Stl2StpCore，生成的 xcconfig 已被 Runner 的 Debug/Release 配置包含。证书/描述文件/商店应用不匹配时修正 Codemagic 和 Apple 账号配置。不要为了通过构建开启 DemoEngine 或忽略失败的测试。
 
+如果出现整组 `Undefined symbol: _stl2stp_*`，检查本次构建是否选择了 master 的最新提交。原生构建脚本现在会用 `xcrun nm` 对每个 SDK、每个请求架构检查全部 C API，缺失时在创建 XCFramework 前失败，并显示对应库、架构和缺失函数。验证通过只证明库中有定义；仍需后面的 Xcode 链接和 Runner 导出检查通过。
+
+生成的配置直接按 SDK 指定 `libStl2StpCore.a`，并保留 Dart 动态查找所需的 `-u` 参数。设置 `ENABLE_DEBUG_DYLIB = NO`，使 Debug 与 Release 都把核心符号保留在 Runner 主程序中，与最终二进制检查一致。新版 Xcode 默认可能把 Debug 代码放入单独的 dylib，参见 [Apple 的构建产物布局说明](https://developer.apple.com/documentation/xcode/understanding-build-product-layout-changes)。若仍然链接失败，提供原生步骤中的两个库符号检查结果及 Xcode 完整链接日志，以区分库内容、架构与链接设置问题。
+
 本配置需在真实 Codemagic Mac 上运行后才能确认 iOS 构建通过。WSL 的脚本/单元验证不代替 Swift、CocoaPods、签名、设备和 TestFlight 验证。
 
 参考：[Flutter 工作流](https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/)、[YAML 工作目录与校验](https://docs.codemagic.io/yaml-basic-configuration/yaml-getting-started/)。
