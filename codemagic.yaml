@@ -20,6 +20,7 @@ workflows:
           #!/usr/bin/env bash
           set -euo pipefail
           for tool in cmake ninja; do command -v "$tool" >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install "$tool"; done
+          git log -1 --format="Build commit: %H %s"
           flutter --version
           xcodebuild -version
           python3 tool/ios/core_symbols.py
@@ -49,13 +50,24 @@ workflows:
         script: |
           #!/usr/bin/env bash
           set -euo pipefail
-          flutter build ios --simulator --debug
+          mkdir -p "$CM_BUILD_DIR/mobile/build"
+          {
+            git log -1 --format="Build commit: %H %s"
+            cat ios/Flutter/Stl2StpCore.xcconfig
+            xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+              -configuration Debug -sdk iphonesimulator \
+              -destination 'generic/platform=iOS Simulator' -showBuildSettings | \
+              sed -n -E '/^[[:space:]]*(ARCHS|CURRENT_ARCH|ONLY_ACTIVE_ARCH|EXCLUDED_ARCHS|STL2STP_CORE_LIBRARY|OTHER_LDFLAGS|ENABLE_DEBUG_DYLIB|SDKROOT|PLATFORM_NAME|NATIVE_ARCH_ACTUAL) = /p'
+          } 2>&1 | tee "$CM_BUILD_DIR/mobile/build/ios-simulator-link-settings.log"
+          flutter build ios --simulator --debug --verbose 2>&1 | \
+            tee "$CM_BUILD_DIR/mobile/build/ios-simulator-build.log"
           python3 tool/ios/check_ios_binary.py build/ios/iphonesimulator/Runner.app/Runner
           mkdir -p "$CM_BUILD_DIR/mobile/build"
           ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app \
             "$CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip"
     artifacts:
       - $CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip
+      - $CM_BUILD_DIR/mobile/build/ios-simulator-*.log
       - /tmp/xcodebuild_logs/*.log
 
   ios-testflight:
@@ -86,6 +98,7 @@ workflows:
           : "${APP_STORE_APPLE_ID:?Set the numeric Apple ID in the ios_release variable group}"
           [[ "$APP_STORE_APPLE_ID" =~ ^[0-9]+$ ]] || { echo 'APP_STORE_APPLE_ID must be numeric' >&2; exit 1; }
           for tool in cmake ninja; do command -v "$tool" >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install "$tool"; done
+          git log -1 --format="Build commit: %H %s"
           flutter --version
           xcodebuild -version
           python3 tool/ios/core_symbols.py
