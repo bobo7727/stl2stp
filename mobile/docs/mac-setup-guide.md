@@ -1,7 +1,7 @@
 # 在 Mac 上继续开发 iOS 版：详细操作流程
 
 > 适用：`mobile/` 目录（原独立仓库的 `app/flutter` 分支；Flutter 界面 + `core/` C++ 核心库）。本文在 Windows/WSL 上写成，**还没有在 Mac 上实际跑过**；命令按 Xcode 16/26、Flutter 3.38、CMake 3.26+ 编写，遇到出入请对照第 12 节排错。
-> 当前从 GitHub master 克隆，在 mobile/ 内执行核心库与 Flutter 命令。最低 iOS 14；先读 [QUICKSTART.md](../QUICKSTART.md)。iOS 原生通道已纳入工程，仍需 Mac/真机验证。
+> 当前从 GitHub master 克隆，在 mobile/ 内执行核心库与 Flutter 命令。最低 iOS 15.0；先读 [QUICKSTART.md](../QUICKSTART.md)。iOS 原生通道已纳入工程，仍需 Mac/真机验证。
 
 ## 0. 总览
 
@@ -136,12 +136,12 @@ cat app/ios/Flutter/Stl2StpCore.xcconfig
 脚本里的关键 CMake 参数（便于手工排错）：
 ```
 -G Ninja -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos|iphonesimulator
--DCMAKE_OSX_ARCHITECTURES=arm64 | "arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
+-DCMAKE_OSX_ARCHITECTURES=arm64 | "arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
 -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_BUILD_TYPE=Release
 -DBUILD_LIBRARY_TYPE=Static -DBUILD_USE_PCH=OFF  (+ 与 Linux 相同的模块/USE_* 开关)
 核心库：-DOCCT_ROOT=<上一步安装目录> -DBUILD_SHARED_LIBS=OFF -DSTL2STP_BUILD_CLI=OFF -DBUILD_TESTING=OFF
 ```
-最低系统版本为 **iOS 14.0**，与锁定的 file_picker_darwin 插件要求一致。修改最低版本时应同步 Runner、Podfile、AppFrameworkInfo 和构建脚本默认值。
+最低系统版本为 **iOS 15.0**。锁定的 file_picker_darwin 插件要求 iOS 14 或更高，低于本工程下限。修改最低版本时应同步 Runner 各配置的 `IPHONEOS_DEPLOYMENT_TARGET`、Podfile、`AppFrameworkInfo.plist` 的 `MinimumOSVersion`，以及构建脚本默认 `MIN_IOS`（经 `CMAKE_OSX_DEPLOYMENT_TARGET` 传给 OCCT 和 core）。
 
 ## 6. 在 iOS 模拟器上运行
 

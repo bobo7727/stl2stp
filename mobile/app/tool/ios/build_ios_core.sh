@@ -8,7 +8,7 @@
 #   app/ios/Flutter/Stl2StpCore.xcconfig                  (picked up by Debug/Release.xcconfig)
 #
 # Run on a Mac with Xcode, CMake, Ninja and Python 3: bash app/tool/ios/build_ios_core.sh
-# Env overrides: WORK (default ~/stl2stp-ios-deps), MIN_IOS (14.0), JOBS,
+# Env overrides: WORK (default ~/stl2stp-ios-deps), MIN_IOS (15.0), JOBS,
 #                SIM_ARCHS ("arm64;x86_64"; use "arm64" on Apple silicon only),
 #                OCCT_TGZ (path to V8.0.1.tar.gz if already downloaded).
 # NOTE: written on Windows/WSL without a Mac; not executed yet. See docs/mac-setup-guide.md.
@@ -17,7 +17,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 APP="$REPO/app"
 WORK="${WORK:-$HOME/stl2stp-ios-deps}"
-MIN_IOS="${MIN_IOS:-14.0}"
+MIN_IOS="${MIN_IOS:-15.0}"
 # Derive the full exported C API and check Dart lookups before starting a build.
 u_flags="$(python3 "$APP/tool/ios/core_symbols.py" --linker-flags)"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu)}"
@@ -35,6 +35,7 @@ echo "$OCCT_SHA256  $OCCT_TGZ" | shasum -a 256 -c -
 ios_common=(
   -G Ninja
   -DCMAKE_SYSTEM_NAME=iOS
+  # CMake maps this to -mios-version-min for both the OCCT and stl2stp-core builds.
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$MIN_IOS"
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
