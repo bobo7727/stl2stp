@@ -83,8 +83,13 @@ class IosBuildScriptTest(unittest.TestCase):
                        IOS_TEST_HEADER=str(mobile / 'core/include/stl2stp/stl2stp.h'))
             env["PATH"] = str(tools) + os.pathsep + env["PATH"]
             script = mobile / "app/tool/ios/build_ios_core.sh"
-            for archs, minimum in (("arm64", "14.0"), ("arm64;x86_64", "15.0")):
-                env.update(SIM_ARCHS=archs, MIN_IOS=minimum)
+            # First run omits MIN_IOS so the script default (15.0) is what CMake sees.
+            for archs, minimum in (("arm64", None), ("arm64;x86_64", "15.0")):
+                env["SIM_ARCHS"] = archs
+                if minimum is None:
+                    env.pop("MIN_IOS", None)
+                else:
+                    env["MIN_IOS"] = minimum
                 run = subprocess.run(["bash", str(script)], env=env, text=True, capture_output=True)
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
                 generated = (mobile / 'app/ios/Flutter/Stl2StpCore.xcconfig').read_text()
@@ -102,9 +107,12 @@ class IosBuildScriptTest(unittest.TestCase):
             configurations = [args for name, args in calls if name == "cmake" and "-S" in args]
             occt = [args for args in configurations if str(work / "OCCT-8.0.1") in args]
             self.assertEqual(len(occt), 4, "OCCT must configure both SDKs on both runs despite .done")
+            core = [args for args in configurations if str(mobile / "core") in args]
+            self.assertEqual(len(core), 4, "core must configure both SDKs on both runs")
+            for args in occt + core:
+                self.assertIn("-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0", args)
             self.assertEqual(sum(name == "cmake" and "--install" in args for name, args in calls), 4)
             self.assertIn("-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64", occt[-1])
-            self.assertIn("-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0", occt[-1])
             checks = [args for name, args in calls if name == 'xcrun']
             self.assertEqual([args[args.index('-arch') + 1] for args in checks],
                              ['arm64', 'arm64', 'arm64', 'arm64', 'x86_64'])

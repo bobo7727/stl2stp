@@ -8,7 +8,7 @@ workflows:
     working_directory: mobile/app
     environment:
       flutter: 3.38.7
-      xcode: latest
+      xcode: "26.6"
       cocoapods: default
     cache:
       cache_paths:
@@ -79,7 +79,7 @@ workflows:
       app_store_connect: stl2stp-app-store-connect
     environment:
       flutter: 3.38.7
-      xcode: latest
+      xcode: "26.6"
       cocoapods: default
       groups:
         - ios_release

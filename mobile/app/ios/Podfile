@@ -1,6 +1,6 @@
 # Based on Flutter 3.38.7's cocoapods/Podfile-ios template.
-# file_picker_darwin 2.3.2 (pubspec.lock) requires iOS 14 or later.
-platform :ios, '14.0'
+# Project minimum is iOS 15.0. file_picker_darwin 2.3.2 (pubspec.lock) allows iOS 14+, which is below this floor.
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'

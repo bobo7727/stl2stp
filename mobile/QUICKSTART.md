@@ -73,7 +73,7 @@ pubspec.lock 已入库。测试和 App 运行会下载/生成 pub 缓存及 Flut
 
 ## 5. Mac / iOS
 
-需要 Mac、Xcode、CMake、Ninja、Python 3、Flutter 3.38.7 和 CocoaPods。当前项目最低 **iOS 14**，与锁定插件一致。进入同一克隆的 mobile/：
+需要 Mac、Xcode、CMake、Ninja、Python 3、Flutter 3.38.7 和 CocoaPods。当前项目最低 **iOS 15.0**。锁定的 file_picker_darwin 插件要求 iOS 14 或更高，低于本工程下限。进入同一克隆的 mobile/：
 
 ```bash
 mkdir -p build

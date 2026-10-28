@@ -7,7 +7,9 @@
 | ios-simulator | Mac 上编译真实 OCCT/C++ 核心、运行 Flutter 分析及测试、生成 arm64 模拟器 App ZIP | 不需要签名 |
 | ios-testflight | 签名 Release IPA，验证原生 C API 符号后上传 App Store Connect/TestFlight | 需要下述配置 |
 
-两者都固定 Flutter 3.38.7、最低 iOS 14，使用 Codemagic 当前 latest Xcode 并输出实际版本。首次会从固定 URL 下载并校验 OCCT 8.0.1，再为 iPhone 和模拟器构建。只缓存下载包/pub 缓存，不缓存可能与 Xcode/架构不匹配的原生 build。工作流没有自动 push 触发器，先手动验证。
+两者都固定 Flutter 3.38.7、最低 iOS 15.0，并将 Xcode 固定为 26.6（此前成功构建实际使用的版本，不再跟随 latest），同时输出实际 `xcodebuild` 版本。首次会从固定 URL 下载并校验 OCCT 8.0.1，再为 iPhone 和模拟器构建。只缓存下载包/pub 缓存，不缓存可能与 Xcode/架构不匹配的原生 build。工作流没有自动 push 触发器，先手动验证。
+
+`Runner/Info.plist` 设置 `ITSAppUsesNonExemptEncryption` 为 false，声明不使用非豁免加密。`Runner/PrivacyInfo.xcprivacy` 声明不追踪、不收集数据，并声明 UserDefaults（CA92.1）以及沙盒内文件大小/是否存在所使用的文件时间戳 API（C617.1）。营销版本保持 1.0.0；build number 仍来自 Codemagic 的 `PROJECT_BUILD_NUMBER`，不在仓库中写死。
 
 ## 1. 连接 GitHub 仓库
 
