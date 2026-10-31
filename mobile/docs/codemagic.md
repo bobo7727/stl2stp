@@ -62,3 +62,9 @@ Codemagic 成功上传 IPA 到 App Store Connect，但不调用 TestFlight 外�
 本配置需在真实 Codemagic Mac 上运行后才能确认 iOS 构建通过。WSL 的脚本/单元验证不代替 Swift、CocoaPods、签名、设备和 TestFlight 验证。
 
 参考：[Flutter 工作流](https://docs.codemagic.io/yaml-quick-start/building-a-flutter-app/)、[YAML 工作目录与校验](https://docs.codemagic.io/yaml-basic-configuration/yaml-getting-started/)。
+
+## 6. 转换回归：GitHub Actions，而不是每次 Codemagic
+
+每次 pull request 和 `master` 推送由仓库里的 GitHub Actions 工作流 `.github/workflows/core-regression.yml` 在 Linux 上完成。它缓存 OCCT 8.0.1 安装前缀（缓存未命中时用 `tools/bootstrap-occt.sh` 构建），再配置 `mobile/core` 并运行完整 `ctest`，其中包括 `stl2stp.regression`。公开仓库使用 GitHub 托管 runner，不另加付费服务。夹具、期望和耗时说明见 `mobile/core/tests/fixtures/README.md`。
+
+Codemagic 保持免费额度：`ios-simulator` 和 `ios-testflight` **没有**加上 Flutter `integration_test`。模拟器上的真实 `FfiEngine` 回归是单独的工作流 `ios-fixture-regression`。它的 YAML 没有 `triggering`，因此 push 和 pull request 都不会启动它，只能在 Codemagic 界面里手动开。那一次会编译模拟器核心（这是 macOS 分钟的大头），再跑 `integration_test/fixture_regression_test.dart`：确认引擎不是 `DemoEngine`，用几个已提交的 STL 夹具走 FFI 转 STEP/IGES，并用 `stl2stp_read_step` 回读 STEP。日常不要为了看转换结果去跑它；Linux ctest 已经覆盖同一批夹具的 OCCT 回读。
