@@ -10,8 +10,9 @@ import 'stl_reader.dart';
 
 /// Engine without native code: stats come from the Dart STL reader and the
 /// conversion is simulated (writes a clearly marked placeholder file).
-/// Used by widget tests and on targets where stl2stp-core is not built yet
-/// (e.g. Windows without MSVC, Android before the NDK build of OCCT).
+/// Used by widget tests, debug/profile when stl2stp-core is not built yet,
+/// and release builds only when `--dart-define=STL2STP_DEMO=true` (or `=1`)
+/// is set. A release build never selects this automatically.
 class DemoEngine implements ConversionEngine {
   DemoEngine({this.stepDelay = const Duration(milliseconds: 40), this.failWith});
 

@@ -109,6 +109,8 @@ class IosBuildScriptTest(unittest.TestCase):
             self.assertEqual(len(occt), 4, "OCCT must configure both SDKs on both runs despite .done")
             core = [args for args in configurations if str(mobile / "core") in args]
             self.assertEqual(len(core), 4, "core must configure both SDKs on both runs")
+            for args in core:
+                self.assertIn("-DSTL2STP_WITH_OCCT=ON", args)
             for args in occt + core:
                 self.assertIn("-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0", args)
             self.assertEqual(sum(name == "cmake" and "--install" in args for name, args in calls), 4)

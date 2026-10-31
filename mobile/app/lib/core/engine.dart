@@ -18,8 +18,9 @@ class SimpleCancelToken implements CancelToken {
 }
 
 /// What the UI needs from the conversion core. Implemented by [FfiEngine]
-/// (real stl2stp-core over dart:ffi) and [DemoEngine] (no native code; used
-/// by widget tests and on platforms where the core is not built yet).
+/// (real stl2stp-core over dart:ffi), [DemoEngine] (debug, profile, and
+/// explicit test opt-in), and [UnavailableEngine] (a release build whose
+/// native core failed to load or initialize).
 abstract class ConversionEngine {
   /// Human-readable name shown in Settings › About.
   String get name;
@@ -35,4 +36,32 @@ abstract class ConversionEngine {
   /// Runs read → (simplify) → build → write → (verify) and reports progress.
   Future<ConvertResult> convert(ConvertRequest request,
       {required void Function(ConvertProgress) onProgress, required CancelToken cancel});
+}
+
+/// Release builds use this when stl2stp-core cannot be loaded or initialized.
+/// It never converts. The UI shows an error instead of [DemoEngine].
+class UnavailableEngine implements ConversionEngine {
+  UnavailableEngine({this.detail = ''});
+
+  /// Technical reason from the failed load, for the error screen.
+  final String detail;
+
+  @override
+  String get name => 'stl2stp-core (unavailable)';
+
+  @override
+  bool get isReal => false;
+
+  @override
+  CancelToken newCancelToken() => SimpleCancelToken();
+
+  StateError get _error => StateError(detail.isEmpty ? 'stl2stp-core is not available' : detail);
+
+  @override
+  Future<MeshInfo> inspect(String path) => Future<MeshInfo>.error(_error);
+
+  @override
+  Future<ConvertResult> convert(ConvertRequest request,
+          {required void Function(ConvertProgress) onProgress, required CancelToken cancel}) =>
+      Future<ConvertResult>.error(_error);
 }

@@ -1,5 +1,7 @@
 {
  "x.demo_banner": "Demo mode: stl2stp-core was not found, outputs are placeholders.",
+ "x.core_unavailable.title": "Conversion engine unavailable",
+ "x.core_unavailable.body": "This release needs the on-device stl2stp-core to convert files. It failed to load, so the app cannot continue. Reinstall the app. If it still fails, contact support.",
  "x.engine": "Engine",
  "x.open_path.title": "Enter STL file path",
  "x.open_path.hint": "/path/to/model.stl",

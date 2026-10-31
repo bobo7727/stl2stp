@@ -7,6 +7,9 @@ import json, os
 S = {
  # ---- misc app strings ----
  'x.demo_banner': ('演示模式：未找到 stl2stp-core 转换引擎，转换结果只是占位文件。', 'Demo mode: stl2stp-core was not found, outputs are placeholders.'),
+ 'x.core_unavailable.title': ('转换引擎不可用', 'Conversion engine unavailable'),
+ 'x.core_unavailable.body': ('正式版需要本机的 stl2stp-core 才能转换文件。这次没有加载成功，不能继续。请重新安装 App。如果仍然失败，请联系支持。',
+                             'This release needs the on-device stl2stp-core to convert files. It failed to load, so the app cannot continue. Reinstall the app. If it still fails, contact support.'),
  'x.engine': ('转换引擎', 'Engine'),
  'x.open_path.title': ('输入 STL 文件路径', 'Enter STL file path'),
  'x.open_path.hint': ('/path/to/model.stl', '/path/to/model.stl'),

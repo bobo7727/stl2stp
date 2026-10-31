@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'core/engine.dart';
 import 'l10n/strings.dart';
+import 'screens/core_load_error_screen.dart';
 import 'screens/flow.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -46,7 +48,10 @@ class Stl2StpApp extends StatelessWidget {
           localeResolutionCallback: (locale, supported) =>
               locale != null && locale.languageCode == 'en' ? const Locale('en') : const Locale('zh'),
           builder: (context, child) => RepaintBoundary(key: screenshotKey, child: child),
-          home: homeOverride ?? (st.onboardingSeen ? _Home(openOnStart: openOnStart) : const OnboardingScreen()),
+          home: homeOverride ??
+              (st.engine is UnavailableEngine
+                  ? CoreLoadErrorScreen(detail: (st.engine as UnavailableEngine).detail)
+                  : (st.onboardingSeen ? _Home(openOnStart: openOnStart) : const OnboardingScreen())),
         );
       }),
     );

@@ -66,9 +66,13 @@ build_occt() { # name sysroot archs
 build_core() { # name sysroot archs
   local name=$1 sysroot=$2 archs=$3
   local B="$WORK/build-core-$name" P="$WORK/occt-$name" OUT="$APP/ios/Stl2StpCore/$name"
+  # STL2STP_WITH_OCCT defaults to ON, but an old cache can keep OFF and
+  # then compile exchange_disabled.cpp. The C API symbol check cannot tell
+  # that stub from the real exchange, so the iOS build forces ON.
   cmake "${ios_common[@]}" -S "$REPO/core" -B "$B" \
     -DCMAKE_OSX_SYSROOT="$sysroot" -DCMAKE_OSX_ARCHITECTURES="$archs" \
-    -DOCCT_ROOT="$P" -DBUILD_SHARED_LIBS=OFF -DSTL2STP_BUILD_CLI=OFF -DBUILD_TESTING=OFF
+    -DOCCT_ROOT="$P" -DBUILD_SHARED_LIBS=OFF -DSTL2STP_BUILD_CLI=OFF -DBUILD_TESTING=OFF \
+    -DSTL2STP_WITH_OCCT=ON
   cmake --build "$B" --parallel "$JOBS"
   mkdir -p "$OUT"
   # One archive = core + every OCCT toolkit that was built (only what the
