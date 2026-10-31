@@ -47,7 +47,7 @@ stl2stp-app-store-connect
 
 发布前会对归档中的 Runner 执行实际符号检查，确认包含全部 C API（包括 stl2stp_weld_vertices），避免 App 因缺少真实核心符号而退回演示模式。测试失败、依赖构建失败或符号缺失都会停止工作流。
 
-Codemagic 成功上传后，还要在 App Store Connect 查看 Apple 的处理/测试审核结果，并配置 TestFlight 测试人员。当前 YAML 只提交 TestFlight，`submit_to_app_store` 为 false；正式 App Store 审核在功能、商店资料及真机验收就绪后进行。上传成功不等于 Apple 已完成处理或发布。
+Codemagic 成功上传 IPA 到 App Store Connect，但不调用 TestFlight 外部测试审核（`submit_to_testflight: false`，避免 POST `/v1/betaAppReviewSubmissions`），也不提交 App Store（`submit_to_app_store: false`）。当前只做内部 TestFlight：上传后在 App Store Connect 等待 Apple 处理完成，再把构建分配给内部测试人员。正式 App Store 审核在功能、商店资料及真机验收就绪后进行。上传成功不等于 Apple 已完成处理或发布。
 
 ## 5. 首次构建遇到问题
 
