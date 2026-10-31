@@ -146,4 +146,45 @@ if(STL2STP_WITH_OCCT)
         add_test(NAME stl2stp.review_${_case} COMMAND stl2stp-review-tests ${_case} "${_data}/review-${_case}")
         set_tests_properties(stl2stp.review_${_case} PROPERTIES LABELS "review" TIMEOUT 300)
     endforeach()
+
+    # Direct OCCT readers in the regression executable. Link the toolkit list twice
+    # under --no-as-needed so GNU ld does not drop a shared OCCT DSO that this
+    # executable references ("DSO missing from command line").
+    set(_regression_occt ${STL2STP_OCCT_LIBRARIES})
+    # OCCT 8 folds GProp into TKTopAlgo, so TKGProp is optional. When it is a
+    # separate DSO, the test must name it: BRepGProp is called from this
+    # executable, and ld will not take the symbol from a mere NEEDED entry.
+    if(TARGET OpenCASCADE::TKGProp)
+        list(APPEND _regression_occt OpenCASCADE::TKGProp)
+    elseif(TARGET TKGProp)
+        list(APPEND _regression_occt TKGProp)
+    else()
+        find_library(_occt_TKGProp NAMES TKGProp PATHS "${OCCT_LIBRARY_DIR}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+        if(_occt_TKGProp)
+            list(APPEND _regression_occt "${_occt_TKGProp}")
+        endif()
+    endif()
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    find_package(Threads REQUIRED)
+    add_executable(stl2stp-regression test_regression.cpp)
+    target_compile_features(stl2stp-regression PRIVATE cxx_std_17)
+    set_target_properties(stl2stp-regression PROPERTIES CXX_EXTENSIONS OFF)
+    target_include_directories(stl2stp-regression SYSTEM PRIVATE "${OCCT_INCLUDE_DIR}")
+    target_link_libraries(stl2stp-regression PRIVATE stl2stp-core Threads::Threads)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_link_libraries(stl2stp-regression PRIVATE
+            "-Wl,--push-state,--no-as-needed" ${_regression_occt} ${_regression_occt} "-Wl,--pop-state")
+    else()
+        target_link_libraries(stl2stp-regression PRIVATE ${_regression_occt} ${_regression_occt})
+    endif()
+    set(_regression_large "${CMAKE_CURRENT_BINARY_DIR}/regression-large")
+    set(_regression_work "${CMAKE_CURRENT_BINARY_DIR}/regression-work")
+    add_test(NAME stl2stp.regression_fixtures
+        COMMAND Python3::Interpreter "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/gen_fixtures.py"
+            --check --large-dir "${_regression_large}")
+    set_tests_properties(stl2stp.regression_fixtures PROPERTIES FIXTURES_SETUP regression_data LABELS regression TIMEOUT 180)
+    add_test(NAME stl2stp.regression
+        COMMAND stl2stp-regression "${CMAKE_CURRENT_SOURCE_DIR}/fixtures" "${_regression_large}" "${_regression_work}")
+    set_tests_properties(stl2stp.regression PROPERTIES
+        FIXTURES_REQUIRED regression_data RUN_SERIAL TRUE LABELS "regression;occt" TIMEOUT 3600)
 endif()

@@ -1,5 +1,7 @@
 # 测试数据
 
+转换回归的 STL 语料和期望在 `core/tests/fixtures/`（`gen_fixtures.py` + `manifest.json`），由 `stl2stp.regression` 驱动，说明见该目录的 README。下面这段仍是 mesh/exchange 单测自己的生成数据。
+
 权威 fixture 由 `core/tests/fixtures.cpp` 在 CTest 执行时生成到构建目录
 `tests/data/`，不修改本目录，不把生成的 STL、STEP、IGES 或大模型加入 Git。
 唯一的小型手写 STL `small_zero-area-duplicate.stl` 留在本目录；CMake 只把它复制到构建目录。

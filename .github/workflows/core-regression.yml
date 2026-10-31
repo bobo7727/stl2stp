@@ -1,0 +1,66 @@
+# Linux conversion regression. The repository is public, so this hosted runner
+# is free. OCCT 8.0.1 is built once and cached; ctest then runs the existing
+# suite plus mobile/core/tests/test_regression.cpp. Codemagic is not used here.
+name: Core regression
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  linux-ctest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build python3 ca-certificates curl
+
+      - name: Cache OCCT 8.0.1 install
+        id: occt-cache
+        uses: actions/cache@v4
+        with:
+          path: mobile/build/occt/install
+          key: occt-8.0.1-${{ runner.os }}-${{ hashFiles('mobile/tools/bootstrap-occt.sh') }}
+
+      - name: Build OCCT 8.0.1
+        if: steps.occt-cache.outputs.cache-hit != 'true'
+        working-directory: mobile
+        run: CC=gcc CXX=g++ bash tools/bootstrap-occt.sh --jobs 3 --prefix "$PWD/build/occt/install"
+
+      - name: Configure and build the core
+        working-directory: mobile
+        run: |
+          cmake -S core -B build/core-linux -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DOCCT_ROOT="$PWD/build/occt/install" \
+            -DSTL2STP_WITH_OCCT=ON
+          cmake --build build/core-linux
+
+      - name: Run ctest
+        working-directory: mobile
+        run: ctest --test-dir build/core-linux --output-on-failure
+
+      - name: Show regression timings
+        if: always()
+        working-directory: mobile
+        run: |
+          if [ -f build/core-linux/tests/regression-work/timings.txt ]; then
+            cat build/core-linux/tests/regression-work/timings.txt
+          else
+            echo "No regression timings file (ctest did not reach stl2stp.regression)."
+          fi
+
+      - name: Upload regression timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-timings
+          path: mobile/build/core-linux/tests/regression-work/timings.txt
+          if-no-files-found: ignore
