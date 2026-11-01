@@ -515,6 +515,15 @@ def expectations():
             "20 mm cube as ASCII STL with a leading UTF-8 BOM (EF BB BF) before 'solid'. "
             "The loader skips the BOM. Export is one closed solid, volume 8000.",
             solids=1, faces=12, volume=8000.0, **ok),
+        "24_near_degenerate_triangle.stl": _case(
+            "24_near_degenerate_triangle.stl",
+            "One triangle (0,0,0), (20,0,0), (10, 2^-20, 0). Altitude is about 9.54e-7, "
+            "above Precision::Confusion() (1e-7), and every edge is much longer than that, "
+            "so BRepLib_MakeEdge/MakeFace accept it. It is an open face: NOT_SOLID, 1 face, "
+            "not a solid. An edge no longer than 1e-7 between distinct vertices is rejected "
+            "by MakeEdge and by the face builder.",
+            load_status=0, export=True, closed=False, solids=0, shell_closed=False, faces=1,
+            volume=None, volume_abs_tol=0.0, volume_rel_tol=0.0, export_status=3),
     }
 
 
@@ -554,6 +563,11 @@ def build_meshes():
         "21_ascii_leading_whitespace.stl": ("leading", cube, "cube"),
         "22_binary_header_solid.stl": ("solid_header", cube, None),
         "23_ascii_utf8_bom.stl": ("bom", cube, "cube"),
+        "24_near_degenerate_triangle.stl": (
+            "binary",
+            [((f32(0), f32(0), f32(0)), (f32(20), f32(0), f32(0)), (f32(10), f32(2 ** -20), f32(0)))],
+            None,
+        ),
     }
     # Fail loud if a hand-built solid is inside-out or the wrong size.
     hole_volume = mesh_volume(hole)
