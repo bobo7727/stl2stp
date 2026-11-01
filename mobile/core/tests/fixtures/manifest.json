@@ -808,31 +808,73 @@
     },
     {
       "file": "21_ascii_leading_whitespace.stl",
-      "description": "Same CRLF cube with spaces and a CRLF before the solid keyword.",
+      "description": "Same CRLF cube with spaces and a CRLF before the solid keyword. Leading whitespace (and a UTF-8 BOM, if present) is not a binary STL.",
       "generate": false,
-      "load_status": 1,
+      "load_status": 0,
       "export": true,
-      "closed": false,
-      "volume": null,
-      "volume_abs_tol": 0.0,
-      "volume_rel_tol": 0.0,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
       "time_budget_s": null,
-      "known_bug": "binary_format() treats a file as binary unless the first five bytes are 'solid' or the length is an exact binary STL. Leading whitespace therefore parses the ASCII text as binary records (PARTIAL) and export fails with OCCT.",
-      "assert_mesh": false,
+      "known_bug": null,
+      "assert_mesh": true,
       "step": {
-        "status": -6,
-        "solids": 0,
-        "faces": 0,
-        "shell_closed": false
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
       },
       "iges": {
-        "status": -6,
+        "status": 0,
         "solids": 0,
-        "faces": 0,
+        "faces": 12,
         "shell_closed": false
       },
       "sha256": "83432013258655dc5ecb81e70edcedfbc5dc0e119968549b067fdc68df6f0851",
       "bytes": 3267,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
+    },
+    {
+      "file": "22_binary_header_solid.stl",
+      "description": "20 mm cube as binary STL whose 80-byte header begins with 'solid facet'. The length is exact (84 + 12*50), so the size check classifies it as binary even though the header looks like an ASCII keyword.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "c7727728450e7e735e17391519a0d322a829a3907d12eb17688456d9ccd09d79",
+      "bytes": 684,
       "triangles": 12,
       "vertices": 8,
       "records": 12,

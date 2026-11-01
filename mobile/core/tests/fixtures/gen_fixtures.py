@@ -232,8 +232,21 @@ def boundary_edges(tris):
 
 
 def wb(path: Path, tris) -> None:
+    _write_binary(path, b"stl2stp test".ljust(80, b" "), tris)
+
+
+def wb_solid_header(path: Path, tris) -> None:
+    # 80-byte header begins with the ASCII words "solid" and "facet". The file length is still
+    # an exact binary STL, which is what must keep the loader from treating it as text.
+    header = b"solid facet".ljust(80, b" ")
+    if len(header) != 80 or not header.startswith(b"solid"):
+        raise SystemExit("binary solid header must be 80 bytes and start with 'solid'")
+    _write_binary(path, header, tris)
+
+
+def _write_binary(path: Path, header: bytes, tris) -> None:
     with path.open("wb") as handle:
-        handle.write(b"stl2stp test".ljust(80, b" "))
+        handle.write(header)
         handle.write(struct.pack("<I", len(tris)))
         for tri in tris:
             handle.write(struct.pack("<3f", *norm(*tri)))
@@ -269,7 +282,6 @@ def _ascii_body(tris, name: str) -> str:
 
 
 def wa_crlf(path: Path, tris, name: str) -> None:
-    # First five bytes must be "solid" or the loader's binary detector claims the file.
     path.write_bytes(_ascii_body(tris, name).encode("ascii"))
 
 
@@ -478,13 +490,15 @@ def expectations():
             solids=1, faces=12, volume=8000.0, **ok),
         "21_ascii_leading_whitespace.stl": _case(
             "21_ascii_leading_whitespace.stl",
-            "Same CRLF cube with spaces and a CRLF before the solid keyword.",
-            load_status=1, export=True, closed=False, solids=0, shell_closed=False, faces=0,
-            volume=None, volume_abs_tol=0.0, volume_rel_tol=0.0, export_status=-6,
-            assert_mesh=False,
-            known_bug="binary_format() treats a file as binary unless the first five bytes are "
-                      "'solid' or the length is an exact binary STL. Leading whitespace therefore "
-                      "parses the ASCII text as binary records (PARTIAL) and export fails with OCCT."),
+            "Same CRLF cube with spaces and a CRLF before the solid keyword. "
+            "Leading whitespace (and a UTF-8 BOM, if present) is not a binary STL.",
+            solids=1, faces=12, volume=8000.0, **ok),
+        "22_binary_header_solid.stl": _case(
+            "22_binary_header_solid.stl",
+            "20 mm cube as binary STL whose 80-byte header begins with 'solid facet'. "
+            "The length is exact (84 + 12*50), so the size check classifies it as binary "
+            "even though the header looks like an ASCII keyword.",
+            solids=1, faces=12, volume=8000.0, **ok),
     }
 
 
@@ -522,6 +536,7 @@ def build_meshes():
         "19_truncated_binary.stl": ("truncated", cube[:2], None),
         "20_ascii_crlf_whitespace.stl": ("crlf", cube, "cube"),
         "21_ascii_leading_whitespace.stl": ("leading", cube, "cube"),
+        "22_binary_header_solid.stl": ("solid_header", cube, None),
     }
     # Fail loud if a hand-built solid is inside-out or the wrong size.
     hole_volume = mesh_volume(hole)
@@ -548,6 +563,8 @@ def write_mesh(path: Path, kind, payload, name) -> None:
         wa_crlf(path, payload, name)
     elif kind == "leading":
         wa_leading_space(path, payload, name)
+    elif kind == "solid_header":
+        wb_solid_header(path, payload)
     elif kind == "text":
         path.write_text(payload, encoding="ascii", newline="\n")
     elif kind == "empty":
@@ -574,7 +591,7 @@ def manifest_for(meshes, expect, directory: Path):
         case = dict(spec)
         case["sha256"] = sha256(path)
         case["bytes"] = path.stat().st_size
-        if kind in ("binary", "ascii", "crlf", "leading", "truncated"):
+        if kind in ("binary", "ascii", "crlf", "leading", "truncated", "solid_header"):
             stats = loader_model(payload if kind != "truncated" else payload)
             case["triangles"] = stats["triangles"]
             case["vertices"] = stats["vertices"]
@@ -657,7 +674,7 @@ def manifest_for_split(meshes, expect, small_dir: Path, large_dir: Path | None):
         else:
             case["sha256"] = sha256(directory / file)
             case["bytes"] = (directory / file).stat().st_size
-        if kind in ("binary", "ascii", "crlf", "leading", "truncated"):
+        if kind in ("binary", "ascii", "crlf", "leading", "truncated", "solid_header"):
             stats = loader_model(payload)
             case["triangles"] = stats["triangles"]
             case["vertices"] = stats["vertices"]
