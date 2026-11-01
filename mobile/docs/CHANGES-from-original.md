@@ -378,8 +378,9 @@ OCCT 的 STEP reader 回读时可能拆成多个 solid，或把 solid 降级为 
 
 - ORIGINAL 与原版一样，不覆盖 schema/unit/precision。在 OCCT 8.0.1 下实际默认为 AP214IS、MM、precision mode Average。
   IGES 构造时用 `Interface_Static::CVal("write.iges.unit")`。
-- 两种模式都保留原版查询的旧键 `Interface_Static::IVal("write.brep.mode")`（OCCT 8.0.1 中没有注册这个键，返回 0；
-  新键其实是 `write.iges.brep.mode`）。这是有意保留原版的可观察行为。
+- 两种模式都把 IGES 写成 BRep（`write.iges.brep.mode = 1`，MSBO/壳）。OCCT 8.0.1 没有注册旧键
+  `write.brep.mode`（`IVal` 返回 0 = Faces），沿用它会让闭合网格回读成散面；新键才是
+  `write.iges.brep.mode`。单位仍是毫米。
 
 ### 4.6 共面合并（新增，两种模式都可用）
 
@@ -400,7 +401,7 @@ unify.Build();
 `normalize_step_strings` 处理字符串 token → 原子发布。
 
 **IGES**：`IGESControl_Controller::Init()` → 用 RAII 设置 `write.iges.header.{author,company,product,receiver}` →
-`IGESControl_Writer(unit, IVal("write.brep.mode"))` → `AddShape(shape, progress)` → `ComputeModel()` →
+`IGESControl_Writer(unit, 1 /*write.iges.brep.mode BRep*/)` → `AddShape(shape, progress)` → `ComputeModel()` →
 复制 `IGESData_GlobalSection` 并改写字段 → `SetGlobalSection` → `ClearStartSection()`，
 description 非空时 `AddStartLine(description)` → `Write(临时文件, false /*非 FNES*/)` → 原子发布。
 
