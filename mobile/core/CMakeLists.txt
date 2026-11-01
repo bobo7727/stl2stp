@@ -103,6 +103,10 @@ if(STL2STP_WITH_OCCT)
     target_include_directories(stl2stp-core SYSTEM PRIVATE "${OCCT_INCLUDE_DIR}")
     target_link_libraries(stl2stp-core PRIVATE ${_occt_links} ${_occt_links}
         ${OCCT_EXTRA_LIBRARIES} Threads::Threads ${CMAKE_DL_LIBS})
+    # Tests that call OCCT directly (not only through stl2stp-core) must link these
+    # toolkits themselves. Listing them twice plus --no-as-needed is what avoids
+    # GNU ld's "DSO missing from command line" on the shared OCCT graph.
+    set(STL2STP_OCCT_LIBRARIES ${_occt_links})
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_link_options(stl2stp-core PUBLIC "LINKER:--disable-new-dtags")
     endif()

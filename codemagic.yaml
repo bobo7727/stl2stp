@@ -144,3 +144,75 @@ workflows:
         auth: integration
         submit_to_testflight: false
         submit_to_app_store: false
+
+  # Manual only: there is no `triggering` block, so Codemagic does not start
+  # this on push or pull request. It rebuilds the iOS simulator core (the
+  # expensive part) and is kept off the free-tier path used for ordinary
+  # checks. Every pull request runs the same corpus on Linux via GitHub
+  # Actions (.github/workflows/core-regression.yml). Start this workflow from
+  # the Codemagic UI when an iOS FFI check is actually needed.
+  ios-fixture-regression:
+    name: iOS simulator - fixture regression (manual)
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    working_directory: mobile/app
+    environment:
+      flutter: 3.38.7
+      xcode: "26.6"
+      cocoapods: default
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/stl2stp-ios-deps/V8.0.1.tar.gz
+    scripts:
+      - name: Record toolchain and validate C API
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          for tool in cmake ninja; do command -v "$tool" >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install "$tool"; done
+          git log -1 --format="Build commit: %H %s"
+          flutter --version
+          xcodebuild -version
+          python3 tool/ios/core_symbols.py
+          python3 tool/ios/test_core_symbols.py
+          python3 tool/ios/test_build_ios_core.py
+          python3 tool/ios/test_check_ios_binary.py
+          python3 ../tools/tests/test_occt_discovery.py
+          python3 ../core/tests/fixtures/gen_fixtures.py --check --large-dir "$CM_BUILD_DIR/mobile/build/regression-large"
+      - name: Flutter packages
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          flutter pub get
+      - name: Build OCCT and the real iOS core
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          SIM_ARCHS=arm64 JOBS=4 bash tool/ios/build_ios_core.sh
+      - name: Install CocoaPods dependencies
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd ios
+          pod install
+      - name: Boot a simulator and run the FfiEngine fixture regression
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          UDID=$(python3 - << 'PY'
+          import json, subprocess, sys
+          data = json.loads(subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"]))
+          for runtime, devices in data.get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              for device in devices:
+                  if device.get("isAvailable") and "iPhone" in device.get("name", ""):
+                      print(device["udid"])
+                      print(device["name"], file=sys.stderr)
+                      raise SystemExit(0)
+          raise SystemExit("no available iPhone simulator")
+          PY
+          )
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          flutter test integration_test/fixture_regression_test.dart -d "$UDID"

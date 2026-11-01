@@ -1,0 +1,852 @@
+{
+  "version": 1,
+  "units": "STL coordinates are written unchanged. STEP and IGES length unit is millimetres.",
+  "cases": [
+    {
+      "file": "01_cube_20mm_binary.stl",
+      "description": "20 mm cube, binary STL. Reference millimetre-scale solid.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "e8c0592aa904ab181eeb4c63861b8d8bf711659665d989c2ec91fa9dc42f3065",
+      "bytes": 684,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
+    },
+    {
+      "file": "02_cube_20mm_ascii.stl",
+      "description": "Same 20 mm cube as ASCII STL.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "2a45f68319005fe869d88dc04a7fdf91a4049926430ce13b48407f68398402ac",
+      "bytes": 2827,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
+    },
+    {
+      "file": "03_cylinder_d20_h40.stl",
+      "description": "Faceted cylinder, diameter 20, height 40, 64 sides (256 triangles). The seam vertex at angle 2*pi does not match angle 0 after float32 rounding, so the default weld closes it and reports REPAIRED.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 12546.194005836636,
+      "volume_abs_tol": 1.0,
+      "volume_rel_tol": 0.001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 4,
+        "solids": 1,
+        "faces": 256,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 4,
+        "solids": 0,
+        "faces": 256,
+        "shell_closed": false
+      },
+      "sha256": "db5b9bdf4cd2cada728118074282514351dd26c96860bd148c155bf0b209db21",
+      "bytes": 12884,
+      "triangles": 256,
+      "vertices": 132,
+      "records": 256,
+      "bbox_min": [
+        -10.0,
+        -10.0,
+        0.0
+      ],
+      "bbox_max": [
+        10.0,
+        10.0,
+        40.0
+      ],
+      "mesh_volume": 12546.194005836636
+    },
+    {
+      "file": "04_torus.stl",
+      "description": "Torus R=30, r=8, 96 x 48 (9216 triangles). Float32 seam vertices do not meet exactly; the default weld closes the solid and reports REPAIRED.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 37764.16574815452,
+      "volume_abs_tol": 1.0,
+      "volume_rel_tol": 0.001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 4,
+        "solids": 1,
+        "faces": 9216,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 4,
+        "solids": 0,
+        "faces": 9216,
+        "shell_closed": false
+      },
+      "sha256": "9a4ae01f531001da80d8eb9666db44b697d44f973e63ea78e9f8cbd879ea5e89",
+      "bytes": 460884,
+      "triangles": 9216,
+      "vertices": 4753,
+      "records": 9216,
+      "bbox_min": [
+        -38.0,
+        -38.0,
+        -8.0
+      ],
+      "bbox_max": [
+        38.0,
+        38.0,
+        8.0
+      ],
+      "mesh_volume": 37764.16574815452
+    },
+    {
+      "file": "05_sphere_r25_medium.stl",
+      "description": "UV sphere radius 25, 128 x 64. The south pole is not a single float32 point; default weld should close it and report REPAIRED.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 65384.16286175711,
+      "volume_abs_tol": 1.0,
+      "volume_rel_tol": 0.001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 4,
+        "solids": 1,
+        "faces": 16128,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 4,
+        "solids": 0,
+        "faces": 16128,
+        "shell_closed": false
+      },
+      "sha256": "efdc4dae0ba917f259d261834e5f5edb354daa07b62bc33e8cb5b9fd2aaba802",
+      "bytes": 806484,
+      "triangles": 16128,
+      "vertices": 8256,
+      "records": 16128,
+      "bbox_min": [
+        -25.0,
+        -25.0,
+        -25.0
+      ],
+      "bbox_max": [
+        25.0,
+        25.0,
+        25.0
+      ],
+      "mesh_volume": 65384.16286175711
+    },
+    {
+      "file": "06_two_separate_boxes.stl",
+      "description": "Two disjoint 10 mm cubes. Two closed solids, volume 2000.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 2000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 2,
+        "faces": 24,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 24,
+        "shell_closed": false
+      },
+      "sha256": "4219a8705abd209e30824e428c40a07df5860fc6ecb68d8e5338c0c5c10a8f65",
+      "bytes": 1284,
+      "triangles": 24,
+      "vertices": 16,
+      "records": 24,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        40.0,
+        10.0,
+        10.0
+      ],
+      "mesh_volume": 2000.0
+    },
+    {
+      "file": "07_open_mesh_cube_missing_top.stl",
+      "description": "Open cube. The attached generator drops triangles 2 and 3, which are the +X face (the filename says missing top; the omitted face is +X). Export must be an open shell, status NOT_SOLID, and must not invent a solid.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": false,
+      "volume": null,
+      "volume_abs_tol": 0.0,
+      "volume_rel_tol": 0.0,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 3,
+        "solids": 0,
+        "faces": 10,
+        "shell_closed": false
+      },
+      "iges": {
+        "status": 3,
+        "solids": 0,
+        "faces": 10,
+        "shell_closed": false
+      },
+      "sha256": "5d30cd0415ff940e97080b366625e7539450b6731f5dde9d619d2c8e2e1946c6",
+      "bytes": 584,
+      "triangles": 10,
+      "vertices": 8,
+      "records": 10,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 5333.333333333333
+    },
+    {
+      "file": "08_tiny_cube_0.1mm.stl",
+      "description": "0.1 mm cube. Below typical CAD accuracy but a closed solid; weld must not collapse it.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 0.0010000000447034842,
+      "volume_abs_tol": 1e-09,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "e7396577cbbab0a3e0e971d2e777771ba56d0b9d02e092de3922c3534fece0e0",
+      "bytes": 684,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        0.10000000149011612,
+        0.10000000149011612,
+        0.10000000149011612
+      ],
+      "mesh_volume": 0.0010000000447034842
+    },
+    {
+      "file": "09_large_sphere_200k_tris.stl",
+      "description": "UV sphere radius 50, 450 x 224 (200700 triangles). Generated at test time, not committed. South-pole weld reports REPAIRED. time_budget_s is a per-export and per-read ceiling.",
+      "generate": true,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 523556.0164599096,
+      "volume_abs_tol": 1.0,
+      "volume_rel_tol": 0.001,
+      "time_budget_s": 600,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 4,
+        "solids": 1,
+        "faces": 200700,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 4,
+        "solids": 0,
+        "faces": 200700,
+        "shell_closed": false
+      },
+      "sha256": "e445b709249f7c7c0721bd2ff459510ef201563bba474029343e89e535f8d7a0",
+      "bytes": 10035084,
+      "triangles": 200700,
+      "vertices": 101024,
+      "records": 200700,
+      "bbox_min": [
+        -50.0,
+        -49.998783111572266,
+        -50.0
+      ],
+      "bbox_max": [
+        50.0,
+        49.998783111572266,
+        50.0
+      ],
+      "mesh_volume": 523556.0164599096
+    },
+    {
+      "file": "10_invalid_not_stl.stl",
+      "description": "Plain text, not an STL. load returns FORMAT and must not crash.",
+      "generate": false,
+      "load_status": -3,
+      "export": false,
+      "closed": false,
+      "volume": null,
+      "volume_abs_tol": 0.0,
+      "volume_rel_tol": 0.0,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": null,
+      "iges": null,
+      "sha256": "104c764e91828e6ca705e1e0f06de761f48bfd03635e632a3b7bf6efdcd35e09",
+      "bytes": 24,
+      "triangles": 0,
+      "vertices": 0,
+      "records": 0,
+      "bbox_min": null,
+      "bbox_max": null,
+      "mesh_volume": null
+    },
+    {
+      "file": "11_inverted_normals.stl",
+      "description": "20 mm cube with every triangle wound inward. Export flips it (REPAIRED) and the solid volume is +8000.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 4,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 4,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "6018c33bdf0fce263c3db94b57341e0ddc535c35bf4444e3b5b200e05de7e903",
+      "bytes": 684,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": -7999.999999999999
+    },
+    {
+      "file": "12_duplicate_vertices.stl",
+      "description": "20 mm cube subdivided 2x2 per face (48 triangles). Each geometric vertex is stored again in every adjacent facet; the loader must weld exact duplicates to 26 vertices (8 corners, 12 edge midpoints, 6 face centres).",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 48,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 48,
+        "shell_closed": false
+      },
+      "sha256": "6dcbf0021dc64e3fdebb3e1b980ac8b0bd1833657d895c7109ee6b73e0291b4a",
+      "bytes": 2484,
+      "triangles": 48,
+      "vertices": 26,
+      "records": 48,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999997
+    },
+    {
+      "file": "13_degenerate_zero_area.stl",
+      "description": "20 mm cube plus a repeated-vertex triangle and a collinear zero-area triangle. Load skips both (PARTIAL). Export drops them and keeps the cube (REPAIRED).",
+      "generate": false,
+      "load_status": 1,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 4,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 4,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "afe67597711554f100e7353cadae779865ca79eb6d6971b867b37703d58ca1d6",
+      "bytes": 784,
+      "triangles": 12,
+      "vertices": 11,
+      "records": 14,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
+    },
+    {
+      "file": "14_large_coordinates_1e5.stl",
+      "description": "20 mm cube translated to (1e5, 1e5, 1e5). Coordinates stay in range; volume stays 8000.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.05,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "c059393c5b6ab2fb11bd8614cc0c07524673ca0730651ec9f676217713711c6a",
+      "bytes": 684,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        100000.0,
+        100000.0,
+        100000.0
+      ],
+      "bbox_max": [
+        100020.0,
+        100020.0,
+        100020.0
+      ],
+      "mesh_volume": 7999.999999998137
+    },
+    {
+      "file": "15_meter_scale_0.02.stl",
+      "description": "Cube of side 0.02, i.e. a 20 mm part stored with metre numbers. STL has no units; the STEP/IGES file is still millimetres, so the solid is 0.02 mm on a side (volume 8e-6), not rescaled to 20 mm. Compared with 01_cube_20mm_binary.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 7.999999463558208e-06,
+      "volume_abs_tol": 1e-12,
+      "volume_rel_tol": 0.001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "bdf6720b13dea29ea4466278e76b945922c6367c1b7d2a6856fd940697560774",
+      "bytes": 684,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        0.019999999552965164,
+        0.019999999552965164,
+        0.019999999552965164
+      ],
+      "mesh_volume": 7.999999463558208e-06
+    },
+    {
+      "file": "16_thin_wall.stl",
+      "description": "Closed plate 50 x 30 x 0.25 mm. Wall is far above the automatic weld tolerance, so the plate must stay 0.25 thick (volume 375).",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 375.0,
+      "volume_abs_tol": 0.0001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "ab8247145fd8dec52895c6617a204412191f3af69e2aba799f983893d1188b04",
+      "bytes": 684,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        50.0,
+        30.0,
+        0.25
+      ],
+      "mesh_volume": 375.0
+    },
+    {
+      "file": "17_through_hole.stl",
+      "description": "40 x 30 x 20 block with a 10 x 10 square through-hole along Z. One closed solid (genus 1, Euler characteristic 0), volume 22000. The annulus is gridded so edges meet; a coarser annulus is only T-junctions and is not a solid.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 22000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 64,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 64,
+        "shell_closed": false
+      },
+      "sha256": "387ecfe500b3678fbe1b7838ee0444cfe10af10dedc7324befc7fd96d4bd52a3",
+      "bytes": 3284,
+      "triangles": 64,
+      "vertices": 32,
+      "records": 64,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        40.0,
+        30.0,
+        20.0
+      ],
+      "mesh_volume": 22000.0
+    },
+    {
+      "file": "18_empty_binary.stl",
+      "description": "Binary STL header with a triangle count of 0. No facet is a FORMAT error, not EMPTY (EMPTY is an operation on a handle that has no mesh).",
+      "generate": false,
+      "load_status": -3,
+      "export": false,
+      "closed": false,
+      "volume": null,
+      "volume_abs_tol": 0.0,
+      "volume_rel_tol": 0.0,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": null,
+      "iges": null,
+      "sha256": "f2e92b4cde9a08dd030a65e4a997176d13acd1c776376c0ed5075e899c88baeb",
+      "bytes": 84,
+      "triangles": 0,
+      "vertices": 0,
+      "records": 0,
+      "bbox_min": null,
+      "bbox_max": null,
+      "mesh_volume": null
+    },
+    {
+      "file": "19_truncated_binary.stl",
+      "description": "Binary STL declaring 12 triangles but containing 2 complete records plus 17 trailing bytes. Load keeps the 2 triangles (PARTIAL). The patch is open, so export is NOT_SOLID.",
+      "generate": false,
+      "load_status": 1,
+      "export": true,
+      "closed": false,
+      "volume": null,
+      "volume_abs_tol": 0.0,
+      "volume_rel_tol": 0.0,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 3,
+        "solids": 0,
+        "faces": 2,
+        "shell_closed": false
+      },
+      "iges": {
+        "status": 3,
+        "solids": 0,
+        "faces": 2,
+        "shell_closed": false
+      },
+      "sha256": "7f970056dbedbf9315fc7ca65429cc89fc1318bd31532689e387e766441fbf0e",
+      "bytes": 201,
+      "triangles": 2,
+      "vertices": 4,
+      "records": 2,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        0.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 0.0
+    },
+    {
+      "file": "20_ascii_crlf_whitespace.stl",
+      "description": "20 mm cube as ASCII with CRLF line endings, tabs, and extra blank lines. The first five bytes are still 'solid'.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "afb955cef3d38e8bab62529f9568267a66ce5172863aa88461855d60649fb0bf",
+      "bytes": 3263,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
+    },
+    {
+      "file": "21_ascii_leading_whitespace.stl",
+      "description": "Same CRLF cube with spaces and a CRLF before the solid keyword.",
+      "generate": false,
+      "load_status": 1,
+      "export": true,
+      "closed": false,
+      "volume": null,
+      "volume_abs_tol": 0.0,
+      "volume_rel_tol": 0.0,
+      "time_budget_s": null,
+      "known_bug": "binary_format() treats a file as binary unless the first five bytes are 'solid' or the length is an exact binary STL. Leading whitespace therefore parses the ASCII text as binary records (PARTIAL) and export fails with OCCT.",
+      "assert_mesh": false,
+      "step": {
+        "status": -6,
+        "solids": 0,
+        "faces": 0,
+        "shell_closed": false
+      },
+      "iges": {
+        "status": -6,
+        "solids": 0,
+        "faces": 0,
+        "shell_closed": false
+      },
+      "sha256": "83432013258655dc5ecb81e70edcedfbc5dc0e119968549b067fdc68df6f0851",
+      "bytes": 3267,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
+    }
+  ]
+}
