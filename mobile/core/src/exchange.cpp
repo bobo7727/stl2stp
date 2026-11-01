@@ -958,8 +958,16 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
             StaticSetting company_setting("write.iges.header.company", organization.c_str());
             StaticSetting product_setting("write.iges.header.product", product_name.c_str());
             StaticSetting receiver_setting("write.iges.header.receiver", "");
-            IGESControl_Writer writer(original ? Interface_Static::CVal("write.iges.unit") : "MM",
-                                     Interface_Static::IVal("write.brep.mode"));
+            // Faces mode (0) writes trimmed surfaces. IGESControl_Reader then rebuilds no shells,
+            // so a closed mesh comes back as loose faces. OCCT 8 registers this as
+            // write.iges.brep.mode (0 = Faces, 1 = BRep / MSBO entity 186). The legacy key
+            // write.brep.mode is not registered and IVal returns 0, which is why closed
+            // exports used to re-read with 0 solids. Mode 1 writes manifold solids and shells.
+            constexpr int iges_brep_mode = 1;
+            [[maybe_unused]] IntegerSetting brep_mode("write.iges.brep.mode", iges_brep_mode);
+            const char* unit_name = original ? Interface_Static::CVal("write.iges.unit") : "MM";
+            if (!unit_name || !unit_name[0]) { unit_name = "MM"; }
+            IGESControl_Writer writer(unit_name, iges_brep_mode);
             const bool added = writer.AddShape(shape, transfer_progress->Start());
             transfer_progress->checkpoint();
             if (!added) { throw Error(STL2STP_ERROR_OCCT, "IGES transfer failed"); }

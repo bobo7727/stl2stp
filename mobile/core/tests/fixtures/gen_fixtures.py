@@ -339,11 +339,16 @@ def _case(file, description, *, load_status, export, closed, solids, shell_close
     step = None
     iges = None
     if export:
-        # IGESControl_Reader (writer brep mode 0, the OCCT default for an unregistered
-        # write.brep.mode) returns loose faces: no shells and no solids. Face count and
-        # GProp volume still match. STEP is where shell/solid closure is checked.
+        # IGES is written in BRep mode (write.iges.brep.mode = 1, MSBO / shell entities).
+        # A closed mesh must re-read as closed shell(s) with the same solid count as STEP.
+        # An open mesh stays an open shell (or loose faces): solids 0, shell_closed false.
         step = {"status": export_status, "solids": solids, "faces": faces, "shell_closed": shell_closed}
-        iges = {"status": export_status, "solids": 0, "faces": faces, "shell_closed": False}
+        iges = {
+            "status": export_status,
+            "solids": solids if shell_closed else 0,
+            "faces": faces,
+            "shell_closed": shell_closed,
+        }
     return {
         "file": file,
         "description": description,

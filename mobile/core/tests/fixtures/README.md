@@ -20,7 +20,7 @@ python3 gen_fixtures.py --check --large-dir build/core-linux/tests/regression-la
 | `volume` | Expected closed-solid volume (mm³). Null when the mesh is not a solid |
 | `volume_abs_tol` / `volume_rel_tol` | Passes when `abs(actual-expected) <= max(abs, rel*|expected|)` |
 | `closed` | Output must be closed solid(s) with that volume |
-| `step` / `iges` | `status`, `solids`, `faces`, `shell_closed` after an OCCT re-read. IGESControl_Reader does not rebuild shells when `write.brep.mode` is the OCCT default 0, so IGES expectations are loose faces (`solids=0`, `shell_closed=false`) with the same face count and, for closed inputs, the same GProp volume. STEP is the solid/shell check |
+| `step` / `iges` | `status`, `solids`, `faces`, `shell_closed` after an OCCT re-read. IGES is written with `write.iges.brep.mode` 1 (BRep / MSBO). Closed fixtures must re-read as closed shells with the same solid count as STEP. Open fixtures stay `solids=0`, `shell_closed=false`. Both formats are millimetres and, for closed inputs, share the GProp volume |
 | `assert_mesh` | When false, only the status codes are checked (used for the leading-whitespace bug) |
 | `known_bug` | Current behaviour that is wrong. Set for `21_ascii_leading_whitespace.stl` only |
 | `generate` | True for the sphere written at test time |
