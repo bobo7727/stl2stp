@@ -28,7 +28,7 @@ python3 gen_fixtures.py --check --large-dir build/core-linux/tests/regression-la
 
 STL has no unit field. STEP and IGES are written in millimetres, so `15_meter_scale_0.02.stl` stays 0.02 mm on a side. The open cube drops triangles 2 and 3 (the +X face); the historical filename says "missing top".
 
-`21_ascii_leading_whitespace.stl` is the same cube as `20_ascii_crlf_whitespace.stl` with spaces and a CRLF before `solid`. The loader skips that preamble (and a leading UTF-8 BOM) before deciding. `22_binary_header_solid.stl` is a binary cube whose 80-byte header begins with `solid facet`; the exact length `84 + n * 50` keeps it binary.
+`21_ascii_leading_whitespace.stl` is the same cube as `20_ascii_crlf_whitespace.stl` with spaces and a CRLF before `solid`. `23_ascii_utf8_bom.stl` is the LF ASCII cube with a leading UTF-8 BOM. The loader skips that preamble before `solid`. `22_binary_header_solid.stl` is a binary cube whose 80-byte header begins with `solid facet`; the exact length `84 + n * 50` keeps it binary.
 
 Regenerate after editing the script:
 

@@ -889,6 +889,48 @@
         20.0
       ],
       "mesh_volume": 7999.999999999999
+    },
+    {
+      "file": "23_ascii_utf8_bom.stl",
+      "description": "20 mm cube as ASCII STL with a leading UTF-8 BOM (EF BB BF) before 'solid'. The loader skips the BOM. Export is one closed solid, volume 8000.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 12,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 0,
+        "faces": 12,
+        "shell_closed": false
+      },
+      "sha256": "56b6567679bc635eab642c17e1029bef087cb5c483fa9f02fa24d77d9240974d",
+      "bytes": 2830,
+      "triangles": 12,
+      "vertices": 8,
+      "records": 12,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
     }
   ]
 }
