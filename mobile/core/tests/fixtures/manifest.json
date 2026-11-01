@@ -348,7 +348,7 @@
       "volume": 523556.0164599096,
       "volume_abs_tol": 1.0,
       "volume_rel_tol": 0.001,
-      "time_budget_s": 600,
+      "time_budget_s": 300,
       "known_bug": null,
       "assert_mesh": true,
       "step": {
@@ -847,6 +847,48 @@
         20.0
       ],
       "mesh_volume": 7999.999999999999
+    },
+    {
+      "file": "24_near_degenerate_triangle.stl",
+      "description": "One triangle (0,0,0), (20,0,0), (10, 2^-20, 0). Altitude is about 9.54e-7, above Precision::Confusion() (1e-7), and every edge is much longer than that, so BRepLib_MakeEdge/MakeFace accept it. It is an open face: NOT_SOLID, 1 face, not a solid. An edge no longer than 1e-7 between distinct vertices is rejected by MakeEdge and by the face builder.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": false,
+      "volume": null,
+      "volume_abs_tol": 0.0,
+      "volume_rel_tol": 0.0,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 3,
+        "solids": 0,
+        "faces": 1,
+        "shell_closed": false
+      },
+      "iges": {
+        "status": 3,
+        "solids": 0,
+        "faces": 1,
+        "shell_closed": false
+      },
+      "sha256": "c268bac9c3220bf9bfb0e2f24c61052e58d70a12d84f84704e749fdc85290de8",
+      "bytes": 134,
+      "triangles": 1,
+      "vertices": 3,
+      "records": 1,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        9.5367431640625e-07,
+        0.0
+      ],
+      "mesh_volume": 0.0
     }
   ]
 }

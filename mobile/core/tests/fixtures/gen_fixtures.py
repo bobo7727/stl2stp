@@ -415,7 +415,7 @@ def expectations():
             LARGE_NAME,
             "UV sphere radius 50, 450 x 224 (200700 triangles). Generated at test time, not committed. "
             "South-pole weld reports REPAIRED. time_budget_s is a per-export and per-read ceiling.",
-            solids=1, faces=None, volume=None, generate=True, time_budget_s=600, **repaired),
+            solids=1, faces=None, volume=None, generate=True, time_budget_s=300, **repaired),
         "10_invalid_not_stl.stl": _case(
             "10_invalid_not_stl.stl",
             "Plain text, not an STL. load returns FORMAT and must not crash.",
@@ -485,6 +485,15 @@ def expectations():
             known_bug="binary_format() treats a file as binary unless the first five bytes are "
                       "'solid' or the length is an exact binary STL. Leading whitespace therefore "
                       "parses the ASCII text as binary records (PARTIAL) and export fails with OCCT."),
+        "24_near_degenerate_triangle.stl": _case(
+            "24_near_degenerate_triangle.stl",
+            "One triangle (0,0,0), (20,0,0), (10, 2^-20, 0). Altitude is about 9.54e-7, "
+            "above Precision::Confusion() (1e-7), and every edge is much longer than that, "
+            "so BRepLib_MakeEdge/MakeFace accept it. It is an open face: NOT_SOLID, 1 face, "
+            "not a solid. An edge no longer than 1e-7 between distinct vertices is rejected "
+            "by MakeEdge and by the face builder.",
+            load_status=0, export=True, closed=False, solids=0, shell_closed=False, faces=1,
+            volume=None, volume_abs_tol=0.0, volume_rel_tol=0.0, export_status=3),
     }
 
 
@@ -522,6 +531,11 @@ def build_meshes():
         "19_truncated_binary.stl": ("truncated", cube[:2], None),
         "20_ascii_crlf_whitespace.stl": ("crlf", cube, "cube"),
         "21_ascii_leading_whitespace.stl": ("leading", cube, "cube"),
+        "24_near_degenerate_triangle.stl": (
+            "binary",
+            [((f32(0), f32(0), f32(0)), (f32(20), f32(0), f32(0)), (f32(10), f32(2 ** -20), f32(0)))],
+            None,
+        ),
     }
     # Fail loud if a hand-built solid is inside-out or the wrong size.
     hole_volume = mesh_volume(hole)
