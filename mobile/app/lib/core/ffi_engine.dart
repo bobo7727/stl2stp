@@ -5,6 +5,7 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 
 import 'engine.dart';
@@ -39,17 +40,33 @@ class NativeCancelToken implements CancelToken {
 class FfiEngine implements ConversionEngine {
   FfiEngine._(this.libraryPath);
 
+  /// Does not open a library. Tests use this to stand in for a successful load.
+  @visibleForTesting
+  FfiEngine.testInstance() : libraryPath = null;
+
   /// Path of the opened library, or null when linked into the process (iOS).
   final String? libraryPath;
 
-  /// Returns null if the core library cannot be found/opened on this platform.
+  /// Reason [tryCreate] last returned null. Null after a successful load.
+  static String? lastLoadError;
+
+  /// Opens the core, checks every symbol, and creates one handle so a library
+  /// that loads but cannot initialize is treated as a failure.
+  /// Returns null if the library cannot be found, opened, or initialized.
   static FfiEngine? tryCreate() {
     try {
       final path = resolveCoreLibraryPath();
-      // Validate all symbols once on the main isolate.
-      Stl2StpBindings(path == null ? DynamicLibrary.process() : DynamicLibrary.open(path));
+      final bindings = Stl2StpBindings(path == null ? DynamicLibrary.process() : DynamicLibrary.open(path));
+      final handle = bindings.create();
+      if (handle == nullptr) {
+        final message = bindings.errorOf(nullptr);
+        throw StateError(message.isEmpty ? 'stl2stp_create failed' : message);
+      }
+      bindings.destroy(handle);
+      lastLoadError = null;
       return FfiEngine._(path);
-    } catch (_) {
+    } catch (e) {
+      lastLoadError = e is StateError ? e.message : '$e';
       return null;
     }
   }

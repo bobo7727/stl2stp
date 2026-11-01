@@ -1,5 +1,7 @@
 {
  "x.demo_banner": "演示模式：未找到 stl2stp-core 转换引擎，转换结果只是占位文件。",
+ "x.core_unavailable.title": "转换引擎不可用",
+ "x.core_unavailable.body": "正式版需要本机的 stl2stp-core 才能转换文件。这次没有加载成功，不能继续。请重新安装 App。如果仍然失败，请联系支持。",
  "x.engine": "转换引擎",
  "x.open_path.title": "输入 STL 文件路径",
  "x.open_path.hint": "/path/to/model.stl",
