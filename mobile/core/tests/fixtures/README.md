@@ -30,6 +30,8 @@ STL has no unit field. STEP and IGES are written in millimetres, so `15_meter_sc
 
 `21_ascii_leading_whitespace.stl` is a known loader bug: `binary_format()` accepts an ASCII file only when the first five bytes are `solid` (or the length is an exact binary STL). Leading whitespace is parsed as binary records, load returns `STL2STP_WARNING_PARTIAL`, and export returns `STL2STP_ERROR_OCCT`. `20_ascii_crlf_whitespace.stl` is the same cube with CRLF, tabs, and blank lines, but it starts with `solid` and converts.
 
+`24_near_degenerate_triangle.stl` is one triangle of base 20 mm and altitude 2^-20 mm (about 9.54e-7). Edges are longer than OCCT's `Precision::Confusion()` (1e-7), so the face is built. The mesh is open: export status NOT_SOLID, one face, no solid.
+
 Regenerate after editing the script:
 
 ```sh

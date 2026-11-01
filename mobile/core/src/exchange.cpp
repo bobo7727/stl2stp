@@ -7,6 +7,7 @@
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
 #include <Precision.hxx>
+#include <gp.hxx>
 #include <gp_Ax3.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
@@ -370,11 +371,11 @@ Scale model_scale(const Mesh& mesh) {
     return scale;
 }
 
-// geometry=false skips curve-on-surface and same-parameter projections. Those dominate
-// large meshes and do not change a shape that already passes; the topological check still
-// rejects open or mis-oriented shells so they fall back to sewing.
-bool shape_valid(const TopoDS_Shape& shape, bool geometry = true) {
-    return !shape.IsNull() && BRepCheck_Analyzer(shape, geometry).IsValid();
+// Geometric controls stay on for every size: curve-on-surface, same-parameter, and wire
+// self-intersection are part of the check. The parallel flag only runs those same tests
+// on more than one thread.
+bool shape_valid(const TopoDS_Shape& shape) {
+    return !shape.IsNull() && BRepCheck_Analyzer(shape, true, true).IsValid();
 }
 
 class Indicator : public Message_ProgressIndicator {
@@ -742,12 +743,19 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
             const auto& nodes = edges[signed_edge.index];
             corner_points[corner] = node_point(signed_edge.reversed ? nodes.second : nodes.first);
         }
-        const gp_Vec in_plane(corner_points[0], corner_points[1]);
-        const gp_Vec normal_vector = in_plane.Crossed(gp_Vec(corner_points[0], corner_points[2]));
-        if (!(normal_vector.SquareMagnitude() > 0.0) || !(in_plane.SquareMagnitude() > 0.0)) {
+        const gp_Vec edge_ab(corner_points[0], corner_points[1]);
+        const gp_Vec edge_ac(corner_points[0], corner_points[2]);
+        const gp_Vec edge_bc(corner_points[1], corner_points[2]);
+        const gp_Vec normal_vector = edge_ab.Crossed(edge_ac);
+        // BRepLib_MakeEdge treats length <= Precision::Confusion() as a closed curve and
+        // fails when the vertices are distinct (DifferentPointsOnClosedCurve).
+        // FindSurface / gp_Dir reject a normal whose square magnitude is <= gp::Resolution().
+        const double confusion2 = edge_tolerance * edge_tolerance;
+        if (!(edge_ab.SquareMagnitude() > confusion2) || !(edge_ac.SquareMagnitude() > confusion2) ||
+            !(edge_bc.SquareMagnitude() > confusion2) || !(normal_vector.SquareMagnitude() > gp::Resolution())) {
             throw Error(STL2STP_ERROR_OCCT, "Original mode cannot construct triangle face (possibly collinear)");
         }
-        const gp_Ax3 plane_axes(corner_points[0], gp_Dir(normal_vector), gp_Dir(in_plane));
+        const gp_Ax3 plane_axes(corner_points[0], gp_Dir(normal_vector), gp_Dir(edge_ab));
         Handle(Geom_Plane) plane = new Geom_Plane(plane_axes);
         TopoDS_Face face;
         builder.MakeFace(face, plane, edge_tolerance);
@@ -805,10 +813,7 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
     }
     if (!strict) {
         progress.check();
-        // Full curve checks stay on for the meshes the unit tests cover. Above that, the
-        // topological analyzer is enough: a passing full check does not modify the shape,
-        // and the projection check is what made a 16k-face sphere spend seconds here.
-        if (!shape_valid(shape, faces.size() <= 8192)) {
+        if (!shape_valid(shape)) {
             notes.add(&Notes::repaired, "original-mode result failed BRep validation: converted with sewing mode");
             return {};
         }
