@@ -23,9 +23,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "e8c0592aa904ab181eeb4c63861b8d8bf711659665d989c2ec91fa9dc42f3065",
       "bytes": 684,
@@ -65,9 +65,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "2a45f68319005fe869d88dc04a7fdf91a4049926430ce13b48407f68398402ac",
       "bytes": 2827,
@@ -107,9 +107,9 @@
       },
       "iges": {
         "status": 4,
-        "solids": 0,
+        "solids": 1,
         "faces": 256,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "db5b9bdf4cd2cada728118074282514351dd26c96860bd148c155bf0b209db21",
       "bytes": 12884,
@@ -149,9 +149,9 @@
       },
       "iges": {
         "status": 4,
-        "solids": 0,
+        "solids": 1,
         "faces": 9216,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "9a4ae01f531001da80d8eb9666db44b697d44f973e63ea78e9f8cbd879ea5e89",
       "bytes": 460884,
@@ -191,9 +191,9 @@
       },
       "iges": {
         "status": 4,
-        "solids": 0,
+        "solids": 1,
         "faces": 16128,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "efdc4dae0ba917f259d261834e5f5edb354daa07b62bc33e8cb5b9fd2aaba802",
       "bytes": 806484,
@@ -233,9 +233,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 2,
         "faces": 24,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "4219a8705abd209e30824e428c40a07df5860fc6ecb68d8e5338c0c5c10a8f65",
       "bytes": 1284,
@@ -317,9 +317,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "e7396577cbbab0a3e0e971d2e777771ba56d0b9d02e092de3922c3534fece0e0",
       "bytes": 684,
@@ -359,9 +359,9 @@
       },
       "iges": {
         "status": 4,
-        "solids": 0,
+        "solids": 1,
         "faces": 200700,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "e445b709249f7c7c0721bd2ff459510ef201563bba474029343e89e535f8d7a0",
       "bytes": 10035084,
@@ -425,9 +425,9 @@
       },
       "iges": {
         "status": 4,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "6018c33bdf0fce263c3db94b57341e0ddc535c35bf4444e3b5b200e05de7e903",
       "bytes": 684,
@@ -467,9 +467,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 48,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "6dcbf0021dc64e3fdebb3e1b980ac8b0bd1833657d895c7109ee6b73e0291b4a",
       "bytes": 2484,
@@ -509,9 +509,9 @@
       },
       "iges": {
         "status": 4,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "afe67597711554f100e7353cadae779865ca79eb6d6971b867b37703d58ca1d6",
       "bytes": 784,
@@ -551,9 +551,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "c059393c5b6ab2fb11bd8614cc0c07524673ca0730651ec9f676217713711c6a",
       "bytes": 684,
@@ -593,9 +593,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "bdf6720b13dea29ea4466278e76b945922c6367c1b7d2a6856fd940697560774",
       "bytes": 684,
@@ -635,9 +635,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "ab8247145fd8dec52895c6617a204412191f3af69e2aba799f983893d1188b04",
       "bytes": 684,
@@ -677,9 +677,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 64,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "387ecfe500b3678fbe1b7838ee0444cfe10af10dedc7324befc7fd96d4bd52a3",
       "bytes": 3284,
@@ -785,9 +785,9 @@
       },
       "iges": {
         "status": 0,
-        "solids": 0,
+        "solids": 1,
         "faces": 12,
-        "shell_closed": false
+        "shell_closed": true
       },
       "sha256": "afb955cef3d38e8bab62529f9568267a66ce5172863aa88461855d60649fb0bf",
       "bytes": 3263,
