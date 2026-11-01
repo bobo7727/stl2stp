@@ -415,7 +415,7 @@ def expectations():
             LARGE_NAME,
             "UV sphere radius 50, 450 x 224 (200700 triangles). Generated at test time, not committed. "
             "South-pole weld reports REPAIRED. time_budget_s is a per-export and per-read ceiling.",
-            solids=1, faces=None, volume=None, generate=True, time_budget_s=600, **repaired),
+            solids=1, faces=None, volume=None, generate=True, time_budget_s=300, **repaired),
         "10_invalid_not_stl.stl": _case(
             "10_invalid_not_stl.stl",
             "Plain text, not an STL. load returns FORMAT and must not crash.",
