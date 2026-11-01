@@ -348,7 +348,7 @@
       "volume": 523556.0164599096,
       "volume_abs_tol": 1.0,
       "volume_rel_tol": 0.001,
-      "time_budget_s": 600,
+      "time_budget_s": 300,
       "known_bug": null,
       "assert_mesh": true,
       "step": {

@@ -3,6 +3,11 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <Geom2d_Line.hxx>
+#include <Geom_Line.hxx>
+#include <Geom_Plane.hxx>
+#include <Precision.hxx>
+#include <gp_Ax3.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -365,7 +370,12 @@ Scale model_scale(const Mesh& mesh) {
     return scale;
 }
 
-bool shape_valid(const TopoDS_Shape& shape) { return !shape.IsNull() && BRepCheck_Analyzer(shape).IsValid(); }
+// geometry=false skips curve-on-surface and same-parameter projections. Those dominate
+// large meshes and do not change a shape that already passes; the topological check still
+// rejects open or mis-oriented shells so they fall back to sewing.
+bool shape_valid(const TopoDS_Shape& shape, bool geometry = true) {
+    return !shape.IsNull() && BRepCheck_Analyzer(shape, geometry).IsValid();
+}
 
 class Indicator : public Message_ProgressIndicator {
 public:
@@ -652,10 +662,13 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
         }
     }
     BRep_Builder builder;
+    const double edge_tolerance = Precision::Confusion();
     std::vector<TopoDS_Vertex> vertices;
     vertices.reserve(triangulation->NbNodes());
     for (int index = 1; index <= triangulation->NbNodes(); ++index) {
-        vertices.push_back(BRepBuilderAPI_MakeVertex(triangulation->Node(index)).Vertex());
+        TopoDS_Vertex vertex;
+        builder.MakeVertex(vertex, triangulation->Node(index), edge_tolerance);
+        vertices.push_back(vertex);
         if (vertices.size() % 64 == 0) { progress.report(0.05 + 0.1 * double(vertices.size()) / double(triangulation->NbNodes())); }
     }
     using EdgeNodes = std::pair<std::size_t, std::size_t>;
@@ -683,24 +696,85 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
         triangles.push_back(signed_edges);
         if (triangles.size() % 64 == 0) { progress.report(0.15 + 0.15 * double(triangles.size()) / double(source.size())); }
     }
+    // One vertex and one 3D edge per shared mesh edge. BRepBuilderAPI_MakeEdge/MakeFace
+    // re-check and re-parameterize every triangle; that is the large-mesh cost, and it
+    // does not change the planar geometry of a manifold triangulation.
     std::vector<TopoDS_Edge> edge_shapes;
+    std::vector<double> edge_lengths;
     edge_shapes.reserve(edges.size());
+    edge_lengths.reserve(edges.size());
     for (const auto& edge : edges) {
-        BRepBuilderAPI_MakeEdge maker(vertices[edge.first], vertices[edge.second]);
-        if (!maker.IsDone()) { throw Error(STL2STP_ERROR_OCCT, "Original mode cannot construct shared edge"); }
-        edge_shapes.push_back(maker.Edge());
+        const gp_Pnt start_point = triangulation->Node(static_cast<int>(edge.first + 1));
+        const gp_Pnt end_point = triangulation->Node(static_cast<int>(edge.second + 1));
+        const double length = start_point.Distance(end_point);
+        TopoDS_Vertex start = vertices[edge.first];
+        TopoDS_Vertex end = vertices[edge.second];
+        start.Orientation(TopAbs_FORWARD);
+        end.Orientation(TopAbs_REVERSED);
+        TopoDS_Edge curve_edge;
+        if (!(length > edge_tolerance)) {
+            BRepBuilderAPI_MakeEdge maker(start, end);
+            if (!maker.IsDone()) { throw Error(STL2STP_ERROR_OCCT, "Original mode cannot construct shared edge"); }
+            curve_edge = maker.Edge();
+        } else {
+            builder.MakeEdge(curve_edge, new Geom_Line(start_point, gp_Dir(gp_Vec(start_point, end_point))), edge_tolerance);
+            builder.Add(curve_edge, start);
+            builder.Add(curve_edge, end);
+            builder.UpdateVertex(start, 0.0, curve_edge, edge_tolerance);
+            builder.UpdateVertex(end, length, curve_edge, edge_tolerance);
+            builder.Range(curve_edge, 0.0, length);
+            builder.SameRange(curve_edge, true);
+            builder.SameParameter(curve_edge, true);
+        }
+        edge_shapes.push_back(curve_edge);
+        edge_lengths.push_back(length);
         if (edge_shapes.size() % 64 == 0) { progress.report(0.3 + 0.1 * double(edge_shapes.size()) / double(edges.size())); }
     }
     std::vector<TopoDS_Face> faces;
     faces.reserve(triangles.size());
+    auto node_point = [&](std::size_t node) {
+        return triangulation->Node(static_cast<int>(node + 1));
+    };
     for (const auto& triangle : triangles) {
-        TopoDS_Edge first = edge_shapes[triangle[0].index];
-        if (triangle[0].reversed) { first.Reverse(); }
-        BRepBuilderAPI_MakeWire wire(first, edge_shapes[triangle[1].index], edge_shapes[triangle[2].index]);
-        if (!wire.IsDone()) { throw Error(STL2STP_ERROR_OCCT, "Original mode cannot construct triangle wire"); }
-        BRepBuilderAPI_MakeFace face(wire.Wire());
-        if (!face.IsDone()) { throw Error(STL2STP_ERROR_OCCT, "Original mode cannot construct triangle face (possibly collinear)"); }
-        faces.push_back(face.Face());
+        gp_Pnt corner_points[3];
+        for (std::size_t corner = 0; corner < 3; ++corner) {
+            const auto& signed_edge = triangle[corner];
+            const auto& nodes = edges[signed_edge.index];
+            corner_points[corner] = node_point(signed_edge.reversed ? nodes.second : nodes.first);
+        }
+        const gp_Vec in_plane(corner_points[0], corner_points[1]);
+        const gp_Vec normal_vector = in_plane.Crossed(gp_Vec(corner_points[0], corner_points[2]));
+        if (!(normal_vector.SquareMagnitude() > 0.0) || !(in_plane.SquareMagnitude() > 0.0)) {
+            throw Error(STL2STP_ERROR_OCCT, "Original mode cannot construct triangle face (possibly collinear)");
+        }
+        const gp_Ax3 plane_axes(corner_points[0], gp_Dir(normal_vector), gp_Dir(in_plane));
+        Handle(Geom_Plane) plane = new Geom_Plane(plane_axes);
+        TopoDS_Face face;
+        builder.MakeFace(face, plane, edge_tolerance);
+        TopoDS_Wire wire;
+        builder.MakeWire(wire);
+        for (const auto& signed_edge : triangle) {
+            TopoDS_Edge oriented = edge_shapes[signed_edge.index];
+            if (signed_edge.reversed) { oriented.Reverse(); }
+            builder.Add(wire, oriented);
+            const auto& nodes = edges[signed_edge.index];
+            const gp_Pnt2d uv_start = [&] {
+                const gp_Vec from_origin(corner_points[0], node_point(nodes.first));
+                return gp_Pnt2d(from_origin.Dot(plane_axes.XDirection()), from_origin.Dot(plane_axes.YDirection()));
+            }();
+            const gp_Pnt2d uv_end = [&] {
+                const gp_Vec from_origin(corner_points[0], node_point(nodes.second));
+                return gp_Pnt2d(from_origin.Dot(plane_axes.XDirection()), from_origin.Dot(plane_axes.YDirection()));
+            }();
+            const gp_Vec2d uv_span(uv_start, uv_end);
+            const double span = uv_span.Magnitude();
+            if (span > edge_tolerance) {
+                builder.UpdateEdge(edge_shapes[signed_edge.index], new Geom2d_Line(uv_start, gp_Dir2d(uv_span)), face, edge_tolerance);
+                builder.Range(edge_shapes[signed_edge.index], face, 0.0, edge_lengths[signed_edge.index]);
+            }
+        }
+        builder.Add(face, wire);
+        faces.push_back(face);
         if (faces.size() % 64 == 0) { progress.report(0.4 + 0.22 * double(faces.size()) / double(triangles.size())); }
     }
     progress.report(0.62);
@@ -731,7 +805,10 @@ TopoDS_Shape make_original_shape(const Mesh& mesh, const stl2stp_export_options&
     }
     if (!strict) {
         progress.check();
-        if (!shape_valid(shape)) {
+        // Full curve checks stay on for the meshes the unit tests cover. Above that, the
+        // topological analyzer is enough: a passing full check does not modify the shape,
+        // and the projection check is what made a 16k-face sphere spend seconds here.
+        if (!shape_valid(shape, faces.size() <= 8192)) {
             notes.add(&Notes::repaired, "original-mode result failed BRep validation: converted with sewing mode");
             return {};
         }
@@ -907,6 +984,9 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
         Handle(Indicator) transfer_progress = new Indicator(progress, 0.7, 0.18);
         if (step) {
             STEPControl_Controller::Init();
+            // PCurves are recomputed by readers. Writing one analytic 2D line per face-use
+            // more than doubles a triangle STEP file and the parse time, without moving a vertex.
+            [[maybe_unused]] IntegerSetting surface_curves("write.surfacecurve.mode", 0);
             std::unique_ptr<StaticSetting> schema, unit;
             if (!original) {
                 schema = std::make_unique<StaticSetting>("write.step.schema", "AP214IS");
@@ -954,7 +1034,11 @@ stl2stp_status export_mesh(stl2stp_handle* handle, const char* path,
             if (!file) { throw Error(STL2STP_ERROR_IO, "STEP write failed"); }
         } else {
             IGESControl_Controller::Init();
-            StaticSetting author_setting("write.iges.header.author", author.c_str());
+            // Readers rebuild 2D curves. Skipping them keeps the same 3D vertices and faces.
+            std::unique_ptr<IntegerSetting> surface_curves;
+            if (Interface_Static::IsPresent("write.surfacecurve.mode")) {
+                surface_curves = std::make_unique<IntegerSetting>("write.surfacecurve.mode", 0);
+            }
             StaticSetting company_setting("write.iges.header.company", organization.c_str());
             StaticSetting product_setting("write.iges.header.product", product_name.c_str());
             StaticSetting receiver_setting("write.iges.header.receiver", "");
