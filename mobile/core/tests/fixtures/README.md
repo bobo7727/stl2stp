@@ -32,6 +32,8 @@ STL has no unit field. STEP and IGES are written in millimetres, so `15_meter_sc
 
 `24_near_degenerate_triangle.stl` is one triangle of base 20 mm and altitude 2^-20 mm (about 9.54e-7). Edges are longer than OCCT's `Precision::Confusion()` (1e-7), so the face is built. The mesh is open: export status NOT_SOLID, one face, no solid.
 
+`25_cube_near_degenerate_triangle.stl` is that closed cube with the bottom triangle split by a point 2^-20 mm off one edge. The thin triangle is kept. The mesh stays one closed solid, 14 faces, volume 8000. IGES BRep re-reads it the same way.
+
 Regenerate after editing the script:
 
 ```sh

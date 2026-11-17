@@ -65,6 +65,37 @@ def mesh_volume(tris) -> float:
     return volume
 
 
+def cube_with_near_degenerate_triangle():
+    """Closed 20 mm cube. The bottom triangle is split by a point 2^-20 mm off one edge.
+
+    One of the three replacement triangles has altitude 2^-20 (about 9.54e-7), above
+    Precision::Confusion() (1e-7), and every edge is much longer than that, so the
+    reviewed face builder keeps it. The outer boundary is unchanged.
+    """
+    cube = qtris(box(20, 20, 20))
+    height = f32(2 ** -20)
+    first = (f32(0), f32(0), f32(0))
+    second = (f32(20), f32(20), f32(0))
+    third = (f32(20), f32(0), f32(0))
+    interior = (f32(10), height, f32(0))
+    if cube[9] != (first, second, third):
+        raise SystemExit(f"cube triangle 9 changed: {cube[9]}")
+    split = [
+        (first, second, interior),
+        (second, third, interior),
+        (third, first, interior),
+    ]
+    mesh = cube[:9] + split + cube[10:]
+    volume = mesh_volume(mesh)
+    boundary, nonmanifold, vertices, edges, records = boundary_edges(mesh)
+    if abs(volume - 8000.0) > 1e-6 or boundary or nonmanifold or vertices != 9 or records != 14:
+        raise SystemExit(
+            f"sliver cube is not a closed 14-face solid: volume={volume} boundary={boundary} "
+            f"bad_edges={nonmanifold} V={vertices} E={edges} records={records}"
+        )
+    return mesh
+
+
 def box(sx, sy, sz, ox=0.0, oy=0.0, oz=0.0):
     v = [(ox + x * sx, oy + y * sy, oz + z * sz) for x in (0, 1) for y in (0, 1) for z in (0, 1)]
     quads = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
@@ -529,6 +560,13 @@ def expectations():
             "by MakeEdge and by the face builder.",
             load_status=0, export=True, closed=False, solids=0, shell_closed=False, faces=1,
             volume=None, volume_abs_tol=0.0, volume_rel_tol=0.0, export_status=3),
+        "25_cube_near_degenerate_triangle.stl": _case(
+            "25_cube_near_degenerate_triangle.stl",
+            "Closed 20 mm cube. Bottom triangle (0,0,0)-(20,20,0)-(20,0,0) is split by "
+            "(10, 2^-20, 0), so one of the three new triangles has altitude about 9.54e-7. "
+            "That is above Precision::Confusion() and every edge is much longer, so the face "
+            "is kept. The shell stays closed: one solid, 14 faces, volume 8000.",
+            solids=1, faces=14, volume=8000.0, **ok),
     }
 
 
@@ -573,6 +611,7 @@ def build_meshes():
             [((f32(0), f32(0), f32(0)), (f32(20), f32(0), f32(0)), (f32(10), f32(2 ** -20), f32(0)))],
             None,
         ),
+        "25_cube_near_degenerate_triangle.stl": ("binary", cube_with_near_degenerate_triangle(), None),
     }
     # Fail loud if a hand-built solid is inside-out or the wrong size.
     hole_volume = mesh_volume(hole)

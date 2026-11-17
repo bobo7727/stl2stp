@@ -973,6 +973,48 @@
         0.0
       ],
       "mesh_volume": 0.0
+    },
+    {
+      "file": "25_cube_near_degenerate_triangle.stl",
+      "description": "Closed 20 mm cube. Bottom triangle (0,0,0)-(20,20,0)-(20,0,0) is split by (10, 2^-20, 0), so one of the three new triangles has altitude about 9.54e-7. That is above Precision::Confusion() and every edge is much longer, so the face is kept. The shell stays closed: one solid, 14 faces, volume 8000.",
+      "generate": false,
+      "load_status": 0,
+      "export": true,
+      "closed": true,
+      "volume": 8000.0,
+      "volume_abs_tol": 0.001,
+      "volume_rel_tol": 0.0001,
+      "time_budget_s": null,
+      "known_bug": null,
+      "assert_mesh": true,
+      "step": {
+        "status": 0,
+        "solids": 1,
+        "faces": 14,
+        "shell_closed": true
+      },
+      "iges": {
+        "status": 0,
+        "solids": 1,
+        "faces": 14,
+        "shell_closed": true
+      },
+      "sha256": "cc67179c7cd45acca620d4cdb4aa3c57216423ee6c4cab25051526ad39bf2159",
+      "bytes": 784,
+      "triangles": 14,
+      "vertices": 9,
+      "records": 14,
+      "bbox_min": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bbox_max": [
+        20.0,
+        20.0,
+        20.0
+      ],
+      "mesh_volume": 7999.999999999999
     }
   ]
 }
