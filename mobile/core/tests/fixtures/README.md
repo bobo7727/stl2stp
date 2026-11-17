@@ -21,14 +21,14 @@ python3 gen_fixtures.py --check --large-dir build/core-linux/tests/regression-la
 | `volume_abs_tol` / `volume_rel_tol` | Passes when `abs(actual-expected) <= max(abs, rel*|expected|)` |
 | `closed` | Output must be closed solid(s) with that volume |
 | `step` / `iges` | `status`, `solids`, `faces`, `shell_closed` after an OCCT re-read. IGESControl_Reader does not rebuild shells when `write.brep.mode` is the OCCT default 0, so IGES expectations are loose faces (`solids=0`, `shell_closed=false`) with the same face count and, for closed inputs, the same GProp volume. STEP is the solid/shell check |
-| `assert_mesh` | When false, only the status codes are checked (used for the leading-whitespace bug) |
-| `known_bug` | Current behaviour that is wrong. Set for `21_ascii_leading_whitespace.stl` only |
+| `assert_mesh` | When false, only the status codes are checked |
+| `known_bug` | Current behaviour that is wrong. Null for every fixture |
 | `generate` | True for the sphere written at test time |
 | `time_budget_s` | Per-export and per-read ceiling for the large file |
 
 STL has no unit field. STEP and IGES are written in millimetres, so `15_meter_scale_0.02.stl` stays 0.02 mm on a side. The open cube drops triangles 2 and 3 (the +X face); the historical filename says "missing top".
 
-`21_ascii_leading_whitespace.stl` is a known loader bug: `binary_format()` accepts an ASCII file only when the first five bytes are `solid` (or the length is an exact binary STL). Leading whitespace is parsed as binary records, load returns `STL2STP_WARNING_PARTIAL`, and export returns `STL2STP_ERROR_OCCT`. `20_ascii_crlf_whitespace.stl` is the same cube with CRLF, tabs, and blank lines, but it starts with `solid` and converts.
+`21_ascii_leading_whitespace.stl` is the same cube as `20_ascii_crlf_whitespace.stl` with spaces and a CRLF before `solid`. `23_ascii_utf8_bom.stl` is the LF ASCII cube with a leading UTF-8 BOM. The loader skips that preamble before `solid`. `22_binary_header_solid.stl` is a binary cube whose 80-byte header begins with `solid facet`; the exact length `84 + n * 50` keeps it binary.
 
 Regenerate after editing the script:
 

@@ -150,30 +150,97 @@ bool read_point(std::istream& stream, Point& point) {
     return bool(stream >> point.coordinate_x >> point.coordinate_y >> point.coordinate_z);
 }
 
+bool ascii_space(unsigned char byte) {
+    return byte == ' ' || byte == '\t' || byte == '\n' || byte == '\r' || byte == '\v' || byte == '\f';
+}
+
+bool ascii_text(unsigned char byte) {
+    return byte == '\n' || byte == '\r' || byte == '\t' || byte == '\v' || byte == '\f' ||
+           (byte >= 32 && byte <= 126);
+}
+
+// Drop a leading UTF-8 BOM and whitespace so an ASCII solid is visible to the parser.
+void skip_stl_preamble(std::istream& stream) {
+    while (stream) {
+        const int peeked = stream.peek();
+        if (peeked == EOF) { return; }
+        const auto byte = static_cast<unsigned char>(peeked);
+        if (ascii_space(byte)) {
+            stream.get();
+            continue;
+        }
+        if (byte != 0xEF) { return; }
+        stream.get();
+        const int second = stream.get();
+        const int third = stream.get();
+        if (second == 0xBB && third == 0xBF) { continue; }
+        stream.clear();
+        stream.seekg(-1 - (second == EOF ? 0 : 1) - (third == EOF ? 0 : 1), std::ios::cur);
+        return;
+    }
+}
+
+bool word_ends_at(const std::string& tail, const char* word) {
+    const std::size_t length = std::strlen(word);
+    if (tail.size() < length) { return false; }
+    const std::size_t begin = tail.size() - length;
+    if (begin > 0 && std::isalnum(static_cast<unsigned char>(tail[begin - 1]))) { return false; }
+    for (std::size_t index = 0; index < length; ++index) {
+        if (std::tolower(static_cast<unsigned char>(tail[begin + index])) != word[index]) { return false; }
+    }
+    return true;
+}
+
+// Binary STL is 80 bytes of header, a uint32 count, and exactly 50 bytes per triangle.
+// That length wins even when the header begins with the ASCII keyword "solid" (and even
+// when that header also contains the word "facet"). Otherwise a file is ASCII only when,
+// after a leading BOM/whitespace, it starts with "solid" and a facet/endsolid keyword
+// occurs before any non-text byte. A binary payload that merely starts with "solid"
+// fails the keyword check or hits a non-text byte and stays binary.
 bool binary_format(std::istream& stream, uint64_t size, uint32_t& declared) {
-    std::array<unsigned char, 1024> prefix{};
-    stream.read(reinterpret_cast<char*>(prefix.data()),
-                static_cast<std::streamsize>(std::min<uint64_t>(prefix.size(), size)));
-    stream.clear();
-    stream.seekg(0);
-    if (size < 84) {
-        return false;
-    }
-    declared = decode_u32(prefix.data() + 80);
-    if (size == 84 + uint64_t(declared) * 50) {
+    auto rewind = [&] {
+        stream.clear();
+        stream.seekg(0);
+    };
+    rewind();
+    if (size < 84) { return false; }
+    std::array<unsigned char, 84> header{};
+    if (!stream.read(reinterpret_cast<char*>(header.data()), static_cast<std::streamsize>(header.size()))) {
+        rewind();
         return true;
     }
-    const std::string leading(reinterpret_cast<const char*>(prefix.data()), 5);
-    if (lowercase(leading) != "solid") {
+    declared = decode_u32(header.data() + 80);
+    rewind();
+    if (size == 84 + uint64_t(declared) * 50) { return true; }
+
+    skip_stl_preamble(stream);
+    std::string token;
+    token.resize(5);
+    if (!stream.read(token.data(), static_cast<std::streamsize>(token.size())) || lowercase(token) != "solid") {
+        rewind();
         return true;
     }
-    for (std::size_t index = 0; index < std::min<uint64_t>(size, prefix.size()); ++index) {
-        if (prefix[index] == 0 || prefix[index] > 126 ||
-            (prefix[index] < 32 && prefix[index] != '\n' && prefix[index] != '\r' && prefix[index] != '\t')) {
+    std::string tail = token;
+    bool pending_keyword = word_ends_at(tail, "facet") || word_ends_at(tail, "endsolid");
+    bool saw_keyword = false;
+    char byte = 0;
+    while (stream.get(byte)) {
+        const auto value = static_cast<unsigned char>(byte);
+        if (!ascii_text(value)) {
+            rewind();
             return true;
         }
+        if (pending_keyword) {
+            if (!std::isalnum(value)) { saw_keyword = true; }
+            pending_keyword = false;
+        }
+        tail.push_back(byte);
+        if (tail.size() > 32) { tail.erase(0, tail.size() - 32); }
+        if (word_ends_at(tail, "facet") || word_ends_at(tail, "endsolid")) { pending_keyword = true; }
     }
-    return false;
+    if (pending_keyword) { saw_keyword = true; }
+    rewind();
+    return !saw_keyword;
 }
 
 bool load_binary(std::istream& stream, uint64_t size, uint32_t declared,
@@ -202,6 +269,7 @@ bool load_binary(std::istream& stream, uint64_t size, uint32_t declared,
 
 bool load_ascii(std::istream& stream, uint64_t size, MeshBuilder& builder, Progress& progress) {
     stream.imbue(std::locale::classic());
+    skip_stl_preamble(stream);
     if (!keyword(stream, "solid")) {
         throw Error(STL2STP_ERROR_FORMAT, "Expected ASCII STL solid header");
     }
