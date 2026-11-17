@@ -248,9 +248,11 @@ STEP 显式 AP214IS / MM；IGES 使用 MM。metadata 与 ORIGINAL 使用同一�
 `sewing_tolerance` 同时用于共面合并；所有模式都要求它是有限正数，
 但 ORIGINAL 且 merge 关闭时不用它改变建模公差。
 STL 本身没有单位字段，不自动推断或缩放单位。
-IGES 保留 reference 的旧键 `write.brep.mode` 查询；8.0.1 未注册此键，`IVal` 返回 0，
-并非新版 `write.iges.brep.mode` 可选项；详见 `docs/original-conversion.md`。
-IGES topology 是导出前 B-Rep，不是 IGES geometry read-back。
+IGES 使用 BRep 模式（`write.iges.brep.mode = 1`，构造函数的 mode 参数为 1），
+写出 MSBO（实体 186）和壳，闭合网格用 `IGESControl_Reader` 回读为壳/实体。
+OCCT 8.0.1 未注册旧键 `write.brep.mode`（`IVal` 返回 0，即 Faces），因此不再查询它。
+单位仍是毫米（`write.iges.unit`，缺省 MM）。
+IGES topology 计数是导出前 B-Rep；回读闭合性由回归测试用 `IGESControl_Reader` 检查。
 
 ```sh
 stl2stp-cli convert in.stl out.step --mode original

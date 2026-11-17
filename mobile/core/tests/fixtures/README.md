@@ -20,7 +20,7 @@ python3 gen_fixtures.py --check --large-dir build/core-linux/tests/regression-la
 | `volume` | Expected closed-solid volume (mm³). Null when the mesh is not a solid |
 | `volume_abs_tol` / `volume_rel_tol` | Passes when `abs(actual-expected) <= max(abs, rel*|expected|)` |
 | `closed` | Output must be closed solid(s) with that volume |
-| `step` / `iges` | `status`, `solids`, `faces`, `shell_closed` after an OCCT re-read. IGESControl_Reader does not rebuild shells when `write.brep.mode` is the OCCT default 0, so IGES expectations are loose faces (`solids=0`, `shell_closed=false`) with the same face count and, for closed inputs, the same GProp volume. STEP is the solid/shell check |
+| `step` / `iges` | `status`, `solids`, `faces`, `shell_closed` after an OCCT re-read. IGES is written with `write.iges.brep.mode` 1 (BRep / MSBO). Closed fixtures must re-read as closed shells with the same solid count as STEP. Open fixtures stay `solids=0`, `shell_closed=false`. Both formats are millimetres and, for closed inputs, share the GProp volume |
 | `assert_mesh` | When false, only the status codes are checked |
 | `known_bug` | Current behaviour that is wrong. Null for every fixture |
 | `generate` | True for the sphere written at test time |
@@ -31,6 +31,8 @@ STL has no unit field. STEP and IGES are written in millimetres, so `15_meter_sc
 `21_ascii_leading_whitespace.stl` is the same cube as `20_ascii_crlf_whitespace.stl` with spaces and a CRLF before `solid`. `23_ascii_utf8_bom.stl` is the LF ASCII cube with a leading UTF-8 BOM. The loader skips that preamble before `solid`. `22_binary_header_solid.stl` is a binary cube whose 80-byte header begins with `solid facet`; the exact length `84 + n * 50` keeps it binary.
 
 `24_near_degenerate_triangle.stl` is one triangle of base 20 mm and altitude 2^-20 mm (about 9.54e-7). Edges are longer than OCCT's `Precision::Confusion()` (1e-7), so the face is built. The mesh is open: export status NOT_SOLID, one face, no solid.
+
+`25_cube_near_degenerate_triangle.stl` is that closed cube with the bottom triangle split by a point 2^-20 mm off one edge. The thin triangle is kept. The mesh stays one closed solid, 14 faces, volume 8000. IGES BRep re-reads it the same way.
 
 Regenerate after editing the script:
 
