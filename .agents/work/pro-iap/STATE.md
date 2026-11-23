@@ -72,3 +72,16 @@
 - 自审注意：不可读文件作为 failed 进入队列，使摘要总数=所选数；批量内无减面，超限/内存不足标 skipped。
 - tests: flutter test PASS（+121，logs/c2_test.log）；analyze PASS（logs/c2_analyze.log）；Swift BLOCKED_ENV（同第 1 轮）。
 - 下一步：09:30 后 Codex 只读评审，第 1 轮与批量分开出结论。
+
+### 2026-11-23 code round 1/3 + 2/3 — Codex 只读评审（09:41 PST 起），分开出结论
+- 第 1 轮范围（9e7ef85..b0abdd5）：verdict **CHANGES**（0 blocker / 3 major / 1 minor）。原文 HANDOFF_VERDICT.code-round-1.md。
+  - C1 major：50,000 面限制按“请求的减面目标”算，核心可能返回 TARGET_NOT_REACHED，实际面数仍超限也被放行；需在减面后按真实面数复核。
+  - C2 major：ffi_engine.dart 的 15 秒清理超时被当作成功完成，原生资源可能还没释放。
+  - C3 major：原生 StoreKit 只有布尔谓词测试，没有 .storekit 配置和 StoreKitTest（需 Xcode/Codemagic，本机做不了）。
+  - C4 minor：前台刷新权益已实现但没有调用点。
+- 批量轮（b0abdd5..a9f8ea3，记为 code 2/3）：verdict **CHANGES**（0 blocker / 1 major / 3 minor）。原文 HANDOFF_VERDICT.code-round-2.md。
+  - BATCH-001 major：outputPathFor 抛异常时 _runOne 没有终态，队列卡住、界面无法退出。
+  - BATCH-002 minor：非本地文件应按来源 URI 去重；BATCH-003 minor：选择器不可用时不能追加第二个文件（batch.add_more 未使用）；BATCH-004 minor：“权益在开始时重检”的测试没有真正点开始。
+- tests（Codex 侧）：BLOCKED_SANDBOX（flutter 无法写 SDK 缓存；Python 三项通过）；Swift BLOCKED_ENV。我方 analyze/test 通过的日志是 c1/c2。
+- 状态：两轮已用，只剩 code 第 3/3 轮。未做任何修复，等老板/协调方确认修复范围；不开第 4 轮。
+- 提示：第 3 轮 Codex 评审需要 Flutter 可写缓存（例如允许 FLUTTER 缓存目录可写或附 Claude 侧日志），否则仍是 BLOCKED_SANDBOX。
