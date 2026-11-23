@@ -12,6 +12,7 @@ import 'engine.dart';
 import 'ffi/bindings.dart';
 import 'ffi/native_library.dart';
 import 'models.dart';
+import 'real_mesh_check.dart';
 import 'stl_reader.dart' show looksAscii;
 
 /// Cancel flag in native memory so the C cancel callback (running inside the
@@ -140,7 +141,9 @@ class FfiEngine implements ConversionEngine {
       'merge': s.mergeCoplanar,
       'verify': s.verifyEffective,
       'weld': s.weld,
+      'settings': s,
       'maxFaces': request.maxFaces,
+      'memBudget': request.memoryBudgetBytes,
       'author': meta(s.author),
       'org': meta(s.organization),
       'product': meta(s.product),
@@ -353,12 +356,18 @@ void _convertWorker(Map<String, Object?> a) {
     // Free-tier limit on the mesh that will really be built (simplification
     // can stop short of its target: TARGET_NOT_REACHED).
     final maxFaces = a['maxFaces'] as int?;
-    if (maxFaces != null) {
+    final memBudget = a['memBudget'] as int?;
+    if (maxFaces != null || memBudget != null) {
       if (b.getMeshStats(h, stats) >= 0) facesAfter = stats.ref.faces;
       final real = facesAfter;
-      if (real != null && real > maxFaces) {
-        return finish(CoreStatus.errorFreeLimit,
-            failed: a['simplify'] == true ? Stage.simplify.index : Stage.read.index, error: 'faces=$real limit=$maxFaces');
+      if (real != null) {
+        final verdict = realMeshVerdict(real, a['settings'] as ConvertSettings,
+            maxFaces: maxFaces, budgetBytes: memBudget);
+        if (verdict != null) {
+          return finish(verdict,
+              failed: a['simplify'] == true ? Stage.simplify.index : Stage.read.index,
+              error: 'faces=$real limit=$maxFaces budget=$memBudget');
+        }
       }
     }
     // 3+4. build + write

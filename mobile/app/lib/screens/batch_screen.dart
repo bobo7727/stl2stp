@@ -20,9 +20,10 @@ import 'paywall_screen.dart';
 /// and opens [BatchScreen] (PLAN §8.1).
 Future<void> startBatchFlow(BuildContext context) async {
   if (!await ensureBatchAllowed(context) || !context.mounted) return;
-  final paths = await pickStls(context);
+  final session = PickSession();
+  final paths = await pickStls(context, session: session);
   if (paths.isEmpty || !context.mounted) return;
-  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => BatchScreen(paths: paths)));
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => BatchScreen(paths: paths, session: session)));
 }
 
 /// Shows the paywall until batch is allowed. A purchase is followed by a fresh
@@ -40,8 +41,11 @@ Future<bool> ensureBatchAllowed(BuildContext context) async {
 
 /// Setup page: file list, shared settings, start (PLAN §8.2).
 class BatchScreen extends StatefulWidget {
-  const BatchScreen({super.key, required this.paths});
+  const BatchScreen({super.key, required this.paths, this.session});
   final List<String> paths;
+
+  /// Content identities of the first pick; later "Add more" picks continue it.
+  final PickSession? session;
   @override
   State<BatchScreen> createState() => _BatchScreenState();
 }
@@ -49,6 +53,7 @@ class BatchScreen extends StatefulWidget {
 class _BatchScreenState extends State<BatchScreen> {
   late List<BatchInput> _inputs;
   bool _reading = true;
+  late final PickSession _session = widget.session ?? PickSession();
   bool _inspecting = false;
   final _inspected = <String>{};
   bool _disposed = false;
@@ -97,7 +102,7 @@ class _BatchScreenState extends State<BatchScreen> {
   }
 
   Future<void> _addMore() async {
-    final paths = await pickStls(context);
+    final paths = await pickStls(context, session: _session);
     if (!mounted || paths.isEmpty) return;
     if (_add(paths)) {
       setState(() => _reading = true);

@@ -233,6 +233,7 @@ class BatchRunner extends ChangeNotifier {
         settings: settings,
         faces: faces,
         maxFaces: maxFacesNow?.call(),
+      memoryBudgetBytes: budgetBytes,
       );
       token = _current = engine.newCancelToken();
       ConvertResult r;

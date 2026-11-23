@@ -13,6 +13,7 @@ import 'package:stl2stp_app/core/engine.dart';
 import 'package:stl2stp_app/core/ffi_engine.dart' show resultAfterExit;
 import 'package:stl2stp_app/screens/converting_screen.dart';
 import 'package:stl2stp_app/core/memory_guard.dart';
+import 'package:stl2stp_app/core/real_mesh_check.dart';
 import 'package:stl2stp_app/core/models.dart';
 import 'package:stl2stp_app/core/sample_mesh.dart';
 import 'package:stl2stp_app/l10n/strings.dart';
@@ -67,10 +68,12 @@ BatchRunner _runner(GateEngine e, List<BatchInput> ins, Directory out,
 class _SpyEngine extends GateEngine {
   _SpyEngine(this.seen);
   final List<int?> seen;
+  static int? lastBudget;
   @override
   Future<ConvertResult> convert(ConvertRequest request,
       {required void Function(ConvertProgress) onProgress, required CancelToken cancel}) {
     seen.add(request.maxFaces);
+    lastBudget = request.memoryBudgetBytes;
     return super.convert(request, onProgress: onProgress, cancel: cancel);
   }
 }
@@ -278,6 +281,43 @@ void main() {
       expect(ok.ok, isTrue);
     });
 
+    test('review example: 40,000-face model, 5% target, simplification stops short, 500 MB budget (TARGET_NOT_REACHED)', () {
+      const guard = MemoryGuard();
+      const s = ConvertSettings(simplify: true, keepPercent: 5);
+      const budget = 500 * 1000 * 1000;
+      // The pre-check trusts the 5% target (2,000 faces) and estimates only ~91 MB...
+      expect(guard.check(40000, s, budget).level, isNot(MemoryLevel.refuse));
+      // ...while the mesh that really remains if simplification stops at 40,000 faces needs ~870 MB.
+      expect(guard.peakBytesForBuiltFaces(40000, s), greaterThan(budget));
+      // Under the free limit, Pro or not: the real count is refused for memory.
+      expect(realMeshVerdict(40000, s, maxFaces: 50000, budgetBytes: budget), CoreStatus.errorMemory);
+      expect(realMeshVerdict(40000, s, maxFaces: null, budgetBytes: budget), CoreStatus.errorMemory); // Pro
+      // Above the free limit the entitlement result wins.
+      expect(realMeshVerdict(60000, s, maxFaces: 50000, budgetBytes: budget), CoreStatus.errorFreeLimit);
+      // Enough budget, or no budget given: export may start.
+      expect(realMeshVerdict(40000, s, maxFaces: 50000, budgetBytes: 2000 * 1000 * 1000), isNull);
+      expect(realMeshVerdict(40000, s), isNull);
+      // The sewing factor counts on the real count too.
+      const sew = ConvertSettings(mode: ConvertMode.sewing);
+      expect(guard.peakBytesForBuiltFaces(1000, sew), greaterThan(guard.peakBytesForBuiltFaces(1000, const ConvertSettings())));
+    });
+
+    test('requests carry the memory budget to the engine (single and batch)', () async {
+      final seen = <int?>[];
+      final r = BatchRunner(
+        engine: _SpyEngine(seen),
+        inputs: [_in('a.stl')],
+        settings: const ConvertSettings(),
+        memoryGuard: const MemoryGuard(),
+        budgetBytes: 123456789,
+        outputPathFor: (src, f) => '${out.path}/a.step',
+        onFileDone: (_, _) {},
+      );
+      await r.run();
+      expect(r.items.single.state, BatchItemState.done);
+      expect(_SpyEngine.lastBudget, 123456789);
+    });
+
     testWidgets('converting screen shows the free-limit result, not a success', (tester) async {
       await tester.binding.setSurfaceSize(const Size(430, 1000));
       await S.preload();
@@ -330,6 +370,24 @@ void main() {
       expect(a.uri == b.uri, isFalse); // identity is the bytes, not the uri
       final r = await materializePicked([a, b, _FakePicked('p.stl', [4, 5, 7])], tempRoot: out);
       expect(r.length, 2);
+    });
+
+    test('repeated Add more: the same non-local file is kept once across picker calls', () async {
+      final session = PickSession();
+      final first = await materializePicked([
+        _FakePicked('a.stl', [1, 2, 3]),
+        _FakePicked('b.stl', [7, 7]),
+      ], tempRoot: out, session: session);
+      expect(first.length, 2);
+      final second = await materializePicked([
+        _FakePicked('a.stl', [1, 2, 3]), // same name/size/content again
+        _FakePicked('a.stl', [1, 2, 4]), // same name, different content: a new file
+        _FakePicked('c.stl', [9]),
+      ], tempRoot: out, session: session);
+      expect(second.length, 2);
+      expect(second.map((p) => File(p).readAsBytesSync().toString()), unorderedEquals(['[1, 2, 4]', '[9]']));
+      // Without a shared session each call starts fresh (old behaviour).
+      expect((await materializePicked([_FakePicked('a.stl', [1, 2, 3])], tempRoot: out)).length, 1);
     });
 
     test('same source twice is kept once; local paths dedupe by path', () async {

@@ -231,7 +231,12 @@ enum Stage {
 
 class ConvertRequest {
   const ConvertRequest(
-      {required this.inputPath, required this.outputPath, required this.settings, required this.faces, this.maxFaces});
+      {required this.inputPath,
+      required this.outputPath,
+      required this.settings,
+      required this.faces,
+      this.maxFaces,
+      this.memoryBudgetBytes});
   final String inputPath;
   final String outputPath;
   final ConvertSettings settings;
@@ -242,6 +247,10 @@ class ConvertRequest {
   /// Free-tier face limit enforced by the engine on the REAL mesh (after
   /// simplification, before building CAD). Null = no limit (Pro, desktop).
   final int? maxFaces;
+
+  /// Memory budget the engine re-checks against the real (post-simplification)
+  /// face count before building CAD. Null = no check.
+  final int? memoryBudgetBytes;
 
   List<Stage> get stages => [
         Stage.read,

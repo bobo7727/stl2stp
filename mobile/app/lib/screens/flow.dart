@@ -60,10 +60,17 @@ int _fnv(Uint8List bytes) {
   return h;
 }
 
+/// Identities of everything already picked for one batch, so adding files in
+/// several picker calls still removes duplicates (name + size + content hash
+/// for non-local files, path for local ones).
+class PickSession {
+  final seen = <String>{};
+}
+
 /// Turns picker results into local paths (see [pickStls]).
 @visibleForTesting
-Future<List<String>> materializePicked(List<PlatformFile> files, {Directory? tempRoot}) async {
-  final seen = <String>{};
+Future<List<String>> materializePicked(List<PlatformFile> files, {Directory? tempRoot, PickSession? session}) async {
+  final seen = (session ?? PickSession()).seen;
   final out = <String>[];
   for (final f in files) {
     final path = f.path;
@@ -87,11 +94,11 @@ Future<List<String>> materializePicked(List<PlatformFile> files, {Directory? tem
 /// source identity (local path, or name + size + content hash), never by the
 /// copied path. Returns an empty list when cancelled. Falls back to the path
 /// dialog (one file per call) when the picker is unavailable.
-Future<List<String>> pickStls(BuildContext context) async {
+Future<List<String>> pickStls(BuildContext context, {PickSession? session}) async {
   final s = S.of(context);
   try {
     final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['stl', 'STL']);
-    final out = await materializePicked(files);
+    final out = await materializePicked(files, session: session);
     return out;
   } catch (e) {
     debugPrint('file picker failed: $e');
