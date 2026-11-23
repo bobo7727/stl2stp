@@ -13,7 +13,9 @@ import '../platform/background_task.dart';
 import '../platform/haptics.dart';
 import '../purchase/free_tier.dart';
 import '../purchase/mock_purchase_service.dart';
+import '../purchase/purchase.dart' show tipServiceFor;
 import '../purchase/purchase_service.dart';
+import '../purchase/tip_service.dart';
 import 'history.dart';
 
 /// App-wide state: preferences, history, the conversion engine and output dir.
@@ -23,6 +25,7 @@ class AppState extends ChangeNotifier {
     required this.prefs,
     required this.outputDir,
     PurchaseService? purchase,
+    TipService? tips,
     this.limits = FreeTierLimits.none,
     this.estimator = const Estimator(),
     this.memoryGuard = const MemoryGuard(),
@@ -30,6 +33,7 @@ class AppState extends ChangeNotifier {
     BackgroundTasks? background,
     Haptics? haptics,
   })  : purchase = purchase ?? MockPurchaseService(prefs),
+        _tipsOverride = tips,
         detectedMemoryBudget = memoryBudgetBytes ?? MemoryBudget.fallbackBytes,
         background = background ?? BackgroundTasks(),
         haptics = haptics ?? Haptics() {
@@ -46,6 +50,10 @@ class AppState extends ChangeNotifier {
 
   /// Store backend (mock on Linux/desktop, in_app_purchase on iOS).
   final PurchaseService purchase;
+
+  /// Voluntary tips (iOS only; [NoTipService] elsewhere). Never affects [isPro] or limits.
+  late final TipService tips = _tipsOverride ?? tipServiceFor(purchase);
+  final TipService? _tipsOverride;
 
   /// Free-tier limits; [FreeTierLimits.none] (default) = no restrictions.
   final FreeTierLimits limits;
@@ -92,8 +100,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 'zh' (default), 'en' or 'system'.
-  String get language => prefs.getString('language') ?? 'zh';
+  /// 'system' (default: follow the device language), 'zh' or 'en'.
+  String get language => prefs.getString('language') ?? 'system';
   set language(String v) {
     prefs.setString('language', v);
     notifyListeners();

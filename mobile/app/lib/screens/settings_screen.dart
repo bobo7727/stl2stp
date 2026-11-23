@@ -10,8 +10,10 @@ import 'history_screen.dart';
 import 'help_screen.dart';
 import 'licenses_screen.dart';
 import 'paywall_screen.dart';
+import 'support_screen.dart';
 
-const appVersion = '0.1.0';
+/// Keep in sync with `version:` in pubspec.yaml.
+const appVersion = '1.0.0';
 
 /// Settings (ui-spec §4.13).
 class SettingsScreen extends StatelessWidget {
@@ -36,9 +38,21 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 32), children: [
         SectionHeader(s.t('settings.purchase')),
         Container(
-          decoration: BoxDecoration(
-              border: Border.all(color: t.warning, style: BorderStyle.solid), borderRadius: BorderRadius.circular(12)),
+          // The yellow outline marks the design placeholder; shipped iOS builds have none.
+          decoration: st.tips.supported
+              ? null
+              : BoxDecoration(
+                  border: Border.all(color: t.warning, style: BorderStyle.solid), borderRadius: BorderRadius.circular(12)),
           child: group([
+            if (st.tips.supported)
+              ListTile(
+                key: const Key('supportRow'),
+                title: Text(s.t('support.title')),
+                trailing: Icon(Icons.chevron_right, color: t.label3),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen())),
+              ),
+            // iOS: Pro is neither sold nor restorable (never sold, unlocks nothing); only the tip is shown.
+            if (st.purchase.proForSale)
             ListTile(
               key: const Key('purchaseStatus'),
               title: Text(s.t('settings.purchase.status')),
@@ -49,6 +63,7 @@ class SettingsScreen extends StatelessWidget {
               ]),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen())),
             ),
+            if (st.purchase.proForSale)
             ListTile(
               key: const Key('settingsRestore'),
               title: Text(s.t('settings.purchase.restore'), style: TextStyle(color: t.accent)),

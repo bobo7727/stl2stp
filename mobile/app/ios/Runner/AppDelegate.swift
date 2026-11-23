@@ -6,6 +6,7 @@ import os
 @objc class AppDelegate: FlutterAppDelegate {
   private var backgroundChannel: FlutterMethodChannel?
   private var memoryChannel: FlutterMethodChannel?
+  private var storeHost: StoreChannelHost?
   private var backgroundTasks: [Int: UIBackgroundTaskIdentifier] = [:]
   private var nextTaskID = 1
 
@@ -14,8 +15,11 @@ import os
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    // Start the one StoreKit 2 transaction listener as early as possible.
+    Task { await StoreCoordinator.shared.begin() }
     let launched = super.application(application, didFinishLaunchingWithOptions: launchOptions)
     installNativeChannels()
+    installStoreChannel()
     return launched
   }
 
@@ -23,11 +27,21 @@ import os
     super.applicationDidBecomeActive(application)
     // A host may attach its Flutter controller after didFinishLaunching.
     installNativeChannels()
+    installStoreChannel()
   }
 
   override func applicationWillTerminate(_ application: UIApplication) {
     disposeNativeChannels()
     super.applicationWillTerminate(application)
+  }
+
+  /// Independent of the background/memory channels so an early return there
+  /// can never skip it; idempotent.
+  private func installStoreChannel() {
+    guard storeHost == nil, let registrar = registrar(forPlugin: "Stl2StpStore") else { return }
+    let host = StoreChannelHost()
+    host.install(messenger: registrar.messenger())
+    storeHost = host
   }
 
   private func installNativeChannels() {

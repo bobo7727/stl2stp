@@ -120,7 +120,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         const SizedBox(height: 16),
         if (p.isPro)
           InfoBanner(kind: BannerKind.success, text: s.t('purchase.status.pro'))
-        else
+        else if (p.proForSale)
           Container(
             decoration: price == null
                 ? BoxDecoration(border: Border.all(color: t.warning), borderRadius: BorderRadius.circular(14))

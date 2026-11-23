@@ -45,8 +45,9 @@ class Stl2StpApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
+          // Chinese devices get Chinese; every other language falls back to English.
           localeResolutionCallback: (locale, supported) =>
-              locale != null && locale.languageCode == 'en' ? const Locale('en') : const Locale('zh'),
+              locale != null && locale.languageCode == 'zh' ? const Locale('zh') : const Locale('en'),
           builder: (context, child) => RepaintBoundary(key: screenshotKey, child: child),
           home: homeOverride ??
               (st.engine is UnavailableEngine

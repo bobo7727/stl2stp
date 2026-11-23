@@ -46,6 +46,10 @@ abstract class PurchaseService extends ChangeNotifier {
   /// The Pro product as reported by the store, once loaded.
   ProductInfo? get product;
 
+  /// Whether Pro may be bought by users who do not own it. The iOS backend
+  /// returns false: Pro is no longer sold there, only restored.
+  bool get proForSale => true;
+
   /// True for the development mock (shows a "no charge" note).
   bool get isMock => false;
 
