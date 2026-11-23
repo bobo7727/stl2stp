@@ -156,6 +156,10 @@ S = {
  'purchase.mock_note': ('开发用模拟商店：不会扣费', 'Development mock store: no charge'),
  'purchase.limit.daily': ('免费版每天可转换 {limit} 次，今天已用完。', 'The free version allows {limit} conversions a day. Today’s are used up.'),
  'purchase.limit.meta': ('自定义文件信息属于完整版功能。', 'Custom file info is a Pro feature.'),
+ # ---- free-tier limit on the real mesh ----
+ 'error.free_limit.title': ('简化后仍超过免费上限', 'Still over the free limit after reducing'),
+ 'error.free_limit.body': ('减面后模型仍有 {faces} 个面，免费版最多转换 {limit} 个面。没有生成文件。请进一步减少面数，或升级 Pro。', 'After reducing, the model still has {faces} faces. Free conversion covers up to {limit}. No file was written. Reduce further, or get Pro.'),
+ 'error.free_limit.action': ('返回设置', 'Back to Settings'),
  # ---- batch ----
  'batch.entry': ('选择多个文件', 'Select multiple files'),
  'batch.entry.pro': ('Pro', 'Pro'),

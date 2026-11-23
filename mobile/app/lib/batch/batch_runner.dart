@@ -76,6 +76,7 @@ class BatchRunner extends ChangeNotifier {
     required this.outputPathFor,
     required this.onFileDone,
     this.isAllowed,
+    this.maxFacesNow,
     this.limitFaces = 2000000,
   }) : items = [for (final i in inputs) BatchItem(i)];
 
@@ -93,6 +94,9 @@ class BatchRunner extends ChangeNotifier {
 
   /// False when Pro is no longer active. Null = always allowed.
   final bool Function()? isAllowed;
+
+  /// Free-tier face limit to enforce on each file's real mesh right now (null = none).
+  final int? Function()? maxFacesNow;
   final int limitFaces;
 
   BatchStopReason? _stopReason;
@@ -167,79 +171,101 @@ class BatchRunner extends ChangeNotifier {
     assert(!_started, 'BatchRunner.run() may be called once');
     if (_started) return;
     _started = true;
-    for (var i = 0; i < items.length; i++) {
-      final it = items[i];
-      _index = i;
-      if (_stopReason == null && isAllowed != null && !isAllowed!()) _stopReason = BatchStopReason.entitlement;
-      if (_stopReason != null) {
-        it.stopReason = _stopReason;
-        _terminal(it, BatchItemState.notRun);
-        continue;
+    try {
+      for (var i = 0; i < items.length; i++) {
+        final it = items[i];
+        _index = i;
+        if (_stopReason == null && isAllowed != null && !isAllowed!()) _stopReason = BatchStopReason.entitlement;
+        if (_stopReason != null) {
+          it.stopReason = _stopReason;
+          _terminal(it, BatchItemState.notRun);
+          continue;
+        }
+        final faces = it.input.faces;
+        if (faces == null) {
+          it.status = CoreStatus.errorFormat;
+          it.message = 'unreadable';
+          _terminal(it, BatchItemState.failed);
+          continue;
+        }
+        if (faces > limitFaces) {
+          it.reasonKey = 'batch.skip.faces';
+          _terminal(it, BatchItemState.skipped);
+          continue;
+        }
+        if (memoryGuard.check(faces, settings, budgetBytes).level == MemoryLevel.refuse) {
+          it.reasonKey = 'batch.skip.memory';
+          _terminal(it, BatchItemState.skipped);
+          continue;
+        }
+        try {
+          await _runOne(it, faces);
+        } catch (e) {
+          // Whatever went wrong, the file gets its one terminal state and the queue goes on.
+          it.status = CoreStatus.errorInternal;
+          it.message = '$e';
+          _terminal(it, BatchItemState.failed);
+        }
       }
-      final faces = it.input.faces;
-      if (faces == null) {
-        it.status = CoreStatus.errorFormat;
-        it.message = 'unreadable';
-        _terminal(it, BatchItemState.failed);
-        continue;
+    } finally {
+      // Even on an unexpected error the queue ends with every file in a terminal state.
+      for (final it in items) {
+        if (!it.isTerminal) {
+          it.stopReason ??= _stopReason ?? BatchStopReason.cancelled;
+          it.state = BatchItemState.notRun;
+        }
       }
-      if (faces > limitFaces) {
-        it.reasonKey = 'batch.skip.faces';
-        _terminal(it, BatchItemState.skipped);
-        continue;
-      }
-      if (memoryGuard.check(faces, settings, budgetBytes).level == MemoryLevel.refuse) {
-        it.reasonKey = 'batch.skip.memory';
-        _terminal(it, BatchItemState.skipped);
-        continue;
-      }
-      await _runOne(it, faces);
+      _index = -1;
+      _finished = true;
+      notifyListeners();
     }
-    _index = -1;
-    _finished = true;
-    notifyListeners();
   }
 
   Future<void> _runOne(BatchItem it, int faces) async {
-    final token = _current = engine.newCancelToken();
+    CancelToken? token;
     it.state = BatchItemState.running;
     notifyListeners();
-    final request = ConvertRequest(
-      inputPath: it.input.path,
-      outputPath: outputPathFor(it.input.path, settings.format),
-      settings: settings,
-      faces: faces,
-    );
-    ConvertResult r;
     try {
-      r = await engine.convert(request, cancel: token, onProgress: (p) {
-        it.stage = p.stage;
-        it.progress = p.overall;
-        notifyListeners();
-      });
-    } catch (e) {
-      r = ConvertResult(status: CoreStatus.errorInternal, outputPath: request.outputPath, message: '$e');
-    } finally {
-      token.dispose();
-      _current = null;
-    }
-    it.result = r;
-    if (r.ok) {
-      // A finished conversion stays done even if a stop arrived at the boundary.
+      // Everything that can throw (output directory, token, engine) is inside this try.
+      final request = ConvertRequest(
+        inputPath: it.input.path,
+        outputPath: outputPathFor(it.input.path, settings.format),
+        settings: settings,
+        faces: faces,
+        maxFaces: maxFacesNow?.call(),
+      );
+      token = _current = engine.newCancelToken();
+      ConvertResult r;
       try {
-        onFileDone(it, r);
+        r = await engine.convert(request, cancel: token, onProgress: (p) {
+          it.stage = p.stage;
+          it.progress = p.overall;
+          notifyListeners();
+        });
       } catch (e) {
-        debugPrint('batch onFileDone failed: $e');
+        r = ConvertResult(status: CoreStatus.errorInternal, outputPath: request.outputPath, message: '$e');
       }
-      _terminal(it, BatchItemState.done);
-    } else if (r.status == CoreStatus.errorCancelled) {
-      // A cancelled file always ends the queue, even if the engine reported it unprompted.
-      it.stopReason = _stopReason ??= BatchStopReason.cancelled;
-      _terminal(it, BatchItemState.notRun);
-    } else {
-      it.status = r.status;
-      it.message = r.message;
-      _terminal(it, BatchItemState.failed);
+      it.result = r;
+      if (r.ok) {
+        // A finished conversion stays done even if a stop arrived at the boundary.
+        try {
+          onFileDone(it, r);
+        } catch (e) {
+          debugPrint('batch onFileDone failed: $e');
+        }
+        _terminal(it, BatchItemState.done);
+      } else if (r.status == CoreStatus.errorCancelled) {
+        // A cancelled file always ends the queue, even if the engine reported it unprompted.
+        it.stopReason = _stopReason ??= BatchStopReason.cancelled;
+        _terminal(it, BatchItemState.notRun);
+      } else {
+        it.status = r.status;
+        it.message = r.message;
+        _terminal(it, BatchItemState.failed);
+      }
+    } finally {
+      token?.dispose();
+      _current = null;
     }
   }
 }

@@ -49,6 +49,8 @@ class BatchScreen extends StatefulWidget {
 class _BatchScreenState extends State<BatchScreen> {
   late List<BatchInput> _inputs;
   bool _reading = true;
+  bool _inspecting = false;
+  final _inspected = <String>{};
   bool _disposed = false;
   bool _truncated = false;
   late ConvertSettings _settings;
@@ -58,19 +60,8 @@ class _BatchScreenState extends State<BatchScreen> {
   void initState() {
     super.initState();
     final state = AppScope.read(context);
-    final unique = <String>[];
-    for (final path in widget.paths) {
-      if (!unique.contains(path)) unique.add(path);
-    }
-    _truncated = unique.length > maxBatchFiles;
-    final paths = unique.take(maxBatchFiles);
-    _inputs = [
-      for (final path in paths)
-        BatchInput(
-            path: path,
-            name: p.basename(path),
-            size: File(path).existsSync() ? File(path).lengthSync() : 0)
-    ];
+    _inputs = [];
+    _add(widget.paths);
     final base = state.initialSettings();
     _settings = ConvertSettings.forPreset(Preset.recommended, format: base.format).copyWith(
         author: base.author, organization: base.organization, product: base.product, description: base.description);
@@ -90,10 +81,40 @@ class _BatchScreenState extends State<BatchScreen> {
     super.dispose();
   }
 
-  /// One at a time; stops as soon as the page is left (§14c P12).
+  /// Adds paths (de-duplicated, capped at [maxBatchFiles]); returns whether any were new.
+  bool _add(List<String> paths) {
+    var added = false;
+    for (final path in paths) {
+      if (_inputs.any((i) => i.path == path)) continue;
+      if (_inputs.length >= maxBatchFiles) {
+        _truncated = true;
+        break;
+      }
+      _inputs.add(BatchInput(path: path, name: p.basename(path), size: File(path).existsSync() ? File(path).lengthSync() : 0));
+      added = true;
+    }
+    return added;
+  }
+
+  Future<void> _addMore() async {
+    final paths = await pickStls(context);
+    if (!mounted || paths.isEmpty) return;
+    if (_add(paths)) {
+      setState(() => _reading = true);
+      _inspectAll(AppScope.read(context));
+    } else {
+      setState(() {});
+    }
+  }
+
+  /// One at a time; stops as soon as the page is left (§14c P12). Safe to call
+  /// again after files were added: only new files are read, never two loops at once.
   Future<void> _inspectAll(AppState state) async {
+    if (_inspecting) return;
+    _inspecting = true;
     for (var i = 0; i < _inputs.length; i++) {
       if (_disposed) return;
+      if (!_inspected.add(_inputs[i].path)) continue;
       int? faces;
       try {
         faces = (await state.engine.inspect(_inputs[i].path)).faces;
@@ -103,7 +124,11 @@ class _BatchScreenState extends State<BatchScreen> {
       if (_disposed) return;
       setState(() => _inputs[i] = _inputs[i].withFaces(faces));
     }
-    if (!_disposed) setState(() => _reading = false);
+    _inspecting = false;
+    if (_disposed) return;
+    // Files added while the loop ran its last pass are picked up here.
+    if (_inputs.any((i) => !_inspected.contains(i.path))) return _inspectAll(state);
+    setState(() => _reading = false);
   }
 
   ConvertSettings get _final => _settings.copyWith(
@@ -157,6 +182,15 @@ class _BatchScreenState extends State<BatchScreen> {
                     style: TextStyle(color: i.faces == null && !_reading ? t.danger : t.label2)),
               ),
           ]),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('batchAddMore'),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(s.t('batch.add_more')),
+            onPressed: _reading || _inputs.length >= maxBatchFiles ? null : _addMore,
+          ),
         ),
         SectionHeader(s.t('batch.settings')),
         Text(s.t('batch.format'), style: TextStyle(color: t.label2)),
@@ -233,6 +267,7 @@ class _BatchRunningScreenState extends State<BatchRunningScreen> with WidgetsBin
       budgetBytes: state.memoryBudgetBytes,
       outputPathFor: state.outputPathFor,
       isAllowed: () => state.batchLimit() == null,
+      maxFacesNow: () => state.isPro ? null : state.limits.maxTriangles,
       onFileDone: (item, r) {
         final bytes = File(r.outputPath).existsSync() ? File(r.outputPath).lengthSync() : 0;
         state.recordConversion();
@@ -260,7 +295,11 @@ class _BatchRunningScreenState extends State<BatchRunningScreen> with WidgetsBin
   }
 
   Future<void> _go() async {
-    await _runner.run();
+    try {
+      await _runner.run();
+    } catch (e) {
+      debugPrint('batch run failed: $e');
+    }
     _ended = true;
     final id = _backgroundTask;
     _backgroundTask = null;

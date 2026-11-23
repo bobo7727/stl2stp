@@ -15,7 +15,12 @@ final screenshotKey = GlobalKey();
 final navigatorKey = GlobalKey<NavigatorState>();
 
 class Stl2StpApp extends StatelessWidget {
-  const Stl2StpApp({super.key, required this.state, this.openOnStart, this.homeOverride});
+  const Stl2StpApp({
+    super.key,
+    required this.state,
+    this.openOnStart,
+    this.homeOverride,
+  });
   final AppState state;
 
   /// Tests: start on a specific screen instead of home/onboarding.
@@ -28,35 +33,81 @@ class Stl2StpApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScope(
       state: state,
-      child: Builder(builder: (context) {
-        final st = AppScope.of(context);
-        return MaterialApp(
-          title: 'STL2STP',
-          debugShowCheckedModeBanner: false,
-          navigatorKey: navigatorKey,
-          theme: buildTheme(Brightness.light),
-          darkTheme: buildTheme(Brightness.dark),
-          themeMode: st.themeMode,
-          locale: st.locale,
-          supportedLocales: S.supportedLocales,
-          localizationsDelegates: const [
-            SDelegate(),
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          // Chinese devices get Chinese; every other language falls back to English.
-          localeResolutionCallback: (locale, supported) =>
-              locale != null && locale.languageCode == 'zh' ? const Locale('zh') : const Locale('en'),
-          builder: (context, child) => RepaintBoundary(key: screenshotKey, child: child),
-          home: homeOverride ??
-              (st.engine is UnavailableEngine
-                  ? CoreLoadErrorScreen(detail: (st.engine as UnavailableEngine).detail)
-                  : (st.onboardingSeen ? _Home(openOnStart: openOnStart) : const OnboardingScreen())),
-        );
-      }),
+      child: ResumeRefresh(
+        state: state,
+        child: Builder(
+          builder: (context) {
+            final st = AppScope.of(context);
+            return MaterialApp(
+              title: 'STL2STP',
+              debugShowCheckedModeBanner: false,
+              navigatorKey: navigatorKey,
+              theme: buildTheme(Brightness.light),
+              darkTheme: buildTheme(Brightness.dark),
+              themeMode: st.themeMode,
+              locale: st.locale,
+              supportedLocales: S.supportedLocales,
+              localizationsDelegates: const [
+                SDelegate(),
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              // Chinese devices get Chinese; every other language falls back to English.
+              localeResolutionCallback: (locale, supported) =>
+                  locale != null && locale.languageCode == 'zh'
+                  ? const Locale('zh')
+                  : const Locale('en'),
+              builder: (context, child) =>
+                  RepaintBoundary(key: screenshotKey, child: child),
+              home:
+                  homeOverride ??
+                  (st.engine is UnavailableEngine
+                      ? CoreLoadErrorScreen(
+                          detail: (st.engine as UnavailableEngine).detail,
+                        )
+                      : (st.onboardingSeen
+                            ? _Home(openOnStart: openOnStart)
+                            : const OnboardingScreen())),
+            );
+          },
+        ),
+      ),
     );
   }
+}
+
+/// Re-reads the Pro entitlement whenever the app comes back to the foreground
+/// (refunds / family changes while it was away). No store prompt, no sync.
+class ResumeRefresh extends StatefulWidget {
+  const ResumeRefresh({super.key, required this.state, required this.child});
+  final AppState state;
+  final Widget child;
+  @override
+  State<ResumeRefresh> createState() => _ResumeRefreshState();
+}
+
+class _ResumeRefreshState extends State<ResumeRefresh>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.resumed) widget.state.purchase.refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _Home extends StatefulWidget {

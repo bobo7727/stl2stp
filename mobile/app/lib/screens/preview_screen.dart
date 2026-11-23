@@ -83,6 +83,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       outputPath: state.outputPathFor(info.path, _s.format),
       settings: _s,
       faces: info.faces,
+      maxFaces: state.isPro ? null : state.limits.maxTriangles,
     );
     await Navigator.push(
         context, MaterialPageRoute(builder: (_) => ConvertingScreen(request: req, model: widget.model)));

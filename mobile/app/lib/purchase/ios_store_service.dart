@@ -165,6 +165,18 @@ class IosStoreService extends PurchaseService implements TipService {
     }
   }
 
+  /// Foreground reconciliation: native recomputes from currentEntitlements.
+  /// A failure leaves the cache untouched.
+  @override
+  Future<void> refresh() async {
+    if (!_started) return;
+    try {
+      final snap = await _method.invokeMapMethod<String, Object?>('refresh');
+      if (snap != null) _applyPro(snap);
+      await _mirror;
+    } catch (_) {}
+  }
+
   void _onEvent(dynamic e) {
     if (e is! Map) return;
     if (e['type'] == 'pro') _applyPro(Map<String, Object?>.from(e));

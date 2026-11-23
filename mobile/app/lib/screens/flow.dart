@@ -96,7 +96,7 @@ Future<List<String>> pickStls(BuildContext context) async {
   } catch (e) {
     debugPrint('file picker failed: $e');
     if (!context.mounted) return const [];
-    final one = await askPath(context, s.t('x.open_path.picker_failed'));
+    final one = await askPath(context, s.t('batch.picker_note'));
     return one == null ? const [] : [one];
   }
 }

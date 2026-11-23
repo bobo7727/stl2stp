@@ -134,6 +134,7 @@ class _ConvertingScreenState extends State<ConvertingScreen> with WidgetsBinding
       CoreStatus.errorCancelled when auto == 'x.memory.pressure' => ErrorKind.memory,
       CoreStatus.errorCancelled when auto != null => ErrorKind.generic,
       CoreStatus.errorCancelled => ErrorKind.cancelled,
+      CoreStatus.errorFreeLimit => ErrorKind.freeLimit,
       CoreStatus.errorMemory => ErrorKind.memory,
       CoreStatus.errorEmpty => ErrorKind.empty,
       CoreStatus.errorFormat => ErrorKind.format,
@@ -148,10 +149,12 @@ class _ConvertingScreenState extends State<ConvertingScreen> with WidgetsBinding
         code: r.status,
         details: auto != null ? S.of(context).t(auto) : r.message,
         notice: auto != null ? S.of(context).t(auto) : null,
-        faces: model.info.faces,
+        faces: kind == ErrorKind.freeLimit ? (r.facesAfterSimplify ?? model.info.faces) : model.info.faces,
+        limit: kind == ErrorKind.freeLimit ? widget.request.maxFaces : null,
         onPrimary: (ctx) {
           switch (kind) {
             case ErrorKind.cancelled:
+            case ErrorKind.freeLimit:
               Navigator.of(ctx).pop();
             case ErrorKind.memory:
               Navigator.of(ctx).pushReplacement(MaterialPageRoute(

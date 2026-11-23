@@ -77,6 +77,15 @@ class DemoEngine implements ConversionEngine {
     }
     final s = request.settings;
     final faces = s.simplify ? s.targetFaces(request.faces) : request.faces;
+    final max = request.maxFaces;
+    if (max != null && faces > max) {
+      return ConvertResult(
+          status: CoreStatus.errorFreeLimit,
+          outputPath: request.outputPath,
+          message: 'faces=$faces limit=$max',
+          facesAfterSimplify: faces,
+          failedStage: Stage.build);
+    }
     File(request.outputPath).writeAsStringSync(s.format == ExportFormat.step
         ? 'ISO-10303-21;\n/* DEMO PLACEHOLDER - not a real STEP file (stl2stp-core not linked) */\nEND-ISO-10303-21;\n'
         : 'DEMO PLACEHOLDER - not a real IGES file (stl2stp-core not linked)\n');

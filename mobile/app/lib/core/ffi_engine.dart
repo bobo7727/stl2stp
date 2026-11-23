@@ -140,6 +140,7 @@ class FfiEngine implements ConversionEngine {
       'merge': s.mergeCoplanar,
       'verify': s.verifyEffective,
       'weld': s.weld,
+      'maxFaces': request.maxFaces,
       'author': meta(s.author),
       'org': meta(s.organization),
       'product': meta(s.product),
@@ -189,7 +190,9 @@ class FfiEngine implements ConversionEngine {
       // its buffers. Wait for the isolate to exit so a conversion is only
       // "finished" once its native resources are released (batch runs the next
       // file straight after this one).
-      await exited.future.timeout(const Duration(seconds: 15), onTimeout: () {});
+      // No timeout: returning early would let the next conversion start while
+      // this one's native handle and buffers still exist.
+      await resultAfterExit(Future.value(r), exited.future);
       if (!r.ok) {
         try {
           final f = File(request.outputPath);
@@ -203,6 +206,16 @@ class FfiEngine implements ConversionEngine {
       exitPort.close();
     }
   }
+}
+
+/// Completes with [result] only once the worker isolate has exited, i.e. its
+/// native handle and buffers are freed. There is deliberately no timeout: a
+/// timeout would report "finished" while cleanup is still outstanding.
+@visibleForTesting
+Future<T> resultAfterExit<T>(Future<T> result, Future<void> exited) async {
+  final r = await result;
+  await exited;
+  return r;
 }
 
 DynamicLibrary _open(String? path) => path == null ? DynamicLibrary.process() : DynamicLibrary.open(path);
@@ -336,6 +349,17 @@ void _convertWorker(Map<String, Object?> a) {
       if (st < 0) return finish(st, failed: Stage.simplify.index, error: b.errorOf(h));
       if (b.getMeshStats(h, stats) >= 0) facesAfter = stats.ref.faces;
       _post(Stage.simplify.index, 1, force: true);
+    }
+    // Free-tier limit on the mesh that will really be built (simplification
+    // can stop short of its target: TARGET_NOT_REACHED).
+    final maxFaces = a['maxFaces'] as int?;
+    if (maxFaces != null) {
+      if (b.getMeshStats(h, stats) >= 0) facesAfter = stats.ref.faces;
+      final real = facesAfter;
+      if (real != null && real > maxFaces) {
+        return finish(CoreStatus.errorFreeLimit,
+            failed: a['simplify'] == true ? Stage.simplify.index : Stage.read.index, error: 'faces=$real limit=$maxFaces');
+      }
     }
     // 3+4. build + write
     final d = b.defaultExportOptions();

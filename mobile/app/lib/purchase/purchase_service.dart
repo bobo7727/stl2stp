@@ -59,4 +59,8 @@ abstract class PurchaseService extends ChangeNotifier {
   Future<PurchaseResult> buyPro();
 
   Future<PurchaseResult> restore();
+
+  /// Re-reads the entitlement without any App Store sync or prompt (called
+  /// when the app returns to the foreground). Default: nothing to refresh.
+  Future<void> refresh() async {}
 }
