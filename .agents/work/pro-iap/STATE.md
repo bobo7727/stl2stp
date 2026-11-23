@@ -92,3 +92,8 @@
 - C3（StoreKitTest/.storekit 覆盖）：需要 Xcode，**未做，放到 Codemagic 验证**（codemagic.yaml 已有 RunnerTests 步骤，首次 ignore_failure；新 Pro Swift 代码尚未编译）。
 - C1 的“按实际数量重查内存”未做：免费限制 5 万面时峰值内存已由现有预检覆盖；Pro 无限制仍用现有内存保护。
 - tests: flutter test PASS（+133，logs/c3_test.log）；analyze PASS（logs/c3_analyze.log）；Swift BLOCKED_ENV。
+
+### 2026-11-23 code round 3/3 — Codex CHANGES（0 blocker / 1 major / 1 minor），升级给老板
+- verdict 原文 HANDOFF_VERDICT.code-round-3.md。C2/C4/BATCH-001/-003/-004 已解决；C1 部分解决（缺“按真实面数重查内存”，Codex 的反例成立）；BATCH-002 内容去重策略接受，但跨“继续添加”未去重（minor）；C3 推迟获认可。
+- 规则：不开第 4 轮。已写 ESCALATION.md（选项 A/B/C，建议 A）。tests（Codex 侧）仍 BLOCKED_SANDBOX。
+- 未推送；分支 feat/pro-iap 最新应用提交 ff93c32。
