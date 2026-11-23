@@ -7,9 +7,22 @@ import '../core/models.dart';
 /// Real values are a product decision (ui-spec §4.14: "额度待定").
 @immutable
 class FreeTierLimits {
-  const FreeTierLimits({this.maxTriangles, this.dailyConversions, this.igesRequiresPro = false, this.metaRequiresPro = false});
+  const FreeTierLimits({
+    this.maxTriangles,
+    this.dailyConversions,
+    this.igesRequiresPro = false,
+    this.metaRequiresPro = false,
+    this.batchRequiresPro = false,
+  });
 
   static const none = FreeTierLimits();
+
+  /// Free faces per model (after simplification) in the shipped iOS app.
+  static const freeMaxTriangles = 50000;
+
+  /// The shipped iOS app: IGES, batch conversion and models over 50,000 faces
+  /// are Pro. Metadata stays free and there is no daily limit.
+  static const release = FreeTierLimits(maxTriangles: freeMaxTriangles, igesRequiresPro: true, batchRequiresPro: true);
 
   /// Largest mesh (triangles after simplification) a free user may convert; null = no limit.
   final int? maxTriangles;
@@ -18,8 +31,13 @@ class FreeTierLimits {
   final int? dailyConversions;
   final bool igesRequiresPro;
   final bool metaRequiresPro;
+  final bool batchRequiresPro;
 
-  bool get isNone => maxTriangles == null && dailyConversions == null && !igesRequiresPro && !metaRequiresPro;
+  bool get isNone =>
+      maxTriangles == null && dailyConversions == null && !igesRequiresPro && !metaRequiresPro && !batchRequiresPro;
+
+  /// Batch conversion is a Pro feature for free users.
+  LimitHit? checkBatch() => batchRequiresPro ? const LimitHit(LimitKind.batch) : null;
 
   /// First limit a free user would hit, or null if allowed.
   LimitHit? check({required int triangles, required ConvertSettings settings, required int conversionsToday}) {
@@ -36,7 +54,7 @@ class FreeTierLimits {
   }
 }
 
-enum LimitKind { triangles, daily, iges, meta }
+enum LimitKind { triangles, daily, iges, meta, batch }
 
 @immutable
 class LimitHit {
@@ -46,5 +64,8 @@ class LimitHit {
   final int value;
 
   /// String key in assets/i18n/app_*.json.
-  String get messageKey => 'purchase.limit.${kind.name}';
+  String get messageKey => switch (kind) {
+        LimitKind.triangles || LimitKind.iges || LimitKind.batch => 'pro.reason.${kind.name}',
+        _ => 'purchase.limit.${kind.name}',
+      };
 }

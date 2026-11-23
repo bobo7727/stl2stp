@@ -16,7 +16,10 @@ final class StoreChannelHost: NSObject, FlutterStreamHandler {
       Task { @MainActor in
         let c = StoreCoordinator.shared
         switch call.method {
-        case "start": await c.begin(); result(["type": "started"])
+        case "start": result(await c.start())
+        case "refresh": result(await c.refresh())
+        case "buyPro": result(await c.buyPro())
+        case "restore": result(await c.restore())
         case "loadProducts": result(await c.loadProducts())
         case "buyTip": result(await c.buyTip(productId: args?["productId"] as? String ?? ""))
         default: result(FlutterMethodNotImplemented)

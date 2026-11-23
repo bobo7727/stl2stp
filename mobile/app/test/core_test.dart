@@ -313,8 +313,8 @@ void main() {
       for (final k in zh.keys) {
         expect(ph.allMatches(zh[k]!).map((m) => m[1]).toSet(), ph.allMatches(en[k]!).map((m) => m[1]).toSet(),
             reason: k);
-        // support.thanks keeps the boss-approved wording (plan D1) verbatim, "感谢支持！".
-        if (k == 'support.thanks') continue;
+        // support.thanks and pro.success keep the owner-approved wording with an exclamation mark (D1, 2026-11-23).
+        if (k == 'support.thanks' || k == 'pro.success') continue;
         expect(zh[k]!.contains('!') || zh[k]!.contains('！'), isFalse, reason: 'no exclamation marks: $k');
       }
     });

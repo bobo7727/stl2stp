@@ -22,7 +22,7 @@ class ProductInfo {
   final String? priceLabel;
 }
 
-enum PurchaseOutcome { success, restored, nothingToRestore, cancelled, pending, failed, unavailable }
+enum PurchaseOutcome { success, restored, nothingToRestore, cancelled, pending, failed, unavailable, unverified, busy }
 
 @immutable
 class PurchaseResult {

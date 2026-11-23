@@ -181,6 +181,9 @@ class AppState extends ChangeNotifier {
   LimitHit? limitFor(int triangles, ConvertSettings s) =>
       isPro ? null : limits.check(triangles: triangles, settings: s, conversionsToday: conversionsToday);
 
+  /// The limit hit by starting a batch (null for Pro, or when batch is not restricted).
+  LimitHit? batchLimit() => isPro ? null : limits.checkBatch();
+
   // ---- outputs & history ----
   String outputPathFor(String sourcePath, ExportFormat f) {
     final dir = Directory(p.join(outputDir.path, 'Outputs'))..createSync(recursive: true);

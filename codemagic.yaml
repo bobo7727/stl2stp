@@ -65,6 +65,19 @@ workflows:
           mkdir -p "$CM_BUILD_DIR/mobile/build"
           ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app \
             "$CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip"
+      - name: Native unit tests (RunnerTests, simulator)
+        # First run: not fatal, so a test-harness problem cannot hide a good build.
+        # Read the log; make this step fatal (remove ignore_failure) once it is green.
+        ignore_failure: true
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          mkdir -p "$CM_BUILD_DIR/mobile/build"
+          git log -1 --format="Build commit: %H %s" | tee "$CM_BUILD_DIR/mobile/build/ios-simulator-xctest.log"
+          xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -only-testing:RunnerTests 2>&1 | tee -a "$CM_BUILD_DIR/mobile/build/ios-simulator-xctest.log"
     artifacts:
       - $CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip
       - $CM_BUILD_DIR/mobile/build/ios-simulator-*.log

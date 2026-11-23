@@ -51,13 +51,13 @@ class SettingsScreen extends StatelessWidget {
                 trailing: Icon(Icons.chevron_right, color: t.label3),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen())),
               ),
-            // iOS: Pro is neither sold nor restorable (never sold, unlocks nothing); only the tip is shown.
+            // Pro status and restore (iOS: native StoreKit 2).
             if (st.purchase.proForSale)
             ListTile(
               key: const Key('purchaseStatus'),
               title: Text(s.t('settings.purchase.status')),
               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(st.isPro ? s.t('purchase.status.pro') : s.t('settings.purchase.free'),
+                Text(st.isPro ? s.t('pro.status.pro') : s.t('pro.status.free'),
                     style: TextStyle(color: st.isPro ? t.success : t.label2)),
                 Icon(Icons.chevron_right, color: t.label3),
               ]),

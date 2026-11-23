@@ -28,13 +28,15 @@ class FakeNative {
 
   MockStreamHandlerEventSink? events;
   final calls = <MethodCall>[];
-  Map<String, Object?> startReply = {'type': 'pro', 'pro': false, 'revision': 1, 'pendingVerification': false};
+  Map<String, Object?> startReply = {'type': 'pro', 'pro': false};
   Map<String, Object?> productsReply = {
     'canPay': true,
     'tips': [
       {'id': tipSmallProductId, 'title': 'Small Tip', 'description': 'd', 'price': r'$0.99'}
-    ]
+    ],
+    'pro': {'id': 'com.stl2stp.app.pro', 'title': 'STL2STP Pro', 'description': 'd', 'price': r'$4.99'},
   };
+  Map<String, Object?> buyProReply = {'outcome': 'success'};
   Map<String, Object?> buyReply = {'outcome': 'success'};
   Map<String, Object?> restoreReply = {'outcome': 'nothingToRestore'};
   Completer<void>? buyGate;
@@ -51,6 +53,9 @@ class FakeNative {
       case 'buyTip':
         await buyGate?.future;
         return buyReply;
+      case 'buyPro':
+        await buyGate?.future;
+        return buyProReply;
       case 'restore':
         return restoreReply;
       case 'refresh':
@@ -87,19 +92,17 @@ void main() {
       expect(const NoTipService().supported, isFalse);
     });
 
-    test('init passes the legacy cache once, loads the tip, never sells Pro', () async {
+    test('init starts native, loads tip and Pro price; native answer replaces the cache', () async {
       final p = await prefs({'store.proActive': true});
       final s = IosStoreService(p);
       await s.init();
       expect(native.calls.map((c) => c.method), contains('start'));
-      expect(s.isPro, isTrue, reason: 'old cache is only read');
-      expect((await s.restore()).outcome, PurchaseOutcome.nothingToRestore);
-      expect(native.calls.map((c) => c.method), isNot(contains('restore')));
-      expect(s.loadState, TipLoad.ready);
+      expect(s.proForSale, isTrue);
+      expect(s.product!.priceLabel, r'$4.99');
       expect(s.products.single.priceLabel, r'$0.99');
-      expect(s.proForSale, isFalse);
-      expect((await s.buyPro()).outcome, PurchaseOutcome.unavailable);
-      expect(native.calls.where((c) => c.method == 'buyTip'), isEmpty);
+      await s.restore(); // flush any queued mirror writes
+      // Native said "not Pro" at start (e.g. refunded while the app was closed): cache turns off.
+      expect(s.isPro, isFalse);
       s.dispose();
     });
 
@@ -237,15 +240,15 @@ void main() {
       expect(find.textContaining('Tip \$'), findsNothing);
     });
 
-    testWidgets('settings on iOS: only the tip; no Pro or restore rows', (tester) async {
+    testWidgets('settings on iOS: tip, Pro status and restore', (tester) async {
       final st = await state(tester, IosStoreService.new);
       addTearDown(st.purchase.dispose);
       await tester.runAsync(() => st.purchase.init());
       await tester.pumpWidget(Stl2StpApp(state: st, homeOverride: const SettingsScreen()));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('supportRow')), findsOneWidget);
-      expect(find.byKey(const Key('purchaseStatus')), findsNothing);
-      expect(find.byKey(const Key('settingsRestore')), findsNothing);
+      expect(find.byKey(const Key('purchaseStatus')), findsOneWidget);
+      expect(find.byKey(const Key('settingsRestore')), findsOneWidget);
     });
 
     testWidgets('settings off iOS (mock): no tip entry, Pro row as before', (tester) async {
