@@ -123,6 +123,7 @@ class FfiEngine implements ConversionEngine {
     final stages = request.stages;
     final sw = Stopwatch()..start();
     final done = Completer<ConvertResult>();
+    final exited = Completer<void>();
     final s = request.settings;
     final iges = s.format == ExportFormat.iges;
     String meta(String v) => iges ? stripNonAscii(v) : v.trim();
@@ -175,6 +176,7 @@ class FfiEngine implements ConversionEngine {
       }
     });
     exitPort.listen((_) {
+      if (!exited.isCompleted) exited.complete();
       if (!done.isCompleted) {
         done.complete(ConvertResult(
             status: CoreStatus.errorInternal, outputPath: request.outputPath, message: 'worker exited'));
@@ -183,6 +185,11 @@ class FfiEngine implements ConversionEngine {
     await Isolate.spawn(_convertWorker, args, onError: errPort.sendPort, onExit: exitPort.sendPort);
     try {
       final r = await done.future;
+      // The worker sends 'done' before it destroys the native handle and frees
+      // its buffers. Wait for the isolate to exit so a conversion is only
+      // "finished" once its native resources are released (batch runs the next
+      // file straight after this one).
+      await exited.future.timeout(const Duration(seconds: 15), onTimeout: () {});
       if (!r.ok) {
         try {
           final f = File(request.outputPath);
