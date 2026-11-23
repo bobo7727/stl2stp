@@ -85,3 +85,10 @@
 - tests（Codex 侧）：BLOCKED_SANDBOX（flutter 无法写 SDK 缓存；Python 三项通过）；Swift BLOCKED_ENV。我方 analyze/test 通过的日志是 c1/c2。
 - 状态：两轮已用，只剩 code 第 3/3 轮。未做任何修复，等老板/协调方确认修复范围；不开第 4 轮。
 - 提示：第 3 轮 Codex 评审需要 Flutter 可写缓存（例如允许 FLUTTER 缓存目录可写或附 Claude 侧日志），否则仍是 BLOCKED_SANDBOX。
+
+### 2026-11-23 code round 3/3 — 修复完成（老板经协调方批准范围）
+- 修复：C1（ConvertRequest.maxFaces；FfiEngine worker 在减面后按真实面数检查，超限返回 errorFreeLimit 且不写文件；DemoEngine 同；ConvertingScreen 新 ErrorKind.freeLimit；批量同样传入）、C2（去掉 15 秒超时，resultAfterExit 必须等 worker 退出）、C4（PurchaseService.refresh + ResumeRefresh 回前台调用原生 refresh，不触发 sync）、BATCH-001（_runOne 全部在 try 内，run() finally 保证唯一终态与 finished）、BATCH-003（Add more 按钮，选择器不可用时路径对话框可重复添加）、BATCH-004（真正点开始：撤销后弹付费墙/取消保留选择/购买后继续）。
+- BATCH-002：Codex 建议按来源 URI 去重；协调方明确要求按内容（文件名+大小+内容哈希）去重，保持内容去重，测试里用不同 URI 相同内容验证为同一文件。此项作为已知分歧交 Codex 复核。
+- C3（StoreKitTest/.storekit 覆盖）：需要 Xcode，**未做，放到 Codemagic 验证**（codemagic.yaml 已有 RunnerTests 步骤，首次 ignore_failure；新 Pro Swift 代码尚未编译）。
+- C1 的“按实际数量重查内存”未做：免费限制 5 万面时峰值内存已由现有预检覆盖；Pro 无限制仍用现有内存保护。
+- tests: flutter test PASS（+133，logs/c3_test.log）；analyze PASS（logs/c3_analyze.log）；Swift BLOCKED_ENV。
