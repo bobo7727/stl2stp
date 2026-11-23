@@ -25,3 +25,6 @@ C. 现在就交 diff：C1 的内存部分与 BATCH-002 作为已知问题记录�
 ## Codex 的立场
 
 CHANGES（0 blocker / 1 major / 1 minor）；C3 推迟可接受且不单独触发新轮；明确写“不要开第 4 轮”。
+
+## 老板的决定（2026-11-23）
+选 **A**：直接修好 C1 的内存部分和 BATCH-002，不再开 Codex 评审轮。已在提交 28a5bf509d904408e5cd4c3a6ecaf4ee5ded9db1 完成，未经 Codex 复审；随后推送 feat/pro-iap（不动 master、不开 PR），在 Codemagic 的 ios-simulator 上验证 Swift/StoreKit（C3）。

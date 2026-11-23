@@ -97,3 +97,9 @@
 - verdict 原文 HANDOFF_VERDICT.code-round-3.md。C2/C4/BATCH-001/-003/-004 已解决；C1 部分解决（缺“按真实面数重查内存”，Codex 的反例成立）；BATCH-002 内容去重策略接受，但跨“继续添加”未去重（minor）；C3 推迟获认可。
 - 规则：不开第 4 轮。已写 ESCALATION.md（选项 A/B/C，建议 A）。tests（Codex 侧）仍 BLOCKED_SANDBOX。
 - 未推送；分支 feat/pro-iap 最新应用提交 ff93c32。
+
+### 2026-11-23 老板选 A（经协调方）— 两处小修复，不再开 Codex 轮
+- 老板决定（2026-11-23，跟踪项 4，选 A）：直接修 C1 内存部分与 BATCH-002，不加 Codex 评审轮。plan_approved_by 不变。
+- 修复提交 28a5bf509d904408e5cd4c3a6ecaf4ee5ded9db1：C1——worker 在减面后用真实面数调用 realMeshVerdict（免费面数上限 + 内存预算，免费和 Pro 都适用，不重复乘减面比例，超限不写文件），请求带 memoryBudgetBytes（单文件与批量）；BATCH-002——PickSession 在多次“继续添加”间共享内容身份（名称+大小+内容哈希）。
+- 测试：新增评审例子（4 万面、5% 目标、500 MB）、Pro 同样拒绝、跨次添加去重；flutter test +136 PASS（logs/c4_test.log），analyze PASS（logs/c4_analyze.log）。
+- **这两处修复未经 Codex 复审**（老板选择）。C3（StoreKitTest/.storekit）仍需 Codemagic/Xcode 验证，Swift 尚未编译。

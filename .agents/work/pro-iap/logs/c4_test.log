@@ -1,0 +1,185 @@
+Resolving dependencies...
+Downloading packages...
+  android_file_picker 2.1.1 (2.2.1 available)
+  characters 1.4.0 (1.4.1 available)
+  clock 1.1.2 (1.1.3 available)
+  code_assets 1.2.1 (2.2.0 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_icons 1.0.9 (2.0.0 available)
+  dbus 0.8.0 (0.8.1 available)
+  desktop_drop 0.8.0 (0.9.2 available)
+  file_picker 13.1.0 (13.4.1 available)
+  file_picker_darwin 2.3.2 (2.5.2 available)
+  file_picker_linux 2.0.2 (2.0.5 available)
+  file_picker_platform_interface 4.2.0 (4.3.0 available)
+  file_picker_web 4.2.0 (4.2.2 available)
+  hooks 2.0.2 (2.2.0 available)
+  in_app_purchase_android 0.5.0 (0.5.5 available)
+  in_app_purchase_storekit 0.4.13 (0.4.17 available)
+  intl 0.20.2 (0.20.3 available)
+  jni 1.1.0 (1.2.1 available)
+  jni_flutter 1.0.4+1 (1.1.0 available)
+  matcher 0.12.17 (0.12.20 available)
+  material_color_utilities 0.11.1 (0.13.1 available)
+  meta 1.17.0 (1.19.0 available)
+  objective_c 9.5.0 (9.6.4 available)
+  package_config 2.2.0 (3.0.0 available)
+  petitparser 7.0.2 (7.1.0 available)
+  platform 3.1.6 (3.2.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.23 (2.5.5 available)
+  shared_preferences_foundation 2.5.7 (2.6.2 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.7 (0.7.15 available)
+  vector_math 2.2.0 (2.4.4 available)
+  web 1.1.1 (1.1.2 available)
+  windows_file_picker 2.0.1 (2.0.2 available)
+  xml 6.6.1 (7.1.0 available)
+Got dependencies!
+37 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart
+00:00 +0: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: (setUpAll)
+00:00 +0: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: IosStoreService product id and iOS-only policy
+00:00 +1: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: IosStoreService init starts native, loads tip and Pro price; native answer replaces the cache
+00:00 +2: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: IosStoreService missing / failing products are unavailable, not ready
+00:00 +3: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: IosStoreService a tip never changes Pro
+00:01 +4: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: IosStoreService second buy while one is open is busy (no double sheet)
+00:01 +5: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: IosStoreService background thanks / unverified are surfaced
+00:01 +6: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: IosStoreService store failure at start never throws out of init
+00:01 +7: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:03 +8: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:03 +9: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:03 +10: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:03 +11: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:03 +12: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:04 +13: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +14: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +15: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +16: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +17: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +18: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +19: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +20: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:07 +21: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:09 +22: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:09 +23: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:09 +24: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:09 +25: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:09 +26: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:09 +27: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:10 +28: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:10 +29: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:10 +30: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:10 +31: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:10 +32: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:10 +33: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:10 +34: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:11 +35: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:11 +36: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:11 +37: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:11 +38: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:11 +39: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:15 +40: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:15 +41: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/tip_test.dart: screens support screen: store price, thanks, Pro and limits unchanged
+00:16 +42: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:19 +43: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:20 +44: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:23 +45: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:24 +46: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:24 +47: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:24 +48: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:25 +49: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:25 +50: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:25 +51: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +52: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +53: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +54: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +55: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +56: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +57: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +58: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:31 +59: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:32 +60: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:32 +61: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:32 +62: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:32 +63: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:32 +64: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:32 +65: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: weld option advanced settings toggle and help topic
+00:39 +66: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/purchase_test.dart: paywall placeholder price when the store reports none, then buy
+00:44 +67: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/batch_test.dart: real-mesh free limit (C1) and engine exit (C2) converting screen shows the free-limit result, not a success
+00:44 +68: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/batch_test.dart: real-mesh free limit (C1) and engine exit (C2) converting screen shows the free-limit result, not a success
+00:44 +69: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/batch_test.dart: real-mesh free limit (C1) and engine exit (C2) converting screen shows the free-limit result, not a success
+00:47 +70: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:47 +71: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:47 +72: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:47 +73: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:48 +74: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:48 +75: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:48 +76: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:48 +77: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:48 +78: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:49 +79: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:52 +80: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: onboarding then empty home
+00:54 +81: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/batch_test.dart: batch flow free user tapping the batch entry sees the paywall, not the picker
+00:55 +82: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: history swipe swipe right falls back when sharing is unavailable, missing file explains, swipe left deletes
+00:57 +83: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+00:57 +84: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+00:58 +85: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+00:59 +85: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/batch_test.dart: batch flow picker unavailable: a second file can still be added (path dialog)
+file picker failed: UnimplementedError: pickFiles() has not been implemented.
+00:59 +86: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+00:59 +87: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+01:07 +88: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+01:07 +89: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+01:10 +90: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+01:12 +91: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+01:13 +92: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+01:15 +93: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: preview → convert (demo) → done → history
+01:15 +94: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/batch_test.dart: batch flow Start re-checks Pro: buying on that paywall continues into the run
+01:18 +95: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: running conversion background task begins/ends around a conversion; expiry stops it
+01:21 +96: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: running conversion background task begins/ends around a conversion; expiry stops it
+01:22 +97: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/features_test.dart: running conversion background task begins/ends around a conversion; expiry stops it
+01:22 +98: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: engine failure maps to error screen with code
+01:22 +99: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: engine failure maps to error screen with code
+01:25 +100: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: English locale
+01:26 +101: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: help page from home, zh and en, all topics present
+01:26 +102: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: help page from home, zh and en, all topics present
+01:26 +103: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: help page from home, zh and en, all topics present
+01:26 +104: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: help page from home, zh and en, all topics present
+01:27 +105: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: help page from home, zh and en, all topics present
+01:27 +106: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/widget_flow_test.dart: help page from home, zh and en, all topics present
+01:29 +107: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:30 +108: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:30 +109: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +110: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +111: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +112: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +113: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +114: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +115: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +116: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +117: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +118: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:31 +119: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:32 +120: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:32 +121: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:32 +122: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device
+01:39 +123: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) allowed conversions never see the paywall
+01:41 +124: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) allowed conversions never see the paywall
+01:41 +125: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language Traditional Chinese device
+01:42 +126: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) IGES: reason, three features incl. batch, price; "use STEP" is re-checked and returned
+01:43 +127: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) IGES: reason, three features incl. batch, price; "use STEP" is re-checked and returned
+01:45 +128: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) IGES: reason, three features incl. batch, price; "use STEP" is re-checked and returned
+01:46 +129: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/i18n_test.dart: follows the system language English device: support, paywall and home screens have no Chinese
+01:48 +130: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) 100,000 faces + IGES: only "reduce and export STEP", never free IGES
+01:48 +131: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) large file, STEP: reduce-and-convert offered
+01:50 +132: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) over 1,000,000 faces: no free promise, buy or leave
+01:51 +133: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) "Not now" changes nothing
+01:52 +134: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) buying Pro returns the ORIGINAL settings after a fresh check
+01:55 +135: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: paywall contract (ensureAllowed) a Pro user is never walled
+01:55 +136: /home/xai/orca/workspaces/stl2stp/tip-iap/mobile/app/test/pro_test.dart: (tearDownAll)
+01:56 +136: All tests passed!
+exit 0
