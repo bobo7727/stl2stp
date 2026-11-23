@@ -11,6 +11,7 @@ import '../theme/tokens.dart';
 import '../widgets/common.dart';
 import '../widgets/history_list.dart';
 import '../widgets/stl_drop.dart';
+import 'batch_screen.dart';
 import 'flow.dart';
 import 'help_screen.dart';
 import 'history_screen.dart';
@@ -77,6 +78,12 @@ class HomeScreen extends StatelessWidget {
             final path = await pickStl(context);
             if (path != null && context.mounted) await openModel(context, path);
           }),
+          Center(child: TextButton.icon(
+              key: const Key('batchButton'),
+              icon: const Icon(Icons.library_add_outlined, size: 18),
+              label: Text(s.t('batch.entry') + (state.limits.batchRequiresPro && !state.isPro ? '  · ${s.t('batch.entry.pro')}' : '')),
+              onPressed: () => startBatchFlow(context),
+            )),
           const SizedBox(height: 8),
           Center(
             child: TextButton.icon(
@@ -263,6 +270,12 @@ class _SplitHome extends StatelessWidget {
           final path = await pickStl(context);
           if (path != null && context.mounted) await openModel(context, path);
         }),
+        Center(child: TextButton.icon(
+              key: const Key('batchButton'),
+              icon: const Icon(Icons.library_add_outlined, size: 18),
+              label: Text(s.t('batch.entry') + (state.limits.batchRequiresPro && !state.isPro ? '  · ${s.t('batch.entry.pro')}' : '')),
+              onPressed: () => startBatchFlow(context),
+            )),
         const SizedBox(height: 4),
         Center(
           child: TextButton.icon(
