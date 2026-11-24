@@ -111,8 +111,8 @@ S = {
  'x.converting.background': ('可以切到其他 App，转换会在后台继续一小段时间', 'You can switch apps; the conversion keeps running for a short while'),
  # ---- voluntary tip (iOS) ----
  'support.title': ('支持开发', 'Support Development'),
- 'support.body': ('如果 STL2STP 对你有帮助，可以自愿支持开发。每次支持都是一次性购买，可再次支持，不会自动续费；不会增加功能或转换额度，所有现有转换功能仍可免费使用。',
-                  'If STL2STP helps you, you may support its development. Each tip is a one-time purchase and may be repeated. It does not renew automatically, unlock features, or change conversion limits. Existing conversion features remain free.'),
+ 'support.body': ('如果 STL2STP 对你有帮助，可以自愿支持开发。每次支持都是一次性购买，可再次支持，不会自动续费；它不会解锁任何功能，也不会改变转换额度。免费版可把单个文件转换为 STEP；IGES、批量转换和超过免费面数上限的大模型需要 Pro（一次性买断，与支持是两件事）。',
+                 'If STL2STP helps you, you may support its development. Each tip is a one-time purchase and may be repeated. It does not renew automatically, unlock features, or change conversion limits. The free version converts single files to STEP; IGES, batch conversion and models over the free face limit need Pro, a separate one-time purchase.'),
  'support.button': ('支持 {price}', 'Tip {price}'),
  'support.thanks': ('感谢支持！转换功能和额度保持不变。', 'Thank you for your support! Features and limits are unchanged.'),
  'support.pending': ('购买等待批准或处理，确认后会自动更新。你可以继续使用转换功能。', 'Purchase pending approval or processing. It will update automatically. You can keep converting.'),
@@ -156,6 +156,10 @@ S = {
  'purchase.mock_note': ('开发用模拟商店：不会扣费', 'Development mock store: no charge'),
  'purchase.limit.daily': ('免费版每天可转换 {limit} 次，今天已用完。', 'The free version allows {limit} conversions a day. Today’s are used up.'),
  'purchase.limit.meta': ('自定义文件信息属于完整版功能。', 'Custom file info is a Pro feature.'),
+ # ---- links ----
+ 'settings.about.privacy_policy': ('隐私政策', 'Privacy Policy'),
+ 'settings.about.support': ('支持与反馈', 'Support & Feedback'),
+ 'settings.about.link_copied': ('无法打开浏览器，链接已复制：', 'Could not open the browser. The link was copied:'),
  # ---- free-tier limit on the real mesh ----
  'error.free_limit.title': ('简化后仍超过免费上限', 'Still over the free limit after reducing'),
  'error.free_limit.body': ('减面后模型仍有 {faces} 个面，免费版最多转换 {limit} 个面。没有生成文件。请进一步减少面数，或升级 Pro。', 'After reducing, the model still has {faces} faces. Free conversion covers up to {limit}. No file was written. Reduce further, or get Pro.'),

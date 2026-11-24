@@ -107,3 +107,9 @@
 ### 2026-11-23 Codemagic Build #8（6b04cf92…，443dac9）与 RunnerTests 目标修复
 - Build #8：Flutter 分析/测试、OCCT、模拟器 app 编译通过；RunnerTests 步骤失败：Unable to find a device matching { iPhone 16 }（Xcode 26.6 镜像无该机型）。StoreKit/RunnerTests 尚未真正运行。日志：codemagic-build-8/。
 - 修复：codemagic.yaml 不再写死机型；用 `xcrun simctl list devices available -j` 选最新 iOS 运行时里的 iPhone（优先 “iPhone <数字>”），按 UDID 作 -destination；找不到则打印可用设备并失败。已用样例 JSON 在本机验证选择逻辑与 shell 语法（无 Xcode，未在 macOS 实跑）。该步骤仍是 ignore_failure，待转绿后改为必过。
+
+### 2026-11-23 送审前两处修正（app 管家核对材料时发现）
+- 打赏页文字（support.body 中英）不再说“所有转换功能免费”，改为准确说明：支持不解锁任何功能；免费版可单文件转 STEP；IGES、批量、超免费面数的大模型需要 Pro（一次性买断，与支持无关）。
+- 设置页新增“隐私政策”和“支持与反馈”两行（点击用系统浏览器打开 https 链接，打不开则复制链接并提示）。新增依赖 url_launcher ^6.3.2（官方插件；iOS 只需 pod，无需 Info.plist 查询项）。
+- **链接是占位**：lib/core/links.dart 的 privacyPolicyUrl / supportUrl 为 https://replace-me.invalid/...；老板确认真实地址后替换，并把 test/links_test.dart 里 `linksArePlaceholders` 的断言改为 isFalse。送审前必须完成，且与 ASC 里填的 Privacy Policy URL / Support URL 一致。
+- 测试：flutter test +140 PASS，analyze PASS。本次提交只在本地，未推送（等 Codemagic 6b04eb0b 结果）。未经 Codex 评审（小范围文案/入口，老板此前已选 A 不再加评审轮）。

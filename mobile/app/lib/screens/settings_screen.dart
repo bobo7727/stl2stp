@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../core/links.dart';
 import '../l10n/strings.dart';
 import '../purchase/purchase.dart';
 import '../state/app_state.dart';
@@ -153,8 +154,12 @@ class SettingsScreen extends StatelessWidget {
           ),
           ListTile(title: Text(s.t('settings.about.version')), trailing: Text(appVersion, style: TextStyle(color: t.label2))),
           ListTile(
-              title: Text(s.t('settings.about.privacy')),
-              trailing: Text(s.t('settings.about.privacy.value'), style: TextStyle(color: t.label2))),
+            key: const Key('settingsPrivacy'),
+            title: Text(s.t('settings.about.privacy_policy')),
+            subtitle: Text(s.t('settings.about.privacy.value'), style: TextStyle(color: t.label2)),
+            trailing: Icon(Icons.open_in_new, color: t.label3, size: 20),
+            onTap: () => openLinkOrCopy(context, privacyPolicyUrl, copiedMessage: s.t('settings.about.link_copied')),
+          ),
           ListTile(
               title: Text(s.t('x.engine')),
               trailing: ConstrainedBox(
@@ -165,7 +170,12 @@ class SettingsScreen extends StatelessWidget {
             trailing: Icon(Icons.chevron_right, color: t.label3),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LicensesScreen())),
           ),
-          ListTile(title: Text(s.t('settings.about.feedback')), trailing: Text('—', style: TextStyle(color: t.label2))),
+          ListTile(
+            key: const Key('settingsSupport'),
+            title: Text(s.t('settings.about.support')),
+            trailing: Icon(Icons.open_in_new, color: t.label3, size: 20),
+            onTap: () => openLinkOrCopy(context, supportUrl, copiedMessage: s.t('settings.about.link_copied')),
+          ),
         ]),
         Padding(
           padding: const EdgeInsets.all(12),
