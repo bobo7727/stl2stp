@@ -2,16 +2,16 @@
 
 - feature_dir: .agents/work/pro-iap
 - phase: code
-- round: code 1/3
-- mode: full
-- branch: feat/pro-iap（自 feat/tip-iap 9e7ef85 切出，未推送）
+- round: closeout 1/3（独立 fast-path 收尾，不追加原代码评审轮）
+- mode: fast-path
+- branch: feat/pro-iap（自 feat/tip-iap 9e7ef85 切出）
 - planner_implementer: Claude（Sonnet 5.5）
 - reviewer: 见下（Codex 额度日志显示 plus 账号 primary 5% / secondary 19%，尝试 codex exec 只读；不行改 Claude worker；不用 Grok 评审）
 - plan_approved_by: bobo（2026-11-24，选 A）
-- latest_verdict: plan round 3/3 CHANGES → 老板 2026-11-24 选 A 接受 §14c 并批准；代码阶段 Codex 评审待额度恢复
-- status: code-phase
-- task_id: task_32109a7bd79b
-- dispatch_id: ctx_1ad8721397f0
+- latest_verdict: 收尾自审 PASS；flutter analyze/test PASS；原代码评审与老板决定见日志
+- status: closeout-verified
+- task_id: task_902dd776ff2d
+- dispatch_id: ctx_1cd487dce4b9
 
 ## Log
 
@@ -117,3 +117,14 @@
 ### 2026-11-23 隐私/支持链接换成正式地址
 - privacyPolicyUrl = https://bobo7727.github.io/stl2stp-support/privacy.html；supportUrl = https://bobo7727.github.io/stl2stp-support/（GitHub Pages，HTTPS，双语）。links_test 改为断言“不是占位”。需与 ASC 里填的 Privacy Policy URL / Support URL 一致。
 - tests: flutter test PASS，analyze PASS。本地提交，未推送（等 Codemagic 6b04eb0b 结果后一起推，推前先告知协调方）。
+
+### 2026-11-23 Pro 收尾 — RunnerTests 改为必过，验证并提交推送
+- phase: code；round: closeout 1/3；mode: fast-path；verdict: 自审 PASS（不是新增独立 Codex 评审）。
+- 授权：Claude 额度耗尽，老板明确指定本次由 Codex 执行，仅移除 ignore_failure、跑 Flutter 检查、更新本文件、提交并推送 feat/pro-iap；覆盖本次只读角色限制，不开 PR、不合并、不动 master。
+- fast-path 理由：仅删除 CI 中 3 行，恢复已转绿的原生测试失败门禁，无新功能、依赖或架构改动。
+- checkpoint_sha: 6947a08d8423ed198cef2de083e4ebd574b37e36（开始时工作树干净）。
+- Codemagic Build #9：243535a80c7ff171ce439bf826d5089376c658c9；已核对 codemagic-build-9/ios-simulator-xctest.log：自动选择 iPhone 17，**TEST SUCCEEDED**。这是既有提交的 CI 结果，本次未在 Linux 重跑 iOS 构建。
+- 改动：删除 codemagic.yaml 中 RunnerTests 的 ignore_failure: true 和两行过时注释；现有 set -euo pipefail 使原生测试失败阻断工作流。
+- tests: PASS — flutter test --reporter expanded，140 项通过，exit 0（logs/closeout_test.log）；lint: PASS — flutter analyze，No issues found，exit 0（logs/closeout_analyze.log）。
+- 自审：diff 仅含 codemagic.yaml 和本文件；git diff --check 通过。open issues: 本次收尾无新增问题；原 C3 StoreKitTest/.storekit 覆盖仍按此前决定延后，Build #9 证明现有 RunnerTests 通过。
+- 推送范围：本次收尾提交连同 4c7b7b59e17c6372e52b52be5c8fbe7179a6ff60（打赏文案与隐私/支持入口）、6947a08d8423ed198cef2de083e4ebd574b37e36（真实网址）一起推送至 origin/feat/pro-iap；最终完整 SHA 与远端核对结果通过 Orca 回报协调方。
