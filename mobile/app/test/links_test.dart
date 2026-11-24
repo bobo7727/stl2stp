@@ -29,10 +29,12 @@ void main() {
     expect(zh, allOf(contains('IGES'), contains('批量'), contains('Pro'), contains('不会自动续费')));
   });
 
-  test('links are https and flagged as placeholders until bobo fills them', () {
+  test('links are the published https pages, not placeholders', () {
+    expect(privacyPolicyUrl, 'https://bobo7727.github.io/stl2stp-support/privacy.html');
+    expect(supportUrl, 'https://bobo7727.github.io/stl2stp-support/');
     expect(Uri.parse(privacyPolicyUrl).scheme, 'https');
     expect(Uri.parse(supportUrl).scheme, 'https');
-    expect(linksArePlaceholders, isTrue, reason: 'replace the placeholders, then flip this expectation');
+    expect(linksArePlaceholders, isFalse);
   });
 
   test('openExternalUrl: https only, launcher result and errors are reported', () async {

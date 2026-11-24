@@ -4,14 +4,14 @@ import 'package:url_launcher/url_launcher.dart';
 
 /// Public pages App Review needs to reach from inside the app (guideline 5.1.1(i)).
 ///
-/// PLACEHOLDERS: `.invalid` is a reserved TLD that never resolves. bobo must
-/// replace both with the real public HTTPS pages (the same URLs entered in
-/// App Store Connect) BEFORE submission; [linksArePlaceholders] tells tests and
-/// the release checklist whether that has happened.
-const privacyPolicyUrl = 'https://replace-me.invalid/stl2stp/privacy';
-const supportUrl = 'https://replace-me.invalid/stl2stp/support';
+/// These must stay identical to the Privacy Policy URL and Support URL entered
+/// in App Store Connect. Both pages are bilingual (GitHub Pages, HTTPS).
+const privacyPolicyUrl = 'https://bobo7727.github.io/stl2stp-support/privacy.html';
+const supportUrl = 'https://bobo7727.github.io/stl2stp-support/';
 
-bool get linksArePlaceholders => Uri.parse(privacyPolicyUrl).host.endsWith('.invalid') || Uri.parse(supportUrl).host.endsWith('.invalid');
+/// True while a link still points at a reserved `.invalid` placeholder host.
+bool get linksArePlaceholders =>
+    Uri.parse(privacyPolicyUrl).host.endsWith('.invalid') || Uri.parse(supportUrl).host.endsWith('.invalid');
 
 /// Opens [url] in the system browser. Returns false when it could not be
 /// opened (the caller then offers to copy it).

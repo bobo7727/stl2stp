@@ -113,3 +113,7 @@
 - 设置页新增“隐私政策”和“支持与反馈”两行（点击用系统浏览器打开 https 链接，打不开则复制链接并提示）。新增依赖 url_launcher ^6.3.2（官方插件；iOS 只需 pod，无需 Info.plist 查询项）。
 - **链接是占位**：lib/core/links.dart 的 privacyPolicyUrl / supportUrl 为 https://replace-me.invalid/...；老板确认真实地址后替换，并把 test/links_test.dart 里 `linksArePlaceholders` 的断言改为 isFalse。送审前必须完成，且与 ASC 里填的 Privacy Policy URL / Support URL 一致。
 - 测试：flutter test +140 PASS，analyze PASS。本次提交只在本地，未推送（等 Codemagic 6b04eb0b 结果）。未经 Codex 评审（小范围文案/入口，老板此前已选 A 不再加评审轮）。
+
+### 2026-11-23 隐私/支持链接换成正式地址
+- privacyPolicyUrl = https://bobo7727.github.io/stl2stp-support/privacy.html；supportUrl = https://bobo7727.github.io/stl2stp-support/（GitHub Pages，HTTPS，双语）。links_test 改为断言“不是占位”。需与 ASC 里填的 Privacy Policy URL / Support URL 一致。
+- tests: flutter test PASS，analyze PASS。本地提交，未推送（等 Codemagic 6b04eb0b 结果后一起推，推前先告知协调方）。
