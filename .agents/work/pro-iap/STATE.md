@@ -103,3 +103,7 @@
 - 修复提交 28a5bf509d904408e5cd4c3a6ecaf4ee5ded9db1：C1——worker 在减面后用真实面数调用 realMeshVerdict（免费面数上限 + 内存预算，免费和 Pro 都适用，不重复乘减面比例，超限不写文件），请求带 memoryBudgetBytes（单文件与批量）；BATCH-002——PickSession 在多次“继续添加”间共享内容身份（名称+大小+内容哈希）。
 - 测试：新增评审例子（4 万面、5% 目标、500 MB）、Pro 同样拒绝、跨次添加去重；flutter test +136 PASS（logs/c4_test.log），analyze PASS（logs/c4_analyze.log）。
 - **这两处修复未经 Codex 复审**（老板选择）。C3（StoreKitTest/.storekit）仍需 Codemagic/Xcode 验证，Swift 尚未编译。
+
+### 2026-11-23 Codemagic Build #8（6b04cf92…，443dac9）与 RunnerTests 目标修复
+- Build #8：Flutter 分析/测试、OCCT、模拟器 app 编译通过；RunnerTests 步骤失败：Unable to find a device matching { iPhone 16 }（Xcode 26.6 镜像无该机型）。StoreKit/RunnerTests 尚未真正运行。日志：codemagic-build-8/。
+- 修复：codemagic.yaml 不再写死机型；用 `xcrun simctl list devices available -j` 选最新 iOS 运行时里的 iPhone（优先 “iPhone <数字>”），按 UDID 作 -destination；找不到则打印可用设备并失败。已用样例 JSON 在本机验证选择逻辑与 shell 语法（无 Xcode，未在 macOS 实跑）。该步骤仍是 ignore_failure，待转绿后改为必过。
