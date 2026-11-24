@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../core/links.dart';
 import '../l10n/strings.dart';
 import '../purchase/purchase.dart';
 import '../state/app_state.dart';
@@ -10,8 +11,10 @@ import 'history_screen.dart';
 import 'help_screen.dart';
 import 'licenses_screen.dart';
 import 'paywall_screen.dart';
+import 'support_screen.dart';
 
-const appVersion = '0.1.0';
+/// Keep in sync with `version:` in pubspec.yaml.
+const appVersion = '1.0.0';
 
 /// Settings (ui-spec §4.13).
 class SettingsScreen extends StatelessWidget {
@@ -36,19 +39,32 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 0, 16, 32), children: [
         SectionHeader(s.t('settings.purchase')),
         Container(
-          decoration: BoxDecoration(
-              border: Border.all(color: t.warning, style: BorderStyle.solid), borderRadius: BorderRadius.circular(12)),
+          // The yellow outline marks the design placeholder; shipped iOS builds have none.
+          decoration: st.tips.supported
+              ? null
+              : BoxDecoration(
+                  border: Border.all(color: t.warning, style: BorderStyle.solid), borderRadius: BorderRadius.circular(12)),
           child: group([
+            if (st.tips.supported)
+              ListTile(
+                key: const Key('supportRow'),
+                title: Text(s.t('support.title')),
+                trailing: Icon(Icons.chevron_right, color: t.label3),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen())),
+              ),
+            // Pro status and restore (iOS: native StoreKit 2).
+            if (st.purchase.proForSale)
             ListTile(
               key: const Key('purchaseStatus'),
               title: Text(s.t('settings.purchase.status')),
               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(st.isPro ? s.t('purchase.status.pro') : s.t('settings.purchase.free'),
+                Text(st.isPro ? s.t('pro.status.pro') : s.t('pro.status.free'),
                     style: TextStyle(color: st.isPro ? t.success : t.label2)),
                 Icon(Icons.chevron_right, color: t.label3),
               ]),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen())),
             ),
+            if (st.purchase.proForSale)
             ListTile(
               key: const Key('settingsRestore'),
               title: Text(s.t('settings.purchase.restore'), style: TextStyle(color: t.accent)),
@@ -138,8 +154,12 @@ class SettingsScreen extends StatelessWidget {
           ),
           ListTile(title: Text(s.t('settings.about.version')), trailing: Text(appVersion, style: TextStyle(color: t.label2))),
           ListTile(
-              title: Text(s.t('settings.about.privacy')),
-              trailing: Text(s.t('settings.about.privacy.value'), style: TextStyle(color: t.label2))),
+            key: const Key('settingsPrivacy'),
+            title: Text(s.t('settings.about.privacy_policy')),
+            subtitle: Text(s.t('settings.about.privacy.value'), style: TextStyle(color: t.label2)),
+            trailing: Icon(Icons.open_in_new, color: t.label3, size: 20),
+            onTap: () => openLinkOrCopy(context, privacyPolicyUrl, copiedMessage: s.t('settings.about.link_copied')),
+          ),
           ListTile(
               title: Text(s.t('x.engine')),
               trailing: ConstrainedBox(
@@ -150,7 +170,12 @@ class SettingsScreen extends StatelessWidget {
             trailing: Icon(Icons.chevron_right, color: t.label3),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LicensesScreen())),
           ),
-          ListTile(title: Text(s.t('settings.about.feedback')), trailing: Text('—', style: TextStyle(color: t.label2))),
+          ListTile(
+            key: const Key('settingsSupport'),
+            title: Text(s.t('settings.about.support')),
+            trailing: Icon(Icons.open_in_new, color: t.label3, size: 20),
+            onTap: () => openLinkOrCopy(context, supportUrl, copiedMessage: s.t('settings.about.link_copied')),
+          ),
         ]),
         Padding(
           padding: const EdgeInsets.all(12),

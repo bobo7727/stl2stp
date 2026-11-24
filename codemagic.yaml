@@ -65,6 +65,39 @@ workflows:
           mkdir -p "$CM_BUILD_DIR/mobile/build"
           ditto -c -k --sequesterRsrc --keepParent build/ios/iphonesimulator/Runner.app \
             "$CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip"
+      - name: Native unit tests (RunnerTests, simulator)
+        script: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+          mkdir -p "$CM_BUILD_DIR/mobile/build"
+          git log -1 --format="Build commit: %H %s" | tee "$CM_BUILD_DIR/mobile/build/ios-simulator-xctest.log"
+          # Do not hard-code a device model: the image's simulators change with Xcode.
+          # Pick an available iPhone from the newest iOS runtime, by its UDID.
+          SIM_ID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          found = []
+          for runtime, devices in data.items():
+              if "iOS" not in runtime:
+                  continue
+              ver = tuple(int(x) for x in runtime.rsplit("iOS-", 1)[-1].split("-") if x.isdigit())
+              for d in devices:
+                  if d.get("isAvailable", True) and d["name"].startswith("iPhone"):
+                      found.append((ver, d["name"], d["udid"]))
+          # newest runtime first; then a plain "iPhone <number>" model; then name
+          found.sort(key=lambda t: (t[0], t[1][7:].isdigit(), t[1]), reverse=True)
+          print(found[0][2] if found else "")
+          ')
+          if [ -z "$SIM_ID" ]; then
+            echo "No available iPhone simulator on this image:" | tee -a "$CM_BUILD_DIR/mobile/build/ios-simulator-xctest.log"
+            xcrun simctl list devices available | tee -a "$CM_BUILD_DIR/mobile/build/ios-simulator-xctest.log"
+            exit 1
+          fi
+          echo "Using simulator: $(xcrun simctl list devices available | grep "$SIM_ID")" | tee -a "$CM_BUILD_DIR/mobile/build/ios-simulator-xctest.log"
+          xcodebuild test -workspace ios/Runner.xcworkspace -scheme Runner \
+            -configuration Debug -sdk iphonesimulator \
+            -destination "id=$SIM_ID" \
+            -only-testing:RunnerTests 2>&1 | tee -a "$CM_BUILD_DIR/mobile/build/ios-simulator-xctest.log"
     artifacts:
       - $CM_BUILD_DIR/mobile/build/stl2stp-ios-simulator.zip
       - $CM_BUILD_DIR/mobile/build/ios-simulator-*.log

@@ -18,6 +18,11 @@ abstract final class CoreStatus {
   static const errorMemory = -7;
   static const errorInternal = -8;
 
+  /// Dart-side only (not a core status): after simplification the mesh still
+  /// has more faces than the free tier allows. [ConvertResult.facesAfterSimplify]
+  /// holds the real count.
+  static const errorFreeLimit = -100;
+
   static bool isError(int s) => s < 0;
 }
 
@@ -225,13 +230,27 @@ enum Stage {
 }
 
 class ConvertRequest {
-  const ConvertRequest({required this.inputPath, required this.outputPath, required this.settings, required this.faces});
+  const ConvertRequest(
+      {required this.inputPath,
+      required this.outputPath,
+      required this.settings,
+      required this.faces,
+      this.maxFaces,
+      this.memoryBudgetBytes});
   final String inputPath;
   final String outputPath;
   final ConvertSettings settings;
 
   /// Face count of the loaded mesh (used for the simplify target).
   final int faces;
+
+  /// Free-tier face limit enforced by the engine on the REAL mesh (after
+  /// simplification, before building CAD). Null = no limit (Pro, desktop).
+  final int? maxFaces;
+
+  /// Memory budget the engine re-checks against the real (post-simplification)
+  /// face count before building CAD. Null = no check.
+  final int? memoryBudgetBytes;
 
   List<Stage> get stages => [
         Stage.read,

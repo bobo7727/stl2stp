@@ -17,7 +17,8 @@ import 'package:stl2stp_app/state/app_state.dart';
 import 'package:stl2stp_app/widgets/stl_drop.dart';
 
 Future<AppState> makeState({ConversionEngine? engine, Map<String, Object> prefs = const {}}) async {
-  SharedPreferences.setMockInitialValues({'onboardingSeen': true, ...prefs});
+  // These tests assert Chinese text; the app default now follows the device language.
+  SharedPreferences.setMockInitialValues({'onboardingSeen': true, 'language': 'zh', ...prefs});
   final p = await SharedPreferences.getInstance();
   final dir = Directory.systemTemp.createTempSync('stl2stp_test');
   addTearDown(() => dir.deleteSync(recursive: true));
@@ -49,6 +50,7 @@ void main() {
   });
 
   testWidgets('onboarding then empty home', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(430, 1400)); // the batch entry added a row
     final state = await makeState(prefs: {'onboardingSeen': false});
     await tester.pumpWidget(Stl2StpApp(state: state));
     await tester.pumpAndSettle();

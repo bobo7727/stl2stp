@@ -9,16 +9,19 @@ import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import '../widgets/common.dart';
 
-enum ErrorKind { format, empty, tooBig, memory, cancelled, io, generic }
+enum ErrorKind { format, empty, tooBig, memory, cancelled, io, generic, freeLimit }
 
 /// Error / cancelled screens (ui-spec §4.11).
 class ErrorScreen extends StatelessWidget {
   const ErrorScreen(
-      {super.key, required this.kind, this.code, this.details = '', this.faces, this.onPrimary, this.notice});
+      {super.key, required this.kind, this.code, this.details = '', this.faces, this.onPrimary, this.notice, this.limit});
   final ErrorKind kind;
   final int? code;
   final String details;
   final int? faces;
+
+  /// Face limit shown in the message (defaults to the hard model limit).
+  final int? limit;
   final void Function(BuildContext context)? onPrimary;
 
   /// Extra explanation shown under the body (e.g. why the app stopped the
@@ -37,6 +40,7 @@ class ErrorScreen extends StatelessWidget {
       ErrorKind.cancelled => (Icons.stop_circle_outlined, t.label2, 'cancelled'),
       ErrorKind.io => (Icons.folder_off_outlined, t.danger, 'io'),
       ErrorKind.generic => (Icons.warning_amber_rounded, t.danger, 'generic'),
+      ErrorKind.freeLimit => (Icons.layers_outlined, t.warning, 'free_limit'),
     };
     final primary = switch (kind) {
       ErrorKind.format || ErrorKind.empty => s.t('error.choose_other'),
@@ -44,6 +48,7 @@ class ErrorScreen extends StatelessWidget {
       ErrorKind.memory => s.t('error.memory.action'),
       ErrorKind.cancelled => s.t('error.cancelled.action'),
       ErrorKind.io || ErrorKind.generic => s.t('common.retry'),
+      ErrorKind.freeLimit => s.t('error.free_limit.action'),
     };
     final copyDetails = kind == ErrorKind.memory || kind == ErrorKind.generic;
     final secondary = copyDetails
@@ -54,7 +59,7 @@ class ErrorScreen extends StatelessWidget {
     final body = s.t('error.$key.body', {
       'code': code ?? '?',
       'faces': formatCount(faces ?? 0),
-      'limit': formatCount(AppState.limitFaces),
+      'limit': formatCount(limit ?? AppState.limitFaces),
     });
     return Scaffold(
       appBar: AppBar(),

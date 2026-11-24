@@ -113,12 +113,12 @@ void main() {
                       child: const Text('open'))))));
       await tester.tap(find.text('open'));
       await tester.pumpAndSettle();
-      expect(find.text('Buy (price TBD)'), findsOneWidget);
+      expect(find.text('Unlock Pro — —'), findsOneWidget);
       expect(find.text('Development mock store: no charge'), findsOneWidget);
       await tester.tap(find.byKey(const Key('buyButton')));
       await tester.pumpAndSettle();
       expect(st.isPro, isTrue);
-      expect(find.text('Pro unlocked. Thank you.'), findsOneWidget);
+      expect(find.text('Pro unlocked. Thank you!'), findsOneWidget);
       expect(find.byType(PaywallScreen), findsNothing);
     });
 
@@ -126,7 +126,7 @@ void main() {
       final st = await state(tester, price: 'STORE-PRICE');
       await tester.pumpWidget(Stl2StpApp(state: st, homeOverride: const PaywallScreen()));
       await tester.pumpAndSettle();
-      expect(find.text('Buy for STORE-PRICE'), findsOneWidget);
+      expect(find.text('Unlock Pro — STORE-PRICE'), findsOneWidget);
       await tester.tap(find.byKey(const Key('restoreButton')));
       await tester.pumpAndSettle();
       expect(find.text('No purchases to restore'), findsOneWidget);

@@ -67,17 +67,24 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Future<void> _convert() async {
     _syncMeta();
-    if (!await ensureAllowed(context, info.faces, _s) || !mounted) return;
+    // The paywall may hand back changed (free) settings; use them from here on.
+    final allowed = await ensureAllowed(context, info.faces, _s);
+    if (allowed == null || !mounted) return;
+    if (allowed != _s) _set(allowed);
     final checked = await ensureMemory(context, info.faces, _s);
     if (checked == null || !mounted) return;
-    if (checked != _s) _set(checked);
     final state = AppScope.read(context);
+    // Final check on exactly the settings that will be converted.
+    if (state.limitFor(info.faces, checked) != null) return;
+    if (checked != _s) _set(checked);
     state.rememberSettings(_s);
     final req = ConvertRequest(
       inputPath: info.path,
       outputPath: state.outputPathFor(info.path, _s.format),
       settings: _s,
       faces: info.faces,
+      maxFaces: state.isPro ? null : state.limits.maxTriangles,
+      memoryBudgetBytes: state.memoryBudgetBytes,
     );
     await Navigator.push(
         context, MaterialPageRoute(builder: (_) => ConvertingScreen(request: req, model: widget.model)));

@@ -48,6 +48,15 @@ class MemoryGuard {
     return (baseBytes + math.max(build, qem)).round();
   }
 
+  /// Peak bytes to BUILD [faces] faces that actually exist (after
+  /// simplification): the simplification percentage is NOT applied again.
+  int peakBytesForBuiltFaces(int faces, ConvertSettings s) {
+    var build = perFace * math.max(faces, 0);
+    if (s.mode == ConvertMode.sewing) build *= sewingFactor;
+    if (s.mergeCoplanar) build *= mergeFactor;
+    return (baseBytes + build).round();
+  }
+
   MemoryCheck check(int triangles, ConvertSettings s, int budgetBytes) {
     final need = peakBytes(triangles, s);
     final level = need > budgetBytes

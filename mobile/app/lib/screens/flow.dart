@@ -48,6 +48,66 @@ Future<String?> pickStl(BuildContext context) async {
   }
 }
 
+/// Most files one batch may hold (PLAN §8.2).
+const maxBatchFiles = 50;
+
+/// FNV-1a over [bytes]; cheap content identity for picks that have no path.
+int _fnv(Uint8List bytes) {
+  var h = 0xcbf29ce484222325;
+  for (final b in bytes) {
+    h = ((h ^ b) * 0x100000001b3) & 0x7fffffffffffffff;
+  }
+  return h;
+}
+
+/// Identities of everything already picked for one batch, so adding files in
+/// several picker calls still removes duplicates (name + size + content hash
+/// for non-local files, path for local ones).
+class PickSession {
+  final seen = <String>{};
+}
+
+/// Turns picker results into local paths (see [pickStls]).
+@visibleForTesting
+Future<List<String>> materializePicked(List<PlatformFile> files, {Directory? tempRoot, PickSession? session}) async {
+  final seen = (session ?? PickSession()).seen;
+  final out = <String>[];
+  for (final f in files) {
+    final path = f.path;
+    if (path != null) {
+      if (seen.add('path:$path')) out.add(path);
+      continue;
+    }
+    final bytes = await f.readAsBytes();
+    if (!seen.add('data:${f.name}:${bytes.length}:${_fnv(bytes)}')) continue;
+    final dir = (tempRoot ?? Directory.systemTemp).createTempSync('stl2stp_batch_');
+    final tmp = File(p.join(dir.path, f.name));
+    await tmp.writeAsBytes(bytes, flush: true);
+    out.add(tmp.path);
+  }
+  return out;
+}
+
+/// Picks several STL files (PLAN §8.1, §14c P13). Every non-local result is
+/// copied into its own temp sub-directory under its original name, so equal
+/// names from different sources never collide. Duplicates are removed by
+/// source identity (local path, or name + size + content hash), never by the
+/// copied path. Returns an empty list when cancelled. Falls back to the path
+/// dialog (one file per call) when the picker is unavailable.
+Future<List<String>> pickStls(BuildContext context, {PickSession? session}) async {
+  final s = S.of(context);
+  try {
+    final files = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['stl', 'STL']);
+    final out = await materializePicked(files, session: session);
+    return out;
+  } catch (e) {
+    debugPrint('file picker failed: $e');
+    if (!context.mounted) return const [];
+    final one = await askPath(context, s.t('batch.picker_note'));
+    return one == null ? const [] : [one];
+  }
+}
+
 Future<String?> askPath(BuildContext context, String note) {
   final s = S.of(context);
   final c = TextEditingController();

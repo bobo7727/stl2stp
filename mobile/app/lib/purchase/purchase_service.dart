@@ -22,7 +22,7 @@ class ProductInfo {
   final String? priceLabel;
 }
 
-enum PurchaseOutcome { success, restored, nothingToRestore, cancelled, pending, failed, unavailable }
+enum PurchaseOutcome { success, restored, nothingToRestore, cancelled, pending, failed, unavailable, unverified, busy }
 
 @immutable
 class PurchaseResult {
@@ -46,6 +46,10 @@ abstract class PurchaseService extends ChangeNotifier {
   /// The Pro product as reported by the store, once loaded.
   ProductInfo? get product;
 
+  /// Whether Pro may be bought by users who do not own it. The iOS backend
+  /// returns false: Pro is no longer sold there, only restored.
+  bool get proForSale => true;
+
   /// True for the development mock (shows a "no charge" note).
   bool get isMock => false;
 
@@ -55,4 +59,8 @@ abstract class PurchaseService extends ChangeNotifier {
   Future<PurchaseResult> buyPro();
 
   Future<PurchaseResult> restore();
+
+  /// Re-reads the entitlement without any App Store sync or prompt (called
+  /// when the app returns to the foreground). Default: nothing to refresh.
+  Future<void> refresh() async {}
 }

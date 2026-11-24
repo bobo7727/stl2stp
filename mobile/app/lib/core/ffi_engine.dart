@@ -12,6 +12,7 @@ import 'engine.dart';
 import 'ffi/bindings.dart';
 import 'ffi/native_library.dart';
 import 'models.dart';
+import 'real_mesh_check.dart';
 import 'stl_reader.dart' show looksAscii;
 
 /// Cancel flag in native memory so the C cancel callback (running inside the
@@ -123,6 +124,7 @@ class FfiEngine implements ConversionEngine {
     final stages = request.stages;
     final sw = Stopwatch()..start();
     final done = Completer<ConvertResult>();
+    final exited = Completer<void>();
     final s = request.settings;
     final iges = s.format == ExportFormat.iges;
     String meta(String v) => iges ? stripNonAscii(v) : v.trim();
@@ -139,6 +141,9 @@ class FfiEngine implements ConversionEngine {
       'merge': s.mergeCoplanar,
       'verify': s.verifyEffective,
       'weld': s.weld,
+      'settings': s,
+      'maxFaces': request.maxFaces,
+      'memBudget': request.memoryBudgetBytes,
       'author': meta(s.author),
       'org': meta(s.organization),
       'product': meta(s.product),
@@ -175,6 +180,7 @@ class FfiEngine implements ConversionEngine {
       }
     });
     exitPort.listen((_) {
+      if (!exited.isCompleted) exited.complete();
       if (!done.isCompleted) {
         done.complete(ConvertResult(
             status: CoreStatus.errorInternal, outputPath: request.outputPath, message: 'worker exited'));
@@ -183,6 +189,13 @@ class FfiEngine implements ConversionEngine {
     await Isolate.spawn(_convertWorker, args, onError: errPort.sendPort, onExit: exitPort.sendPort);
     try {
       final r = await done.future;
+      // The worker sends 'done' before it destroys the native handle and frees
+      // its buffers. Wait for the isolate to exit so a conversion is only
+      // "finished" once its native resources are released (batch runs the next
+      // file straight after this one).
+      // No timeout: returning early would let the next conversion start while
+      // this one's native handle and buffers still exist.
+      await resultAfterExit(Future.value(r), exited.future);
       if (!r.ok) {
         try {
           final f = File(request.outputPath);
@@ -196,6 +209,16 @@ class FfiEngine implements ConversionEngine {
       exitPort.close();
     }
   }
+}
+
+/// Completes with [result] only once the worker isolate has exited, i.e. its
+/// native handle and buffers are freed. There is deliberately no timeout: a
+/// timeout would report "finished" while cleanup is still outstanding.
+@visibleForTesting
+Future<T> resultAfterExit<T>(Future<T> result, Future<void> exited) async {
+  final r = await result;
+  await exited;
+  return r;
 }
 
 DynamicLibrary _open(String? path) => path == null ? DynamicLibrary.process() : DynamicLibrary.open(path);
@@ -329,6 +352,23 @@ void _convertWorker(Map<String, Object?> a) {
       if (st < 0) return finish(st, failed: Stage.simplify.index, error: b.errorOf(h));
       if (b.getMeshStats(h, stats) >= 0) facesAfter = stats.ref.faces;
       _post(Stage.simplify.index, 1, force: true);
+    }
+    // Free-tier limit on the mesh that will really be built (simplification
+    // can stop short of its target: TARGET_NOT_REACHED).
+    final maxFaces = a['maxFaces'] as int?;
+    final memBudget = a['memBudget'] as int?;
+    if (maxFaces != null || memBudget != null) {
+      if (b.getMeshStats(h, stats) >= 0) facesAfter = stats.ref.faces;
+      final real = facesAfter;
+      if (real != null) {
+        final verdict = realMeshVerdict(real, a['settings'] as ConvertSettings,
+            maxFaces: maxFaces, budgetBytes: memBudget);
+        if (verdict != null) {
+          return finish(verdict,
+              failed: a['simplify'] == true ? Stage.simplify.index : Stage.read.index,
+              error: 'faces=$real limit=$maxFaces budget=$memBudget');
+        }
+      }
     }
     // 3+4. build + write
     final d = b.defaultExportOptions();

@@ -8,30 +8,64 @@ import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import '../widgets/common.dart';
 
-/// Shows a purchase result as a snackbar. Returns true if Pro is now unlocked.
+/// Shows a purchase/restore result as a snackbar. Returns true if Pro is now unlocked.
 bool showPurchaseResult(BuildContext context, PurchaseResult r) {
   final s = S.of(context);
   final msg = switch (r.outcome) {
-    PurchaseOutcome.success => s.t('purchase.success'),
-    PurchaseOutcome.restored => s.t('purchase.restored'),
-    PurchaseOutcome.nothingToRestore => s.t('purchase.nothing_to_restore'),
-    PurchaseOutcome.cancelled => s.t('purchase.cancelled'),
-    PurchaseOutcome.pending => s.t('purchase.buying'),
-    PurchaseOutcome.unavailable => s.t('purchase.unavailable'),
-    PurchaseOutcome.failed => s.t('purchase.failed', {'msg': r.message ?? ''}),
+    PurchaseOutcome.success => s.t('pro.success'),
+    PurchaseOutcome.restored => s.t('pro.restored'),
+    PurchaseOutcome.nothingToRestore => s.t('pro.nothing_to_restore'),
+    PurchaseOutcome.cancelled => s.t('pro.cancelled'),
+    PurchaseOutcome.pending => s.t('pro.pending'),
+    PurchaseOutcome.unavailable => s.t('pro.unavailable'),
+    PurchaseOutcome.unverified => s.t('pro.unverified'),
+    PurchaseOutcome.failed => s.t('pro.failed', {'msg': r.message ?? ''}),
+    PurchaseOutcome.busy => null,
   };
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  if (msg != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   return r.unlocked;
 }
 
-/// Paywall (ui-spec §4.14). Prices come only from the store's product info;
-/// until the store reports one, the design placeholder “购买（价格待定）” is shown.
-/// Pops with `true` when Pro got unlocked.
+/// How the paywall ended.
+sealed class PaywallResult {
+  const PaywallResult();
+}
+
+/// Pro was bought or restored; the caller re-checks everything and carries on.
+class PaywallPurchased extends PaywallResult {
+  const PaywallPurchased();
+}
+
+/// "Not now": nothing changes.
+class PaywallCancelled extends PaywallResult {
+  const PaywallCancelled();
+}
+
+/// The user chose a free alternative; the caller must re-check these settings.
+class PaywallUseFree extends PaywallResult {
+  const PaywallUseFree(this.settings);
+  final ConvertSettings settings;
+}
+
+/// Largest reduce percentage (multiple of 5, within the 5–95 % slider) that fits
+/// the free face limit, or null when even 5 % would not fit.
+int? freeReducePercent(int faces, {int limit = FreeTierLimits.freeMaxTriangles}) {
+  if (faces <= limit) return null;
+  final pct = (limit * 100 / faces).floor() ~/ 5 * 5;
+  return pct < 5 ? null : pct.clamp(5, 95);
+}
+
+/// Paywall for Pro (one-time, non-consumable). The price is only ever the
+/// store's own display price. Pops with a [PaywallResult].
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key, this.reason});
+  const PaywallScreen({super.key, this.reason, this.faces, this.settings});
 
   /// The free-tier limit that triggered the paywall, if any.
   final LimitHit? reason;
+
+  /// Face count / current settings of the conversion that hit [reason] (for the free alternatives).
+  final int? faces;
+  final ConvertSettings? settings;
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -65,7 +99,28 @@ class _PaywallScreenState extends State<PaywallScreen> {
     }
     if (!mounted) return;
     setState(() => _busy = false);
-    if (showPurchaseResult(context, r)) Navigator.pop(context, true);
+    if (showPurchaseResult(context, r)) Navigator.pop(context, const PaywallPurchased());
+  }
+
+  /// Free alternative for this trigger, or null (see PLAN §5): never offered
+  /// when it could not actually satisfy the limits.
+  ({String labelKey, Map<String, Object?> params, ConvertSettings settings})? _freeOption() {
+    final reason = widget.reason, faces = widget.faces, cur = widget.settings;
+    if (reason == null || faces == null || cur == null) return null;
+    if (reason.kind == LimitKind.triangles) {
+      final pct = freeReducePercent(faces, limit: reason.limit);
+      if (pct == null) return null;
+      final toStep = cur.format == ExportFormat.iges;
+      return (
+        labelKey: toStep ? 'pro.reduce.step' : 'pro.reduce',
+        params: {'percent': pct},
+        settings: cur.copyWith(format: ExportFormat.step, simplify: true, keepPercent: pct),
+      );
+    }
+    if (reason.kind == LimitKind.iges) {
+      return (labelKey: 'pro.use_step', params: const {}, settings: cur.copyWith(format: ExportFormat.step));
+    }
+    return null;
   }
 
   @override
@@ -74,23 +129,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final t = Tokens.of(context);
     final st = AppScope.of(context);
     final p = st.purchase;
-    final price = p.product?.priceLabel;
-    final limits = st.limits;
+    // The mock store has no price; a real store without one means "not loaded".
+    final price = p.product?.priceLabel ?? (p.isMock ? '—' : null);
     final reason = widget.reason;
-    final freeLimit = limits.isNone
-        ? s.t('paywall.free_limit')
-        : [
-            if (limits.maxTriangles != null) '≤ ${formatCount(limits.maxTriangles!)}',
-            if (limits.dailyConversions != null) '${limits.dailyConversions} / ${s.isZh ? '天' : 'day'}',
-          ].join(' · ');
+    final free = _freeOption();
+    final limit = st.limits.maxTriangles ?? FreeTierLimits.freeMaxTriangles;
     return Scaffold(
       appBar: AppBar(),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        InfoBanner(kind: BannerKind.warn, text: s.t('paywall.placeholder_banner')),
-        if (p.isMock) ...[
-          const SizedBox(height: 8),
-          InfoBanner(kind: BannerKind.info, text: s.t('purchase.mock_note')),
-        ],
+        if (p.isMock) InfoBanner(kind: BannerKind.info, text: s.t('purchase.mock_note')),
         if (reason != null) ...[
           const SizedBox(height: 8),
           InfoBanner(
@@ -107,51 +154,81 @@ class _PaywallScreenState extends State<PaywallScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Center(child: Text(s.t('paywall.title'), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: t.label))),
+        Center(
+            child: Text(s.t('pro.title'),
+                key: const Key('proTitle'),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: t.label))),
+        const SizedBox(height: 8),
+        Center(child: Text(s.t('pro.subtitle'), textAlign: TextAlign.center, style: TextStyle(color: t.label2))),
         const SizedBox(height: 16),
-        for (final k in ['unlimited', 'large', 'iges', 'meta'])
+        for (final k in ['iges', 'batch', 'large'])
           ListTile(
             leading: Icon(Icons.check_circle, color: t.success),
-            title: Text(s.t('paywall.feature.$k')),
-            trailing: Text(s.t('common.placeholder_tag'), style: TextStyle(color: t.warning)),
+            title: Text(s.t('pro.feature.$k', {'limit': formatCount(limit)})),
           ),
-        const SizedBox(height: 8),
-        Center(child: Text(freeLimit, style: TextStyle(color: t.label2))),
+        const SizedBox(height: 4),
+        Center(child: Text(s.t('pro.free_note', {'limit': formatCount(limit)}), style: TextStyle(color: t.label2))),
         const SizedBox(height: 16),
         if (p.isPro)
-          InfoBanner(kind: BannerKind.success, text: s.t('purchase.status.pro'))
-        else
-          Container(
-            decoration: price == null
-                ? BoxDecoration(border: Border.all(color: t.warning), borderRadius: BorderRadius.circular(14))
-                : null,
-            child: FilledButton(
-              key: const Key('buyButton'),
-              onPressed: _busy ? null : () => _run(p.buyPro, s.t('purchase.buying')),
-              child: _busy && _busyLabel == s.t('purchase.buying')
-                  ? Text(_busyLabel!)
-                  : Text(price == null ? s.t('paywall.buy') : s.t('purchase.buy_price', {'price': price})),
-            ),
+          InfoBanner(kind: BannerKind.success, text: s.t('pro.status.pro'))
+        else ...[
+          FilledButton(
+            key: const Key('buyButton'),
+            onPressed: _busy || price == null ? null : () => _run(p.buyPro, s.t('purchase.buying')),
+            child: Text(_busy && _busyLabel == s.t('purchase.buying')
+                ? _busyLabel!
+                : price == null
+                    ? s.t('pro.price_loading')
+                    : s.t('pro.buy', {'price': price})),
           ),
+          if (price == null)
+            TextButton(
+                key: const Key('priceRetry'),
+                onPressed: _busy ? null : () => p.init().catchError((Object _) {}),
+                child: Text(s.t('pro.price_retry'))),
+          if (free != null)
+            OutlinedButton(
+              key: const Key('freeOption'),
+              onPressed: _busy ? null : () => Navigator.pop(context, PaywallUseFree(free.settings)),
+              child: Text(s.t(free.labelKey, free.params), textAlign: TextAlign.center),
+            ),
+        ],
         const SizedBox(height: 4),
         TextButton(
           key: const Key('restoreButton'),
           onPressed: _busy ? null : () => _run(p.restore, s.t('purchase.restoring')),
-          child: Text(_busy && _busyLabel == s.t('purchase.restoring') ? _busyLabel! : s.t('paywall.restore')),
+          child: Text(_busy && _busyLabel == s.t('purchase.restoring') ? _busyLabel! : s.t('pro.restore')),
         ),
-        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(s.t('paywall.later'))),
+        TextButton(
+            key: const Key('laterButton'),
+            onPressed: () => Navigator.pop(context, const PaywallCancelled()),
+            child: Text(s.t('pro.later'))),
       ]),
     );
   }
 }
 
-/// Checks free-tier limits before converting. Returns true if the conversion may
-/// proceed: no limit hit (always the case with [FreeTierLimits.none]), already Pro,
-/// or the user unlocked Pro on the paywall that this opens.
-Future<bool> ensureAllowed(BuildContext context, int faces, ConvertSettings settings) async {
-  final hit = AppScope.read(context).limitFor(faces, settings);
-  if (hit == null) return true;
-  final unlocked = await Navigator.push<bool>(
-      context, MaterialPageRoute(builder: (_) => PaywallScreen(reason: hit)));
-  return unlocked ?? false;
+/// Checks the free-tier limits for [settings] before converting. Returns the
+/// settings to convert with, or null if the user stays on the preview. A free
+/// alternative or a purchase is always followed by a fresh check of ALL limits
+/// on the final settings, so nothing is waved through by having tapped a button.
+Future<ConvertSettings?> ensureAllowed(BuildContext context, int faces, ConvertSettings settings) async {
+  var cur = settings;
+  for (var i = 0; i < 4; i++) {
+    final hit = AppScope.read(context).limitFor(faces, cur);
+    if (hit == null) return cur;
+    final r = await Navigator.push<PaywallResult>(
+        context, MaterialPageRoute(builder: (_) => PaywallScreen(reason: hit, faces: faces, settings: cur)));
+    if (!context.mounted) return null;
+    switch (r) {
+      case PaywallUseFree(:final settings):
+        cur = settings;
+      case PaywallPurchased():
+        break; // the next loop pass re-checks (Pro now bypasses the limits)
+      case PaywallCancelled() || null:
+        return null;
+    }
+  }
+  return null;
 }

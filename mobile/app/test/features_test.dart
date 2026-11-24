@@ -35,7 +35,7 @@ Future<AppState> makeState({
   BackgroundTasks? background,
   Haptics? haptics,
 }) async {
-  SharedPreferences.setMockInitialValues({'onboardingSeen': true});
+  SharedPreferences.setMockInitialValues({'onboardingSeen': true, 'language': 'zh'});
   final p = await SharedPreferences.getInstance();
   final dir = Directory.systemTemp.createTempSync('stl2stp_feat');
   addTearDown(() => dir.deleteSync(recursive: true));

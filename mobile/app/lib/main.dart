@@ -12,6 +12,7 @@ import 'core/ffi_engine.dart';
 import 'core/licenses.dart';
 import 'core/memory_guard.dart';
 import 'l10n/strings.dart';
+import 'purchase/ios_store_service.dart';
 import 'purchase/purchase.dart';
 import 'state/app_state.dart';
 
@@ -63,6 +64,11 @@ ConversionEngine _loadNative() {
   throw StateError(FfiEngine.lastLoadError ?? 'stl2stp-core failed to load');
 }
 
+/// Free-tier limits: only the shipped iOS app (real store) restricts anything.
+/// Other platforms, the mock store and tests keep [FreeTierLimits.none].
+FreeTierLimits limitsFor(PurchaseService purchase) =>
+    purchase is IosStoreService ? FreeTierLimits.release : FreeTierLimits.none;
+
 Future<AppState> createAppState({ConversionEngine? engine}) async {
   final prefs = await SharedPreferences.getInstance();
   final dir = await getApplicationSupportDirectory();
@@ -71,7 +77,12 @@ Future<AppState> createAppState({ConversionEngine? engine}) async {
   purchase.init().catchError((Object _) {});
   final budget = await MemoryBudget.detect();
   return AppState(
-      engine: engine ?? createEngine(), prefs: prefs, outputDir: dir, purchase: purchase, memoryBudgetBytes: budget);
+      engine: engine ?? createEngine(),
+      prefs: prefs,
+      outputDir: dir,
+      purchase: purchase,
+      limits: limitsFor(purchase),
+      memoryBudgetBytes: budget);
 }
 
 Future<void> main(List<String> args) async {
